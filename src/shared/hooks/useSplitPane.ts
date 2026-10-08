@@ -62,8 +62,15 @@ export const neighbor = (ids: string[], id: string): string | null => {
   return ids[i + 1] ?? ids[i - 1] ?? null;
 };
 
+/** The left tab of a chat that has no session id yet (the address "/"). One at a time. */
+export const NEW_CHAT_TAB = 'new-chat';
+
 export const openLeftTab = (id: string) =>
   write((p) => (p.left.includes(id) ? p : { ...p, left: [...p.left, id] }));
+
+/** The new chat got its session id: its tab keeps its place. */
+export const replaceNewChatTab = (id: string) =>
+  write((p) => ({ ...p, left: p.left.includes(id) ? without(p.left, NEW_CHAT_TAB) : p.left.map((x) => (x === NEW_CHAT_TAB ? id : x)) }));
 
 export const closeLeftTab = (id: string) => write((p) => ({ ...p, left: without(p.left, id) }));
 

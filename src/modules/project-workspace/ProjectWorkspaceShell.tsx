@@ -17,13 +17,11 @@ import {
   closeRightTab,
   isEmbedded,
   neighbor,
+  NEW_CHAT_TAB,
   openLeftTab,
   selectRightTab,
   usePanes,
 } from '@/shared/hooks/useSplitPane';
-
-/** quests: the tab id of a chat that has no session id yet. */
-const NEW_CHAT_TAB = 'new-chat';
 
 /** Rendered by ProjectWorkspaceRoute to lay out the workspace sidebar, main region and global overlays. */
 function ProjectWorkspaceShell({
@@ -39,9 +37,11 @@ function ProjectWorkspaceShell({
   const showTabs = !isEmbedded && !isMobile;
   const showSplit = showTabs && panes.rightActive !== null;
 
+  // The address "/" is the new chat: it gets a stored "New chat" tab that stays until closed. When the new chat
+  // gets its session id, ProjectMainRegion turns that tab into the chat's tab in place (replaceNewChatTab).
   useEffect(() => {
-    if (showTabs && sessionId) {
-      openLeftTab(sessionId);
+    if (showTabs) {
+      openLeftTab(sessionId ?? NEW_CHAT_TAB);
     }
   }, [showTabs, sessionId]);
 
@@ -94,34 +94,31 @@ function ProjectWorkspaceShell({
     }
   };
 
-  // A new chat has no id until its first message (the address is "/"), so it shows as a "New chat" tab
-  // that is not stored; after the first message the app moves to /session/<id> and the real tab replaces it.
-  const leftTabs = showTabs && !sessionId ? [...panes.left, NEW_CHAT_TAB] : panes.left;
   // The address "/" carries no project, so after a reload the new chat would lose its input box. Start it in
-  // the project of the last left tab, else the first project.
+  // the project of the last chat tab, else the first project.
   const { selectedProject, handleNewSession } = useProjectCommandState();
   useEffect(() => {
     if (!showTabs || sessionId || selectedProject || projects.length === 0) {
       return;
     }
-    const lastTab = panes.left[panes.left.length - 1];
-    const owner = projects.find((project) => project.sessions?.some((s) => s.id === lastTab));
+    const lastChat = panes.left.filter((id) => id !== NEW_CHAT_TAB).at(-1);
+    const owner = projects.find((project) => project.sessions?.some((s) => s.id === lastChat));
     handleNewSession(owner ?? projects[0]);
   }, [showTabs, sessionId, selectedProject, projects, panes.left, handleNewSession]);
+
+  const leftActive = sessionId ?? NEW_CHAT_TAB;
+  const showLeftTab = useCallback((id: string) => {
+    navigate(id === NEW_CHAT_TAB ? '/' : `/session/${id}`);
+  }, [navigate]);
   const closeLeft = useCallback((id: string) => {
-    if (id === NEW_CHAT_TAB) {
-      const last = panes.left[panes.left.length - 1];
-      if (last) {
-        navigate(`/session/${last}`);
-      }
-      return;
-    }
-    if (id === sessionId) {
+    if (id === leftActive) {
       const next = neighbor(panes.left, id);
-      navigate(next ? `/session/${next}` : '/');
+      if (next) {
+        showLeftTab(next);
+      }
     }
     closeLeftTab(id);
-  }, [sessionId, panes.left, navigate]);
+  }, [leftActive, panes.left, showLeftTab]);
 
   return (
     <div
@@ -135,12 +132,12 @@ function ProjectWorkspaceShell({
           className={showSplit ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-1 flex-col'}
           style={showSplit ? { flex: `0 0 ${splitPercent}%` } : undefined}
         >
-          {showTabs && leftTabs.length > 0 && (
+          {showTabs && panes.left.length > 0 && (
             <PaneTabs
-              ids={leftTabs}
-              activeId={sessionId ?? NEW_CHAT_TAB}
+              ids={panes.left}
+              activeId={leftActive}
               nameOf={nameOf}
-              onSelect={(id) => id !== NEW_CHAT_TAB && navigate(`/session/${id}`)}
+              onSelect={showLeftTab}
               onClose={closeLeft}
               dotOf={dotOf}
             />
