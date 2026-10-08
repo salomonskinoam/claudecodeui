@@ -10,7 +10,7 @@ import { PROVIDER_LABELS, createSessionViewModel, formatCompactAge } from '@/mod
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { useProviderSessionIdCopy } from '@/modules/sidebar/hooks/useProviderSessionIdCopy';
 import SessionOptions from '@/modules/sidebar/SessionOptions';
-import { setSplitSessionId, useSplitSessionId } from '@/shared/hooks/useSplitPane';
+import { openRightTab, usePanes } from '@/shared/hooks/useSplitPane';
 
 type SidebarSessionItemProps = {
   project: Project;
@@ -70,9 +70,8 @@ function SidebarSessionItem({
   const sessionView = createSessionViewModel(session, currentTime, t);
   const isSelected = selectedSession?.id === session.id;
   // quests split screen: an arrow marks which pane shows this session.
-  const splitSessionId = useSplitSessionId();
-  const isSplitActive = splitSessionId !== null && splitSessionId !== selectedSession?.id;
-  const paneArrow = !isSplitActive ? null : isSelected ? '◀' : splitSessionId === session.id ? '▶' : null;
+  const { rightActive } = usePanes();
+  const paneArrow = rightActive === null ? null : isSelected ? '◀' : rightActive === session.id ? '▶' : null;
   const compactSessionAge = formatCompactAge(sessionView.sessionTime, currentTime);
   const [isMobileOptionsOpen, setIsMobileOptionsOpen] = useState(false);
   const showAttentionIndicator = needsAttention && !isSelected;
@@ -415,7 +414,7 @@ function SidebarSessionItem({
             }
             if (event.metaKey || event.ctrlKey) {
               event.preventDefault();
-              setSplitSessionId(session.id);
+              openRightTab(session.id);
               return;
             }
             if (event.shiftKey || event.altKey) return;
