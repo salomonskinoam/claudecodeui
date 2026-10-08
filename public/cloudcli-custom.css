@@ -96,3 +96,9 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
 [data-slot="prompt-input-footer"] button.w-8, [data-slot="prompt-input-footer"] button[type="submit"] { width: 26px !important; }
 [data-slot="prompt-input-footer"] svg { width: 15px !important; height: 15px !important; }
 [data-slot="prompt-input-footer"] span.rounded-full.h-4 { font-size: 10px !important; line-height: 16px !important; }
+
+/* A collapsed tool call that starts a response draws the bold response line itself (its own <hr> is hidden). */
+.qt-tool:not(.qt-open):has(.quests-response-line) {
+  height: 9px !important;
+  background: linear-gradient(transparent 3px, hsl(var(--foreground) / .5) 3px, hsl(var(--foreground) / .5) 5px, transparent 5px) !important;
+}
