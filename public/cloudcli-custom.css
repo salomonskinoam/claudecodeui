@@ -86,3 +86,14 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
 .prose table { border-collapse: collapse !important; }
 .prose th, .prose td { border: 1px solid #4a4a4a !important; padding: 4px 6px !important; color: #cccccc !important; }
 .prose th { color: #ffffff !important; font-weight: 700 !important; text-align: center !important; }
+
+/* Chat input sizes, measured from Cursor: one text line (~44px), a ~36px bottom row, 14px chips, no hint line.
+   The textarea height stays a default without !important, so the app's auto-grow (inline height) still wins. */
+[data-slot="prompt-input-textarea"] { height: 40px; }
+[data-slot="prompt-input-footer"] { padding: 4px 8px !important; }
+[data-slot="prompt-input-footer"] > .basis-full { display: none !important; }
+[data-slot="prompt-input-footer"] * { font-size: 14px !important; line-height: 20px !important; }
+[data-slot="prompt-input-footer"] button { height: 26px !important; min-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+[data-slot="prompt-input-footer"] button.w-8, [data-slot="prompt-input-footer"] button[type="submit"] { width: 26px !important; }
+[data-slot="prompt-input-footer"] svg { width: 15px !important; height: 15px !important; }
+[data-slot="prompt-input-footer"] span.rounded-full.h-4 { font-size: 10px !important; line-height: 16px !important; }
