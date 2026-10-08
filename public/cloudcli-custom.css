@@ -52,15 +52,18 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
 .bg-primary\/5.border-primary\/20 .text-foreground,
 .bg-primary\/5.border-primary\/20 .text-muted-foreground { color: hsl(var(--primary-foreground)) !important; }
 
-/* Tool calls (class qt-tool, set by cloudcli-custom.js): a 1px line, clickable over 7px.
-   Open: the same line on top closes it again. */
-.qt-tool:not(.qt-open) {
+/* Tool calls collapse to a 1px line, clickable over 7px; open, the same line on top closes it again.
+   A tool call is a group (.chat-message.tool) or an assistant message without the plain-text block
+   (div[dir=auto]); anything with an input field (a question waiting for an answer) never collapses.
+   Pure CSS, so a row is collapsed from its first render and the scroll height never jumps; cloudcli-custom.js
+   only adds qt-open to the ones you open. ponytail: matches the app's markup, re-check after an upstream merge. */
+:is(.chat-message.tool, .chat-message.assistant:not(:has(> .w-full > .w-full > div[dir="auto"]))):not(:has(input, textarea)):not(.qt-open) {
   height: 7px !important; min-height: 0 !important; overflow: hidden !important;
   padding: 0 !important; margin: 2px 0 !important; cursor: pointer;
   background: linear-gradient(transparent 3px, rgba(127,127,127,.6) 3px, rgba(127,127,127,.6) 4px, transparent 4px);
 }
-.qt-tool:not(.qt-open) > * { visibility: hidden; }
-.qt-tool.qt-open {
+:is(.chat-message.tool, .chat-message.assistant:not(:has(> .w-full > .w-full > div[dir="auto"]))):not(:has(input, textarea)):not(.qt-open) > * { visibility: hidden; }
+.chat-message.qt-open {
   padding-top: 7px !important;
   background: linear-gradient(transparent 3px, rgba(127,127,127,.6) 3px, rgba(127,127,127,.6) 4px, transparent 4px) top / 100% 7px no-repeat;
 }
@@ -98,7 +101,7 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
 [data-slot="prompt-input-footer"] span.rounded-full.h-4 { font-size: 10px !important; line-height: 16px !important; }
 
 /* A collapsed tool call that starts a response draws the bold response line itself (its own <hr> is hidden). */
-.qt-tool:not(.qt-open):has(.quests-response-line) {
+:is(.chat-message.tool, .chat-message.assistant:not(:has(> .w-full > .w-full > div[dir="auto"]))):not(:has(input, textarea)):not(.qt-open):has(.quests-response-line) {
   height: 9px !important;
   background: linear-gradient(transparent 3px, hsl(var(--foreground) / .5) 3px, hsl(var(--foreground) / .5) 5px, transparent 5px) !important;
 }

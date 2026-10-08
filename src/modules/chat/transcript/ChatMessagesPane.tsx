@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 
 import type { BackgroundTaskSummary,
@@ -11,7 +11,6 @@ import type { BackgroundTaskSummary,
   ProviderModelsDefinition } from '@/shared/types';
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
 import { groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
-import { useLazyRowObserver } from '@/modules/chat/hooks/useLazyRowObserver';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelectionEmptyState';
@@ -94,6 +93,76 @@ const getGroupedMessageKey = (message: ChatMessage): string =>
   getIntrinsicMessageKey(message) ?? 'message-generated';
 
 /**
+ * quests: as in Cursor, the user message of the turn at the top of the view stays pinned at the top of the chat;
+ * scrolling up into the turn before hands the pin to that turn's message, and as the next user message comes up
+ * under the pin it pushes the pin up and out, so the two never overlap. Clicking the pin scrolls to the message.
+ * The turn is found from each row's data-message-timestamp, compared in whole seconds (the attribute is the
+ * timestamp as text, which drops the milliseconds the message list keeps), and its text comes from the message
+ * list. Its own component, so scrolling re-renders the pin only, never the transcript.
+ */
+const StickyUserPin = memo(function StickyUserPin({
+  paneRef,
+  chatMessages,
+}: {
+  paneRef: RefObject<HTMLDivElement>;
+  chatMessages: ChatMessage[];
+}) {
+  const [pinned, setPinned] = useState<ChatMessage | null>(null);
+  const [offset, setOffset] = useState(0);
+  const pinRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) {
+      return undefined;
+    }
+    const second = (value: ChatMessage['timestamp'] | string | null | undefined) =>
+      Math.floor(new Date(value ?? 0).getTime() / 1000);
+    const userMessages = chatMessages.filter((message) => message.type === 'user' && String(message.content || '').trim());
+    const update = () => {
+      const paneTop = pane.getBoundingClientRect().top;
+      let topRowSecond: number | null = null;
+      for (const row of pane.querySelectorAll<HTMLElement>('[data-message-timestamp]')) {
+        if (row.getBoundingClientRect().top >= paneTop - 1) {
+          break;
+        }
+        topRowSecond = second(row.dataset.messageTimestamp);
+      }
+      setPinned(topRowSecond === null
+        ? null
+        : userMessages.filter((message) => second(message.timestamp) <= topRowSecond).at(-1) ?? null);
+      const next = Array.from(pane.querySelectorAll<HTMLElement>('.chat-message.user'))
+        .find((message) => message.getBoundingClientRect().top >= paneTop - 1);
+      const gap = next ? next.getBoundingClientRect().top - paneTop : Infinity;
+      setOffset(Math.min(0, Math.round(gap - (pinRef.current?.offsetHeight ?? 0) - 8)));
+    };
+    update();
+    pane.addEventListener('scroll', update, { passive: true });
+    return () => pane.removeEventListener('scroll', update);
+  }, [paneRef, chatMessages]);
+
+  if (!pinned) {
+    return null;
+  }
+  return (
+    <div className="sticky top-0 z-20 h-0">
+      <button
+        ref={pinRef}
+        type="button"
+        title="Scroll to this message"
+        style={{ transform: `translateY(${offset}px)` }}
+        onClick={() => paneRef.current
+          ?.querySelector(`[data-message-timestamp="${String(pinned.timestamp)}"]`)
+          ?.scrollIntoView({ block: 'start' })}
+        className="quests-sticky-user absolute left-12 right-8 top-0 line-clamp-3 whitespace-pre-wrap px-3 py-2 text-left text-sm"
+      >
+        {String(pinned.content)}
+      </button>
+    </div>
+  );
+});
+
+/**
  * Rendered by chat's ChatInterface as the scrolling transcript: the message
  * list and tool groups, the export menu, the provider empty state and the
  * load-all-history overlay.
@@ -147,45 +216,9 @@ function ChatMessagesPane({
   selectedProject,
 }: ChatMessagesPaneProps) {
   const { t } = useTranslation('chat');
-  const lazyRows = useLazyRowObserver(scrollContainerRef);
-
-  // quests: as in Cursor, the user message of the turn at the top of the view stays pinned at the top of the
-  // chat; scrolling up into the turn before hands the pin to that turn's message. Clicking the pin scrolls to it.
-  // The turn comes from the message list, not the page: rows far off screen are unmounted placeholders, which
-  // keep only their data-message-timestamp.
-  const [stickyUser, setStickyUser] = useState<ChatMessage | null>(null);
-  useEffect(() => {
-    const pane = scrollContainerRef.current;
-    if (!pane) {
-      return undefined;
-    }
-    const time = (value: ChatMessage['timestamp'] | string | null | undefined) => new Date(value ?? 0).getTime();
-    const userMessages = chatMessages.filter((message) => message.type === 'user' && String(message.content || '').trim());
-    const update = () => {
-      const paneTop = pane.getBoundingClientRect().top;
-      let topRowTime: number | null = null;
-      for (const row of pane.querySelectorAll<HTMLElement>('[data-message-timestamp]')) {
-        if (row.getBoundingClientRect().top >= paneTop - 1) {
-          break;
-        }
-        topRowTime = time(row.dataset.messageTimestamp);
-      }
-      const turn = topRowTime === null
-        ? null
-        : userMessages.filter((message) => time(message.timestamp) <= topRowTime).at(-1) ?? null;
-      setStickyUser(turn);
-    };
-    update();
-    pane.addEventListener('scroll', update, { passive: true });
-    return () => pane.removeEventListener('scroll', update);
-  }, [scrollContainerRef, chatMessages]);
-  const scrollToStickyUser = () => {
-    if (stickyUser?.timestamp) {
-      scrollContainerRef.current
-        ?.querySelector(`[data-message-timestamp="${String(stickyUser.timestamp)}"]`)
-        ?.scrollIntoView({ block: 'start' });
-    }
-  };
+  // quests: every loaded message stays mounted. Unmounting rows off screen swapped them for estimated-height
+  // placeholders, so the content height changed while scrolling and the view jumped.
+  const lazyRows = null;
 
   const groupedVisibleMessages = useMemo(
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
@@ -233,18 +266,7 @@ function ChatMessagesPane({
         hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
       }`}
     >
-      {stickyUser && (
-        <div className="sticky top-0 z-20 h-0">
-          <button
-            type="button"
-            title="Scroll to this message"
-            onClick={scrollToStickyUser}
-            className="quests-sticky-user absolute left-12 right-8 top-0 line-clamp-3 whitespace-pre-wrap px-3 py-2 text-left text-sm"
-          >
-            {String(stickyUser.content)}
-          </button>
-        </div>
-      )}
+      <StickyUserPin paneRef={scrollContainerRef} chatMessages={chatMessages} />
       {chatMessages.length > 0 && (
         <div className="pointer-events-none sticky right-4 top-3 z-10 mb-2 flex items-start justify-between gap-2 sm:px-4">
           {/* Running background work stays in view while the transcript scrolls under it. */}

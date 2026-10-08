@@ -13,33 +13,23 @@
   try { set(+localStorage.getItem('quests-font-base') || 19.75); } catch {}
   window.addEventListener('storage', e => { if (e.key === 'quests-font-base' && e.newValue) set(e.newValue); });
 
-  // Tool calls collapse to a 1px line. In CloudCLI UI 1.37.3 a tool call is either a group
-  // (.chat-message.tool) or an assistant message without the plain-text block (div[dir=auto]).
-  // ponytail: matches the app's markup, re-check after an upgrade of CloudCLI UI.
-  // Anything with an input field (a question waiting for an answer) is never collapsed.
-  const isTool = el => !el.querySelector('input, textarea') && (el.matches('.chat-message.tool') ||
-    (el.matches('.chat-message.assistant') && !el.querySelector(':scope > .w-full > .w-full > div[dir="auto"]')));
-  // React rewrites className on re-render, so our classes are re-applied after every change, and the
-  // open state lives here, not in the class.
-  const opened = new WeakSet();
-  let queued = false;
-  const mark = () => {
-    queued = false;
-    for (const el of document.querySelectorAll('.chat-message')) {
-      el.classList.toggle('qt-tool', isTool(el));
-      el.classList.toggle('qt-open', opened.has(el));
+  // Tool calls collapse in CSS (cloudcli-custom.css, same selector as TOOL below); a click opens or closes one
+  // by adding qt-open. React rewrites className on re-render, so the opened ones are kept here and re-marked.
+  const TOOL = ':is(.chat-message.tool, .chat-message.assistant:not(:has(> .w-full > .w-full > div[dir="auto"]))):not(:has(input, textarea))';
+  const opened = new Set();
+  new MutationObserver(() => {
+    for (const el of opened) {
+      if (!el.isConnected) opened.delete(el);
+      else if (!el.classList.contains('qt-open')) el.classList.add('qt-open');
     }
-  };
-  new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(mark); } })
-    .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  }).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'] });
 
   document.addEventListener('click', e => {
-    const el = e.target.closest?.('.qt-tool');
-    if (!el) return;
+    const el = e.target.closest?.('.chat-message');
+    if (!el || !el.matches(TOOL)) return;
     const open = opened.has(el);
     if (open && e.clientY - el.getBoundingClientRect().top > 7) return;  // a click inside an open tool works as usual
-    open ? opened.delete(el) : opened.add(el);
-    mark();
+    if (open) { opened.delete(el); el.classList.remove('qt-open'); } else { opened.add(el); el.classList.add('qt-open'); }
     e.preventDefault(); e.stopPropagation();
   }, true);
 })();
