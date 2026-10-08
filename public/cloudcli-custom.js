@@ -1,5 +1,12 @@
-// Our changes to CloudCLI UI, loaded by its page (see start-cloudcli.sh).
+// Our changes to CloudCLI UI, loaded by its page (see index.html).
 (() => {
+  // A link ending in #panes=<json> sets the tab layout ({left: [ids], right: [ids], rightActive: id},
+  // see src/shared/hooks/useSplitPane.ts). It runs before the app starts, then removes itself from the address.
+  if (location.hash.startsWith('#panes=')) {
+    try { localStorage.setItem('quests-panes', decodeURIComponent(location.hash.slice(7))); } catch {}
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+
   // Text size slider at the top. Sets --base (see cloudcli-custom.css), remembered in this browser.
   const set = px => document.documentElement.style.setProperty('--base', px + 'px');
   let px = 20;
