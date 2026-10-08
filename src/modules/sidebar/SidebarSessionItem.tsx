@@ -10,6 +10,7 @@ import { PROVIDER_LABELS, createSessionViewModel, formatCompactAge } from '@/mod
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { useProviderSessionIdCopy } from '@/modules/sidebar/hooks/useProviderSessionIdCopy';
 import SessionOptions from '@/modules/sidebar/SessionOptions';
+import { setSplitSessionId, useSplitSessionId } from '@/shared/hooks/useSplitPane';
 
 type SidebarSessionItemProps = {
   project: Project;
@@ -68,6 +69,10 @@ function SidebarSessionItem({
   const isCompact = useCompactSidebar();
   const sessionView = createSessionViewModel(session, currentTime, t);
   const isSelected = selectedSession?.id === session.id;
+  // quests split screen: an arrow marks which pane shows this session.
+  const splitSessionId = useSplitSessionId();
+  const isSplitActive = splitSessionId !== null && splitSessionId !== selectedSession?.id;
+  const paneArrow = !isSplitActive ? null : isSelected ? '◀' : splitSessionId === session.id ? '▶' : null;
   const compactSessionAge = formatCompactAge(sessionView.sessionTime, currentTime);
   const [isMobileOptionsOpen, setIsMobileOptionsOpen] = useState(false);
   const showAttentionIndicator = needsAttention && !isSelected;
@@ -396,8 +401,9 @@ function SidebarSessionItem({
                 : 'hover:bg-accent/50',
             isChecked && 'border-primary/40 bg-primary/10',
           )}
-          // Left-click keeps in-app navigation; Ctrl/Cmd/middle-click and the
-          // native right-click menu use the href to open a new tab/window.
+          // Left-click keeps in-app navigation; Ctrl/Cmd+click opens the session in the
+          // right pane (quests split screen); middle-click and the native right-click
+          // menu use the href to open a new tab/window.
           // While selecting, every click ticks the row instead.
           onClick={(event) => {
             if (isSelecting) {
@@ -407,7 +413,12 @@ function SidebarSessionItem({
               }
               return;
             }
-            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            if (event.metaKey || event.ctrlKey) {
+              event.preventDefault();
+              setSplitSessionId(session.id);
+              return;
+            }
+            if (event.shiftKey || event.altKey) return;
             event.preventDefault();
             onSessionSelect(session, project.projectId);
           }}
@@ -423,6 +434,11 @@ function SidebarSessionItem({
             >
               <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
             </div>
+            {paneArrow && (
+              <span className="flex-shrink-0 text-sm font-bold" title={paneArrow === '◀' ? 'Left pane' : 'Right pane'}>
+                {paneArrow}
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <div

@@ -15,7 +15,9 @@
     set(input.value); label.textContent = input.value + 'px';
     try { localStorage.setItem('quests-font-base', input.value); } catch {}
   };
-  document.addEventListener('DOMContentLoaded', () => document.body.appendChild(bar));
+  // The right pane of the split screen (an iframe) has no slider of its own and follows the main page's.
+  if (window.self === window.top) document.addEventListener('DOMContentLoaded', () => document.body.appendChild(bar));
+  window.addEventListener('storage', e => { if (e.key === 'quests-font-base' && e.newValue) set(e.newValue); });
 
   // Tool calls collapse to a 1px line. In CloudCLI UI 1.37.3 a tool call is either a group
   // (.chat-message.tool) or an assistant message without the plain-text block (div[dir=auto]).
