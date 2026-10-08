@@ -154,9 +154,10 @@ function ProjectWorkspaceShell({
         </div>
   
         {showSplit && panes.rightActive && (
+          // A 1px line like Cursor's editor divider; the invisible child widens the grab area to 9px.
           <div
             title="Drag to resize the panes"
-            className={`w-1 flex-shrink-0 cursor-col-resize hover:bg-primary/60 ${isDraggingSplit ? 'bg-primary/60' : 'bg-primary/30'}`}
+            className={`relative z-10 w-px flex-shrink-0 cursor-col-resize ${isDraggingSplit ? 'bg-primary' : 'bg-border hover:bg-primary'}`}
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
               setIsDraggingSplit(true);
@@ -164,7 +165,9 @@ function ProjectWorkspaceShell({
             onPointerMove={dragSplit}
             onPointerUp={endDragSplit}
             onPointerCancel={endDragSplit}
-          />
+          >
+            <div className="absolute inset-y-0 -left-1 -right-1" />
+          </div>
         )}
   
         {showSplit && panes.rightActive && (

@@ -16,10 +16,10 @@ html.dark {
   --secondary: 216 5% 18%;
   --secondary-foreground: 0 0% 80%;
   --muted: 216 5% 18%;
-  --muted-foreground: 219 8% 55%;
+  --muted-foreground: 210 1% 50%;  /* #7f8081, Cursor gray text ("Thought for 1s") */
   --accent: 216 5% 18%;
   --accent-foreground: 0 0% 80%;
-  --border: 0 0% 21%;
+  --border: 210 1% 27%;  /* #454647, Cursor tool-box and table borders */
   --input: 0 0% 21%;
   --ring: 216 37% 38%;
 }
@@ -82,10 +82,10 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
   padding: 1px 4px !important; border-radius: 3px !important; font-weight: 400 !important;
 }
 .prose code:not(pre code)::before, .prose code:not(pre code)::after { content: none !important; }
-.prose pre { background: #2b2d30 !important; }
+.prose pre { background: #161718 !important; }
 .prose table { border-collapse: collapse !important; }
-.prose th, .prose td { border: 1px solid #4a4a4a !important; padding: 4px 6px !important; color: #cccccc !important; }
-.prose th { color: #ffffff !important; font-weight: 700 !important; text-align: center !important; }
+.prose th, .prose td { border: 1px solid #454647 !important; padding: 4px 6px !important; color: #cccccc !important; }
+.prose th { font-weight: 700 !important; text-align: center !important; }
 
 /* Chat input sizes, measured from Cursor: a ~36px bottom row, 14px chips, no hint line.
    The one-line text area is rows={1} in PromptInput.tsx. */
@@ -109,3 +109,8 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
   color: #cccccc !important; box-shadow: none !important;
 }
 .chat-message.user .rounded-2xl.border .prose { color: #cccccc !important; }
+
+/* Reply text, measured from Cursor: everything #cccccc, headings and bold included (not white). */
+.prose, .prose :where(p, li, strong, b, em, h1, h2, h3, h4, h5, h6, blockquote, td, th) { color: #cccccc !important; }
+/* Tool call boxes and their output, measured from Cursor: page background, 1px #454647 border, output #161718. */
+.chat-message pre { background: #161718 !important; }
