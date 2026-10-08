@@ -93,12 +93,12 @@ const getGroupedMessageKey = (message: ChatMessage): string =>
   getIntrinsicMessageKey(message) ?? 'message-generated';
 
 /**
- * quests: as in Cursor, the user message of the turn at the top of the view stays pinned at the top of the chat;
- * scrolling up into the turn before hands the pin to that turn's message, and as the next user message comes up
- * under the pin it pushes the pin up and out, so the two never overlap. Clicking the pin scrolls to the message.
- * The turn is found from each row's data-message-timestamp, compared in whole seconds (the attribute is the
- * timestamp as text, which drops the milliseconds the message list keeps), and its text comes from the message
- * list. Its own component, so scrolling re-renders the pin only, never the transcript.
+ * quests: as in Cursor, the user message of the turn at the top of the view stays pinned at the top of the chat:
+ * the last user message whose top has scrolled above the view. Scrolling up hands the pin to the one before, and
+ * as the next user message comes up under the pin it pushes the pin up and out, so the two never overlap.
+ * Clicking the pin scrolls to the message. Read straight from the page: every loaded message stays mounted
+ * (lazyRows is off), so the message above is always there. Its own component, so scrolling re-renders the pin
+ * only, never the transcript.
  */
 const StickyUserPin = memo(function StickyUserPin({
   paneRef,
@@ -107,7 +107,7 @@ const StickyUserPin = memo(function StickyUserPin({
   paneRef: RefObject<HTMLDivElement>;
   chatMessages: ChatMessage[];
 }) {
-  const [pinned, setPinned] = useState<ChatMessage | null>(null);
+  const [pinned, setPinned] = useState<HTMLElement | null>(null);
   const [offset, setOffset] = useState(0);
   const pinRef = useRef<HTMLButtonElement | null>(null);
 
@@ -116,23 +116,19 @@ const StickyUserPin = memo(function StickyUserPin({
     if (!pane) {
       return undefined;
     }
-    const second = (value: ChatMessage['timestamp'] | string | null | undefined) =>
-      Math.floor(new Date(value ?? 0).getTime() / 1000);
-    const userMessages = chatMessages.filter((message) => message.type === 'user' && String(message.content || '').trim());
     const update = () => {
       const paneTop = pane.getBoundingClientRect().top;
-      let topRowSecond: number | null = null;
-      for (const row of pane.querySelectorAll<HTMLElement>('[data-message-timestamp]')) {
-        if (row.getBoundingClientRect().top >= paneTop - 1) {
+      let above: HTMLElement | null = null;
+      let next: HTMLElement | null = null;
+      for (const message of pane.querySelectorAll<HTMLElement>('.chat-message.user')) {
+        if (message.getBoundingClientRect().top < paneTop - 1) {
+          above = message;
+        } else {
+          next = message;
           break;
         }
-        topRowSecond = second(row.dataset.messageTimestamp);
       }
-      setPinned(topRowSecond === null
-        ? null
-        : userMessages.filter((message) => second(message.timestamp) <= topRowSecond).at(-1) ?? null);
-      const next = Array.from(pane.querySelectorAll<HTMLElement>('.chat-message.user'))
-        .find((message) => message.getBoundingClientRect().top >= paneTop - 1);
+      setPinned(above);
       const gap = next ? next.getBoundingClientRect().top - paneTop : Infinity;
       setOffset(Math.min(0, Math.round(gap - (pinRef.current?.offsetHeight ?? 0) - 8)));
     };
@@ -151,12 +147,10 @@ const StickyUserPin = memo(function StickyUserPin({
         type="button"
         title="Scroll to this message"
         style={{ transform: `translateY(${offset}px)` }}
-        onClick={() => paneRef.current
-          ?.querySelector(`[data-message-timestamp="${String(pinned.timestamp)}"]`)
-          ?.scrollIntoView({ block: 'start' })}
+        onClick={() => pinned.scrollIntoView({ block: 'start' })}
         className="quests-sticky-user absolute left-12 right-8 top-0 line-clamp-3 whitespace-pre-wrap px-3 py-2 text-left text-sm"
       >
-        {String(pinned.content)}
+        {pinned.querySelector<HTMLElement>('[dir="auto"]')?.innerText ?? ''}
       </button>
     </div>
   );
