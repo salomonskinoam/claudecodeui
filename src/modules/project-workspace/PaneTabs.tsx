@@ -1,5 +1,6 @@
 import { memo } from 'react';
 
+import { type ChatDot, CHAT_DOT_STYLE } from '@/shared/hooks/useLiveChats';
 import { cn } from '@/shared/utils';
 
 type PaneTabsProps = {
@@ -10,18 +11,7 @@ type PaneTabsProps = {
   onClose: (id: string) => void;
   /** Closes the whole pane; shown at the right end of the row when given. */
   onClosePane?: () => void;
-  dotOf: (id: string) => TabDot | null;
-};
-
-/** The dot before a tab's name. */
-export type TabDot = 'waiting' | 'running' | 'done';
-
-// Blue and orange are the Claude Code extension's own tab dots (resources/claude-logo-pending.svg, claude-logo-done.svg);
-// green is its timeline "success" dot.
-const DOT: Record<TabDot, { color: string; label: string }> = {
-  waiting: { color: '#3B82F6', label: 'Waiting for you' },
-  running: { color: '#74c991', label: 'Running' },
-  done: { color: '#D97757', label: 'Finished, not seen yet' },
+  dotOf: (id: string) => ChatDot | null;
 };
 
 /** quests: one row of chat tabs above a pane, like an editor's tab bar. */
@@ -46,9 +36,9 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
           >
             {dot && (
               <span
-                title={DOT[dot].label}
+                title={CHAT_DOT_STYLE[dot].label}
                 className={cn('h-2 w-2 flex-shrink-0 rounded-full', dot === 'running' && 'animate-pulse')}
-                style={{ backgroundColor: DOT[dot].color }}
+                style={{ backgroundColor: CHAT_DOT_STYLE[dot].color }}
               />
             )}
             <span className="truncate">{nameOf(id)}</span>

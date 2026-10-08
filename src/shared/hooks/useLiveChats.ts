@@ -1,35 +1,84 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import { authenticatedFetch } from '@/shared/api';
-
-/** quests: a chat's live state; a chat that is idle is absent. */
-export type LiveState = 'running' | 'waiting';
+import { isEmbedded } from '@/shared/hooks/useSplitPane';
 
 /**
- * quests: the live state of every chat (Cursor, terminal and this page), polled from GET /api/quests/live
- * every two seconds. Drives the tab dots.
+ * quests: one status dot per chat, the same on the tabs and in the sidebar.
+ *   waiting  blue    a prompt waits on the user
+ *   running  green   the chat is working
+ *   done     orange  it stopped while out of view, and has not been shown since
+ * No dot: idle and already seen.
+ * Live states come from GET /api/quests/live (every chat on this machine: Cursor, terminal and this page),
+ * polled every two seconds by the main page; the split-screen iframe shows no tabs or sidebar and does not poll.
  */
-export function useLiveChats(enabled: boolean): Record<string, LiveState> {
-  const [states, setStates] = useState<Record<string, LiveState>>({});
+export type ChatDot = 'waiting' | 'running' | 'done';
 
-  useEffect(() => {
-    if (!enabled) {
-      return undefined;
+// Blue and orange are the Claude Code extension's own tab dots (resources/claude-logo-pending.svg,
+// claude-logo-done.svg); green is its timeline "success" dot.
+export const CHAT_DOT_STYLE: Record<ChatDot, { color: string; label: string }> = {
+  waiting: { color: '#3B82F6', label: 'Waiting for you' },
+  running: { color: '#74c991', label: 'Running' },
+  done: { color: '#D97757', label: 'Finished, not seen yet' },
+};
+
+type LiveState = 'running' | 'waiting';
+
+let live: Record<string, LiveState> = {};
+const unseen = new Set<string>();
+let inView: string[] = [];
+let snapshot: Record<string, ChatDot> = {};
+const listeners = new Set<() => void>();
+let timer: number | null = null;
+
+function publish(): void {
+  const next: Record<string, ChatDot> = {};
+  unseen.forEach((id) => {
+    next[id] = 'done';
+  });
+  Object.assign(next, live);
+  snapshot = next;
+  listeners.forEach((listener) => listener());
+}
+
+async function poll(): Promise<void> {
+  const response = await authenticatedFetch('/api/quests/live');
+  if (!response.ok) {
+    return;
+  }
+  const next: Record<string, LiveState> = await response.json();
+  // A chat that stops while out of view becomes unseen.
+  Object.keys(live).forEach((id) => {
+    if (!next[id] && !inView.includes(id)) {
+      unseen.add(id);
     }
-    let stopped = false;
-    const poll = async () => {
-      const response = await authenticatedFetch('/api/quests/live');
-      if (response.ok && !stopped) {
-        setStates(await response.json());
-      }
-    };
-    void poll();
-    const timer = window.setInterval(() => void poll(), 2000);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
-  }, [enabled]);
+  });
+  live = next;
+  publish();
+}
 
-  return states;
+/** The chats on screen right now (each pane's active tab). Showing a chat marks it seen. */
+export function setChatsInView(ids: Array<string | null | undefined>): void {
+  inView = ids.filter((id): id is string => Boolean(id));
+  inView.forEach((id) => unseen.delete(id));
+  publish();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  if (timer === null && !isEmbedded) {
+    void poll();
+    timer = window.setInterval(() => void poll(), 2000);
+  }
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0 && timer !== null) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+  };
+}
+
+export function useChatDots(): Record<string, ChatDot> {
+  return useSyncExternalStore(subscribe, () => snapshot);
 }

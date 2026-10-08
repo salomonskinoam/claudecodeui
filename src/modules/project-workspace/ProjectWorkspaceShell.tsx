@@ -5,8 +5,8 @@ import { useParams } from 'react-router-dom';
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
-import PaneTabs, { type TabDot } from '@/modules/project-workspace/PaneTabs';
-import { type LiveState, useLiveChats } from '@/shared/hooks/useLiveChats';
+import PaneTabs from '@/modules/project-workspace/PaneTabs';
+import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
 import ProjectQuickSettingsRegion from '@/modules/project-workspace/ProjectQuickSettingsRegion';
@@ -52,33 +52,14 @@ function ProjectWorkspaceShell({
     return `chat ${id.slice(0, 8)}`;
   }, [projects]);
 
-  // Tab dots: blue waiting for you, green running, orange finished while its tab was not in view.
-  // A chat leaving running/waiting out of view becomes unseen; showing its tab in either pane clears that.
-  const live = useLiveChats(showTabs);
-  const previousLiveRef = useRef<Record<string, LiveState>>({});
-  const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
-  const inView = [sessionId, showSplit ? panes.rightActive : null];
+  // Status dots (useLiveChats): the chats on screen are each pane's active tab; showing a chat marks it seen.
   useEffect(() => {
-    const finished = Object.keys(previousLiveRef.current).filter((id) => !live[id] && !inView.includes(id));
-    previousLiveRef.current = live;
-    if (finished.length > 0) {
-      setUnseen((previous) => new Set([...previous, ...finished]));
+    if (showTabs) {
+      setChatsInView([sessionId, showSplit ? panes.rightActive : null]);
     }
-    // inView is read at the moment the state changes, on purpose not a dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live]);
-  useEffect(() => {
-    setUnseen((previous) => {
-      const next = new Set(previous);
-      inView.forEach((id) => id && next.delete(id));
-      return next.size === previous.size ? previous : next;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, panes.rightActive, showSplit]);
-  const dotOf = useCallback(
-    (id: string): TabDot | null => live[id] ?? (unseen.has(id) ? 'done' : null),
-    [live, unseen],
-  );
+  }, [showTabs, sessionId, showSplit, panes.rightActive]);
+  const dots = useChatDots();
+  const dotOf = useCallback((id: string): ChatDot | null => dots[id] ?? null, [dots]);
 
   // The bar between the panes drags; the left pane's share of the width (percent) is remembered.
   // While dragging, the iframe ignores the pointer so it cannot swallow the drag.
