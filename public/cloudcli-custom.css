@@ -1,23 +1,24 @@
 /* Our changes to CloudCLI UI, loaded by its page (see index.html). */
 
 /* Cursor's look, from ~/.config/Cursor/User/settings.json (workbench.colorCustomizations):
-   editor #1E1F22, text #ABB2BF, sidebar #1a1a1c, widgets #353535, status bar #2B2D30, active tab #3d5984.
+   editor #1E1F22, sidebar #1a1a1c, widgets #353535, status bar #2B2D30, active tab #3d5984;
+   text #cccccc, the chat text of Cursor's Claude panel.
    html.dark outranks the app's own .dark rule. */
 html.dark {
   --background: 225 6% 13%;
-  --foreground: 219 14% 71%;
+  --foreground: 0 0% 80%;
   --card: 240 4% 11%;
-  --card-foreground: 219 14% 71%;
+  --card-foreground: 0 0% 80%;
   --popover: 216 5% 18%;
-  --popover-foreground: 219 14% 71%;
+  --popover-foreground: 0 0% 80%;
   --primary: 216 37% 38%;
   --primary-foreground: 0 0% 100%;
   --secondary: 216 5% 18%;
-  --secondary-foreground: 219 14% 71%;
+  --secondary-foreground: 0 0% 80%;
   --muted: 216 5% 18%;
   --muted-foreground: 219 8% 55%;
   --accent: 216 5% 18%;
-  --accent-foreground: 219 14% 71%;
+  --accent-foreground: 0 0% 80%;
   --border: 0 0% 21%;
   --input: 0 0% 21%;
   --ring: 216 37% 38%;
@@ -63,3 +64,25 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
   padding-top: 7px !important;
   background: linear-gradient(transparent 3px, rgba(127,127,127,.6) 3px, rgba(127,127,127,.6) 4px, transparent 4px) top / 100% 7px no-repeat;
 }
+
+/* Chat input, colors measured from a screenshot of Cursor's Claude panel. */
+[data-slot="prompt-input"] {
+  background: #3c3c3c !important; border: 1px solid #505050 !important; border-radius: 6px !important;
+  box-shadow: none !important; backdrop-filter: none !important;
+}
+[data-slot="prompt-input"]:focus-within { border-color: #ff7570 !important; box-shadow: none !important; --tw-ring-shadow: 0 0 #0000 !important; }
+[data-slot="prompt-input-footer"] { border-top-color: #505050 !important; }
+[data-slot="prompt-input-textarea"]::placeholder { color: #a6a6a6 !important; }
+[data-slot="prompt-input"] button[type="submit"] { background: #8a5351 !important; color: #ffffff !important; }
+
+/* Replies: tables, code and links as Cursor renders them. */
+.prose a { color: #3794ff !important; }
+.prose code:not(pre code) {
+  background: rgba(255, 255, 255, .1) !important; color: #d7ba7d !important;
+  padding: 1px 4px !important; border-radius: 3px !important; font-weight: 400 !important;
+}
+.prose code:not(pre code)::before, .prose code:not(pre code)::after { content: none !important; }
+.prose pre { background: #2b2d30 !important; }
+.prose table { border-collapse: collapse !important; }
+.prose th, .prose td { border: 1px solid #4a4a4a !important; padding: 4px 6px !important; color: #cccccc !important; }
+.prose th { color: #ffffff !important; font-weight: 700 !important; text-align: center !important; }
