@@ -149,29 +149,43 @@ function ChatMessagesPane({
   const { t } = useTranslation('chat');
   const lazyRows = useLazyRowObserver(scrollContainerRef);
 
-  // quests: as in Cursor, the last user message scrolled past the top stays pinned at the top of the chat;
-  // scrolling above it hands the pin to the message before. Clicking the pin scrolls to the message.
-  const [stickyUser, setStickyUser] = useState<HTMLElement | null>(null);
+  // quests: as in Cursor, the user message of the turn at the top of the view stays pinned at the top of the
+  // chat; scrolling up into the turn before hands the pin to that turn's message. Clicking the pin scrolls to it.
+  // The turn comes from the message list, not the page: rows far off screen are unmounted placeholders, which
+  // keep only their data-message-timestamp.
+  const [stickyUser, setStickyUser] = useState<ChatMessage | null>(null);
   useEffect(() => {
     const pane = scrollContainerRef.current;
     if (!pane) {
       return undefined;
     }
+    const time = (value: ChatMessage['timestamp'] | string | null | undefined) => new Date(value ?? 0).getTime();
+    const userMessages = chatMessages.filter((message) => message.type === 'user' && String(message.content || '').trim());
     const update = () => {
       const paneTop = pane.getBoundingClientRect().top;
-      let passed: HTMLElement | null = null;
-      for (const message of pane.querySelectorAll<HTMLElement>('.chat-message.user')) {
-        if (message.getBoundingClientRect().top >= paneTop - 1) {
+      let topRowTime: number | null = null;
+      for (const row of pane.querySelectorAll<HTMLElement>('[data-message-timestamp]')) {
+        if (row.getBoundingClientRect().top >= paneTop - 1) {
           break;
         }
-        passed = message;
+        topRowTime = time(row.dataset.messageTimestamp);
       }
-      setStickyUser(passed);
+      const turn = topRowTime === null
+        ? null
+        : userMessages.filter((message) => time(message.timestamp) <= topRowTime).at(-1) ?? null;
+      setStickyUser(turn);
     };
     update();
     pane.addEventListener('scroll', update, { passive: true });
     return () => pane.removeEventListener('scroll', update);
-  }, [scrollContainerRef, chatMessages.length]);
+  }, [scrollContainerRef, chatMessages]);
+  const scrollToStickyUser = () => {
+    if (stickyUser?.timestamp) {
+      scrollContainerRef.current
+        ?.querySelector(`[data-message-timestamp="${String(stickyUser.timestamp)}"]`)
+        ?.scrollIntoView({ block: 'start' });
+    }
+  };
 
   const groupedVisibleMessages = useMemo(
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
@@ -224,10 +238,10 @@ function ChatMessagesPane({
           <button
             type="button"
             title="Scroll to this message"
-            onClick={() => stickyUser.scrollIntoView({ block: 'start' })}
+            onClick={scrollToStickyUser}
             className="quests-sticky-user absolute left-12 right-8 top-0 line-clamp-3 whitespace-pre-wrap px-3 py-2 text-left text-sm"
           >
-            {stickyUser.querySelector('.rounded-2xl.border')?.textContent ?? stickyUser.textContent}
+            {String(stickyUser.content)}
           </button>
         </div>
       )}
