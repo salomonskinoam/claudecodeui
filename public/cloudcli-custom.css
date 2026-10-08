@@ -87,9 +87,8 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
 .prose th, .prose td { border: 1px solid #4a4a4a !important; padding: 4px 6px !important; color: #cccccc !important; }
 .prose th { color: #ffffff !important; font-weight: 700 !important; text-align: center !important; }
 
-/* Chat input sizes, measured from Cursor: one text line (~44px), a ~36px bottom row, 14px chips, no hint line.
-   The textarea height stays a default without !important, so the app's auto-grow (inline height) still wins. */
-[data-slot="prompt-input-textarea"] { height: 40px; }
+/* Chat input sizes, measured from Cursor: a ~36px bottom row, 14px chips, no hint line.
+   The one-line text area is rows={1} in PromptInput.tsx. */
 [data-slot="prompt-input-footer"] { padding: 4px 8px !important; }
 [data-slot="prompt-input-footer"] > .basis-full { display: none !important; }
 [data-slot="prompt-input-footer"] * { font-size: 14px !important; line-height: 20px !important; }

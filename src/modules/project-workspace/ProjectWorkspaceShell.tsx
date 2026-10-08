@@ -107,12 +107,15 @@ function ProjectWorkspaceShell({
               onClose={closeLeft}
             />
           )}
-          <ProjectMainRegion
-            isMobile={isMobile}
-            ws={ws}
-            sendMessage={sendMessage}
-            navigate={navigate}
-          />
+          {/* The chat view fills the height left under the tab row, so its bottom stays on screen. */}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <ProjectMainRegion
+              isMobile={isMobile}
+              ws={ws}
+              sendMessage={sendMessage}
+              navigate={navigate}
+            />
+          </div>
         </div>
   
         {showSplit && panes.rightActive && (
