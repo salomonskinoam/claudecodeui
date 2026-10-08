@@ -1,0 +1,38 @@
+/* Our changes to CloudCLI UI, loaded by its page (see start-cloudcli.sh). */
+
+/* Text size. --base is the size of normal text; every other text size follows it.
+   Only font sizes change: spacing, icons and layout stay as they are. The slider in cloudcli-custom.js sets --base. */
+:root { --base: 20px; }
+.text-base { font-size: var(--base) !important; line-height: 1.5 !important; }
+.text-lg   { font-size: calc(var(--base) * 1.125) !important; line-height: 1.5 !important; }
+.text-sm, .prose-sm { font-size: calc(var(--base) * .875) !important; line-height: 1.5 !important; }
+.text-xs   { font-size: calc(var(--base) * .75) !important; line-height: 1.4 !important; }
+.text-\[14px\] { font-size: calc(var(--base) * .875) !important; }
+.text-\[13px\] { font-size: calc(var(--base) * .8125) !important; }
+.text-\[12px\] { font-size: calc(var(--base) * .75) !important; }
+.text-\[11px\] { font-size: calc(var(--base) * .6875) !important; }
+.text-\[10px\] { font-size: calc(var(--base) * .625) !important; }
+
+/* Sidebar: "New Session" fades into the background; the open chat takes the button's old blue. */
+.border-l.pl-3 button.bg-primary.w-full {
+  background-color: hsl(var(--muted) / .5) !important; color: hsl(var(--muted-foreground)) !important;
+}
+.border-l.pl-3 button.bg-primary.w-full:hover { background-color: hsl(var(--muted)) !important; }
+.bg-primary\/5.border-primary\/20 {
+  background-color: hsl(var(--primary)) !important; border-color: hsl(var(--primary)) !important;
+}
+.bg-primary\/5.border-primary\/20 .text-foreground,
+.bg-primary\/5.border-primary\/20 .text-muted-foreground { color: hsl(var(--primary-foreground)) !important; }
+
+/* Tool calls (class qt-tool, set by cloudcli-custom.js): a 1px line, clickable over 7px.
+   Open: the same line on top closes it again. */
+.qt-tool:not(.qt-open) {
+  height: 7px !important; min-height: 0 !important; overflow: hidden !important;
+  padding: 0 !important; margin: 2px 0 !important; cursor: pointer;
+  background: linear-gradient(transparent 3px, rgba(127,127,127,.6) 3px, rgba(127,127,127,.6) 4px, transparent 4px);
+}
+.qt-tool:not(.qt-open) > * { visibility: hidden; }
+.qt-tool.qt-open {
+  padding-top: 7px !important;
+  background: linear-gradient(transparent 3px, rgba(127,127,127,.6) 3px, rgba(127,127,127,.6) 4px, transparent 4px) top / 100% 7px no-repeat;
+}

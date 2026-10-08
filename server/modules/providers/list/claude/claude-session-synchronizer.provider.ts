@@ -135,6 +135,13 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       return null;
     }
 
+    // quests: the name set with /rename (in an IDE or the CLI) wins over every other name.
+    // ponytail: reads the whole transcript on each sync, fine at tens of MB.
+    const renamed = await this.extractCustomTitle(filePath);
+    if (renamed) {
+      return { ...parsed, sessionName: normalizeSessionName(renamed, 'Untitled Claude Session') };
+    }
+
     // App-created sessions are keyed by an app id, so disk-discovered provider
     // ids must be resolved through the provider-id mapping first.
     const existingSession = sessionsDb.getSessionByProviderSessionId(parsed.sessionId)
@@ -156,6 +163,22 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       ...parsed,
       sessionName: normalizeSessionName(sessionName, 'Untitled Claude Session'),
     };
+  }
+
+  /** quests: the last /rename title in a transcript, if any. */
+  private async extractCustomTitle(filePath: string): Promise<string | undefined> {
+    const text = await readFile(filePath, 'utf8');
+    const at = text.lastIndexOf('"type":"custom-title"');
+    if (at < 0) {
+      return undefined;
+    }
+    const end = text.indexOf('\n', at);
+    try {
+      const title = JSON.parse(text.slice(text.lastIndexOf('\n', at) + 1, end < 0 ? undefined : end)).customTitle;
+      return typeof title === 'string' && title.trim() ? title : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /**
