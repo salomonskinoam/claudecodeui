@@ -5,8 +5,10 @@ import {
   Mic,
   Moon,
   Sun,
+  Type,
   type LucideIcon,
 } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DarkModeToggle } from '@/shared/ui';
@@ -55,6 +57,52 @@ type QuickSettingsContentProps = {
   onPreferenceChange: (key: PreferenceToggleKey, value: boolean) => void;
 };
 
+/**
+ * quests: text size slider. Sets --base, the size every text size follows (public/cloudcli-custom.css).
+ * The value lives in localStorage under quests-font-base; cloudcli-custom.js applies it at page load and
+ * keeps the split-screen pane in step through the storage event.
+ */
+function TextSizeRow() {
+  const [size, setSize] = useState(() => {
+    try {
+      return Number(localStorage.getItem('quests-font-base')) || 19.75;
+    } catch {
+      return 19.75;
+    }
+  });
+
+  const changeSize = (next: number) => {
+    setSize(next);
+    document.documentElement.style.setProperty('--base', `${next}px`);
+    try {
+      localStorage.setItem('quests-font-base', String(next));
+    } catch {
+      // Storage blocked: the size resets on reload.
+    }
+  };
+
+  return (
+    <div className={SETTING_ROW_CLASS}>
+      <span className="flex items-center gap-2 text-sm text-foreground">
+        <Type className="h-4 w-4 text-muted-foreground" />
+        Text size
+      </span>
+      <span className="flex items-center gap-2">
+        <input
+          type="range"
+          min={12}
+          max={32}
+          step={0.25}
+          value={size}
+          onChange={(event) => changeSize(Number(event.target.value))}
+          className="w-28"
+        />
+        <span className="w-14 text-right text-xs text-muted-foreground">{size}px</span>
+      </span>
+    </div>
+  );
+}
+
 /** Rendered by QuickSettingsPanelView to show the drawer's appearance, tool display and input preference rows. */
 export default function QuickSettingsContent({
   isDarkMode,
@@ -93,6 +141,7 @@ export default function QuickSettingsContent({
           <DarkModeToggle />
         </div>
         <LanguageSelector compact />
+        <TextSizeRow />
       </QuickSettingsSection>
 
       <QuickSettingsSection title={t('quickSettings.sections.toolDisplay')}>

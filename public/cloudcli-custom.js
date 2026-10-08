@@ -7,23 +7,10 @@
     history.replaceState(null, '', location.pathname + location.search);
   }
 
-  // Text size slider at the top. Sets --base (see cloudcli-custom.css), remembered in this browser.
+  // Text size (--base, see cloudcli-custom.css). The slider is in the quick settings pane (QuickSettingsContent.tsx);
+  // this applies the stored size before the app starts and keeps the split-screen pane in step.
   const set = px => document.documentElement.style.setProperty('--base', px + 'px');
-  let px = 19.75;
-  try { px = +localStorage.getItem('quests-font-base') || 19.75; } catch {}
-  set(px);
-  const bar = document.createElement('div');
-  bar.style.cssText = 'position:fixed;top:4px;left:50%;transform:translateX(-50%);z-index:99999;' +
-    'display:flex;gap:8px;align-items:center;padding:2px 10px;border-radius:6px;' +
-    'background:rgba(127,127,127,.25);font:13px system-ui,sans-serif;color:inherit';
-  bar.innerHTML = `text <input type="range" min="12" max="32" step="0.25" value="${px}" style="width:160px"> <span>${px}px</span>`;
-  const [input, label] = [bar.querySelector('input'), bar.querySelector('span')];
-  input.oninput = () => {
-    set(input.value); label.textContent = input.value + 'px';
-    try { localStorage.setItem('quests-font-base', input.value); } catch {}
-  };
-  // The right pane of the split screen (an iframe) has no slider of its own and follows the main page's.
-  if (window.self === window.top) document.addEventListener('DOMContentLoaded', () => document.body.appendChild(bar));
+  try { set(+localStorage.getItem('quests-font-base') || 19.75); } catch {}
   window.addEventListener('storage', e => { if (e.key === 'quests-font-base' && e.newValue) set(e.newValue); });
 
   // Tool calls collapse to a 1px line. In CloudCLI UI 1.37.3 a tool call is either a group
