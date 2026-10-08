@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 
 import type { BackgroundTaskSummary,
@@ -148,6 +148,31 @@ function ChatMessagesPane({
 }: ChatMessagesPaneProps) {
   const { t } = useTranslation('chat');
   const lazyRows = useLazyRowObserver(scrollContainerRef);
+
+  // quests: as in Cursor, the last user message scrolled past the top stays pinned at the top of the chat;
+  // scrolling above it hands the pin to the message before. Clicking the pin scrolls to the message.
+  const [stickyUser, setStickyUser] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const pane = scrollContainerRef.current;
+    if (!pane) {
+      return undefined;
+    }
+    const update = () => {
+      const paneTop = pane.getBoundingClientRect().top;
+      let passed: HTMLElement | null = null;
+      for (const message of pane.querySelectorAll<HTMLElement>('.chat-message.user')) {
+        if (message.getBoundingClientRect().top >= paneTop - 1) {
+          break;
+        }
+        passed = message;
+      }
+      setStickyUser(passed);
+    };
+    update();
+    pane.addEventListener('scroll', update, { passive: true });
+    return () => pane.removeEventListener('scroll', update);
+  }, [scrollContainerRef, chatMessages.length]);
+
   const groupedVisibleMessages = useMemo(
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
     [visibleMessages, showThinking],
@@ -194,6 +219,18 @@ function ChatMessagesPane({
         hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
       }`}
     >
+      {stickyUser && (
+        <div className="sticky top-0 z-20 h-0">
+          <button
+            type="button"
+            title="Scroll to this message"
+            onClick={() => stickyUser.scrollIntoView({ block: 'start' })}
+            className="quests-sticky-user absolute left-12 right-8 top-0 line-clamp-3 whitespace-pre-wrap px-3 py-2 text-left text-sm"
+          >
+            {stickyUser.querySelector('.rounded-2xl.border')?.textContent ?? stickyUser.textContent}
+          </button>
+        </div>
+      )}
       {chatMessages.length > 0 && (
         <div className="pointer-events-none sticky right-4 top-3 z-10 mb-2 flex items-start justify-between gap-2 sm:px-4">
           {/* Running background work stays in view while the transcript scrolls under it. */}

@@ -114,3 +114,9 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
 .prose, .prose :where(p, li, strong, b, em, h1, h2, h3, h4, h5, h6, blockquote, td, th) { color: #cccccc !important; }
 /* Tool call boxes and their output, measured from Cursor: page background, 1px #454647 border, output #161718. */
 .chat-message pre { background: #161718 !important; }
+
+/* The pinned user message at the top of the chat (ChatMessagesPane), styled like a user message in Cursor. */
+.quests-sticky-user {
+  background: #3c3c3c; border: 1px solid #575757; border-radius: 4px; color: #cccccc;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
+}
