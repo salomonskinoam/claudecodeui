@@ -22,6 +22,9 @@ import {
   usePanes,
 } from '@/shared/hooks/useSplitPane';
 
+/** quests: the tab id of a chat that has no session id yet. */
+const NEW_CHAT_TAB = 'new-chat';
+
 /** Rendered by ProjectWorkspaceRoute to lay out the workspace sidebar, main region and global overlays. */
 function ProjectWorkspaceShell({
   isMobile,
@@ -43,6 +46,9 @@ function ProjectWorkspaceShell({
   }, [showTabs, sessionId]);
 
   const nameOf = useCallback((id: string) => {
+    if (id === NEW_CHAT_TAB) {
+      return 'New chat';
+    }
     for (const project of projects) {
       const session = project.sessions?.find((s) => s.id === id);
       if (session) {
@@ -88,7 +94,17 @@ function ProjectWorkspaceShell({
     }
   };
 
+  // A new chat has no id until its first message (the address is "/"), so it shows as a "New chat" tab
+  // that is not stored; after the first message the app moves to /session/<id> and the real tab replaces it.
+  const leftTabs = showTabs && !sessionId ? [...panes.left, NEW_CHAT_TAB] : panes.left;
   const closeLeft = useCallback((id: string) => {
+    if (id === NEW_CHAT_TAB) {
+      const last = panes.left[panes.left.length - 1];
+      if (last) {
+        navigate(`/session/${last}`);
+      }
+      return;
+    }
     if (id === sessionId) {
       const next = neighbor(panes.left, id);
       navigate(next ? `/session/${next}` : '/');
@@ -108,12 +124,12 @@ function ProjectWorkspaceShell({
           className={showSplit ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-1 flex-col'}
           style={showSplit ? { flex: `0 0 ${splitPercent}%` } : undefined}
         >
-          {showTabs && panes.left.length > 0 && (
+          {showTabs && leftTabs.length > 0 && (
             <PaneTabs
-              ids={panes.left}
-              activeId={sessionId ?? null}
+              ids={leftTabs}
+              activeId={sessionId ?? NEW_CHAT_TAB}
               nameOf={nameOf}
-              onSelect={(id) => navigate(`/session/${id}`)}
+              onSelect={(id) => id !== NEW_CHAT_TAB && navigate(`/session/${id}`)}
               onClose={closeLeft}
               dotOf={dotOf}
             />
