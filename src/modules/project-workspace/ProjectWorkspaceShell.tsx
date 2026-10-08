@@ -92,7 +92,6 @@ function ProjectWorkspaceShell({
       style={{ bottom: 'var(--keyboard-height, 0px)' }}
     >
       <ProjectEffects navigate={navigate} />
-      {!isEmbedded && <ProjectSidebarRegion isMobile={isMobile} />}
 
       <div ref={panesRef} className="flex min-w-0 flex-1">
         <div
@@ -162,6 +161,8 @@ function ProjectWorkspaceShell({
       <ProjectCommandPalette />
       {/* Last flex child on purpose: when pinned it docks to the right of the main region. */}
       <ProjectQuickSettingsRegion />
+      {/* quests: the session list sits on the right. */}
+      {!isEmbedded && <ProjectSidebarRegion isMobile={isMobile} />}
     </div>
   );
 }

@@ -9,14 +9,14 @@
 
   // Text size slider at the top. Sets --base (see cloudcli-custom.css), remembered in this browser.
   const set = px => document.documentElement.style.setProperty('--base', px + 'px');
-  let px = 20;
-  try { px = +localStorage.getItem('quests-font-base') || 20; } catch {}
+  let px = 19.75;
+  try { px = +localStorage.getItem('quests-font-base') || 19.75; } catch {}
   set(px);
   const bar = document.createElement('div');
   bar.style.cssText = 'position:fixed;top:4px;left:50%;transform:translateX(-50%);z-index:99999;' +
     'display:flex;gap:8px;align-items:center;padding:2px 10px;border-radius:6px;' +
     'background:rgba(127,127,127,.25);font:13px system-ui,sans-serif;color:inherit';
-  bar.innerHTML = `text <input type="range" min="12" max="32" step="1" value="${px}" style="width:160px"> <span>${px}px</span>`;
+  bar.innerHTML = `text <input type="range" min="12" max="32" step="0.25" value="${px}" style="width:160px"> <span>${px}px</span>`;
   const [input, label] = [bar.querySelector('input'), bar.querySelector('span')];
   input.oninput = () => {
     set(input.value); label.textContent = input.value + 'px';

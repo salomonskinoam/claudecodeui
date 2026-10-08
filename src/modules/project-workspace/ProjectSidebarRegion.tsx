@@ -60,7 +60,8 @@ function ProjectSidebarRegion({
     const origin = resizeOriginRef.current;
     if (!origin) return;
 
-    pendingWidthRef.current = origin.width + (event.clientX - origin.pointerX);
+    // quests: the sidebar sits on the right, so dragging left widens it.
+    pendingWidthRef.current = origin.width - (event.clientX - origin.pointerX);
     if (resizeFrameRef.current !== null) return;
     resizeFrameRef.current = window.requestAnimationFrame(() => {
       resizeFrameRef.current = null;
@@ -86,10 +87,10 @@ function ProjectSidebarRegion({
   const handleResizeKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
-      setSidebarWidth(sidebarWidth - SIDEBAR_WIDTH_KEYBOARD_STEP);
+      setSidebarWidth(sidebarWidth + SIDEBAR_WIDTH_KEYBOARD_STEP);
     } else if (event.key === 'ArrowRight') {
       event.preventDefault();
-      setSidebarWidth(sidebarWidth + SIDEBAR_WIDTH_KEYBOARD_STEP);
+      setSidebarWidth(sidebarWidth - SIDEBAR_WIDTH_KEYBOARD_STEP);
     } else if (event.key === 'Home') {
       event.preventDefault();
       resetSidebarWidth();
@@ -118,7 +119,7 @@ function ProjectSidebarRegion({
   if (!isMobile) {
     return (
       <div
-        className="relative h-full flex-shrink-0 border-r border-border/50"
+        className="relative h-full flex-shrink-0 border-l border-border/50"
         style={isSidebarResizable ? { width: sidebarWidth } : undefined}
       >
         <Sidebar {...sidebarSharedProps} />
@@ -131,7 +132,7 @@ function ProjectSidebarRegion({
             aria-valuemin={SIDEBAR_WIDTH_MIN}
             aria-valuemax={SIDEBAR_WIDTH_MAX}
             tabIndex={0}
-            className="absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none"
+            className="absolute inset-y-0 -left-0.5 z-10 w-1 cursor-col-resize hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none"
             onPointerDown={handleResizeStart}
             onPointerMove={handleResizeMove}
             onPointerUp={handleResizeEnd}

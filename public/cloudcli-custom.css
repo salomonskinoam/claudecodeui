@@ -1,8 +1,35 @@
-/* Our changes to CloudCLI UI, loaded by its page (see start-cloudcli.sh). */
+/* Our changes to CloudCLI UI, loaded by its page (see index.html). */
+
+/* Cursor's look, from ~/.config/Cursor/User/settings.json (workbench.colorCustomizations):
+   editor #1E1F22, text #ABB2BF, sidebar #1a1a1c, widgets #353535, status bar #2B2D30, active tab #3d5984.
+   html.dark outranks the app's own .dark rule. */
+html.dark {
+  --background: 225 6% 13%;
+  --foreground: 219 14% 71%;
+  --card: 240 4% 11%;
+  --card-foreground: 219 14% 71%;
+  --popover: 216 5% 18%;
+  --popover-foreground: 219 14% 71%;
+  --primary: 216 37% 38%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 216 5% 18%;
+  --secondary-foreground: 219 14% 71%;
+  --muted: 216 5% 18%;
+  --muted-foreground: 219 8% 55%;
+  --accent: 216 5% 18%;
+  --accent-foreground: 219 14% 71%;
+  --border: 0 0% 21%;
+  --input: 0 0% 21%;
+  --ring: 216 37% 38%;
+}
+/* Cursor's fonts: the system UI font for text (the app uses serif for chat), Droid Sans Mono for code. */
+html, body, .font-serif, .font-sans { font-family: system-ui, Ubuntu, "Droid Sans", sans-serif !important; }
+code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !important; }
 
 /* Text size. --base is the size of normal text; every other text size follows it.
-   Only font sizes change: spacing, icons and layout stay as they are. The slider in cloudcli-custom.js sets --base. */
-:root { --base: 20px; }
+   Only font sizes change: spacing, icons and layout stay as they are. The slider in cloudcli-custom.js sets --base.
+   19.75px is Cursor's chat text size (claudeCodeUiPatch.chatHistoryFontSize). */
+:root { --base: 19.75px; }
 .text-base { font-size: var(--base) !important; line-height: 1.5 !important; }
 .text-lg   { font-size: calc(var(--base) * 1.125) !important; line-height: 1.5 !important; }
 .text-sm, .prose-sm { font-size: calc(var(--base) * .875) !important; line-height: 1.5 !important; }
