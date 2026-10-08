@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- quests: rainbow tab icon, so this tab stands out in the browser -->
+  <defs>
+    <linearGradient id="r" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff3b30"/>
+      <stop offset=".2" stop-color="#ff9500"/>
+      <stop offset=".4" stop-color="#ffcc00"/>
+      <stop offset=".6" stop-color="#34c759"/>
+      <stop offset=".8" stop-color="#007aff"/>
+      <stop offset="1" stop-color="#af52de"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#r)"/>
+</svg>
