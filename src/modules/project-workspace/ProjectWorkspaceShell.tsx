@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
-import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
+import { useProjectCommandState, useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import PaneTabs from '@/modules/project-workspace/PaneTabs';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
@@ -97,6 +97,17 @@ function ProjectWorkspaceShell({
   // A new chat has no id until its first message (the address is "/"), so it shows as a "New chat" tab
   // that is not stored; after the first message the app moves to /session/<id> and the real tab replaces it.
   const leftTabs = showTabs && !sessionId ? [...panes.left, NEW_CHAT_TAB] : panes.left;
+  // The address "/" carries no project, so after a reload the new chat would lose its input box. Start it in
+  // the project of the last left tab, else the first project.
+  const { selectedProject, handleNewSession } = useProjectCommandState();
+  useEffect(() => {
+    if (!showTabs || sessionId || selectedProject || projects.length === 0) {
+      return;
+    }
+    const lastTab = panes.left[panes.left.length - 1];
+    const owner = projects.find((project) => project.sessions?.some((s) => s.id === lastTab));
+    handleNewSession(owner ?? projects[0]);
+  }, [showTabs, sessionId, selectedProject, projects, panes.left, handleNewSession]);
   const closeLeft = useCallback((id: string) => {
     if (id === NEW_CHAT_TAB) {
       const last = panes.left[panes.left.length - 1];
