@@ -214,9 +214,9 @@ export async function initializeSessionsWatcher(): Promise<void> {
         ignoreInitial: true,
         followSymlinks: false,
         depth: 6,
-        usePolling: true,
-        interval: 6_000,
-        binaryInterval: 6_000,
+        // quests: native change events (inotify) instead of a 6s poll, so a chat running in an IDE streams into
+        // the page within the 0.5-2s batch window. ~/.claude/projects is ~200 folders, far under the inotify limit.
+        usePolling: false,
       });
 
       watcher
