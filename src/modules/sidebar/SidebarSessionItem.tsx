@@ -69,9 +69,10 @@ function SidebarSessionItem({
   const isCompact = useCompactSidebar();
   const sessionView = createSessionViewModel(session, currentTime, t);
   const isSelected = selectedSession?.id === session.id;
-  // quests split screen: an arrow marks which pane shows this session.
-  const { rightActive } = usePanes();
-  const paneArrow = rightActive === null ? null : isSelected ? '◀' : rightActive === session.id ? '▶' : null;
+  // quests tabs: an arrow marks each pane this session is open in; bold when it is that pane's active tab.
+  const panes = usePanes();
+  const inLeftPane = panes.left.includes(session.id);
+  const inRightPane = panes.right.includes(session.id);
   const compactSessionAge = formatCompactAge(sessionView.sessionTime, currentTime);
   const [isMobileOptionsOpen, setIsMobileOptionsOpen] = useState(false);
   const showAttentionIndicator = needsAttention && !isSelected;
@@ -433,9 +434,14 @@ function SidebarSessionItem({
             >
               <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
             </div>
-            {paneArrow && (
-              <span className="flex-shrink-0 text-sm font-bold" title={paneArrow === '◀' ? 'Left pane' : 'Right pane'}>
-                {paneArrow}
+            {inLeftPane && (
+              <span className={cn('flex-shrink-0 text-sm', isSelected ? 'font-bold' : 'opacity-50')} title="Open in the left pane">
+                ◀
+              </span>
+            )}
+            {inRightPane && (
+              <span className={cn('flex-shrink-0 text-sm', panes.rightActive === session.id ? 'font-bold' : 'opacity-50')} title="Open in the right pane">
+                ▶
               </span>
             )}
             <div className="min-w-0 flex-1">
