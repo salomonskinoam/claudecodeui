@@ -102,3 +102,10 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
   height: 9px !important;
   background: linear-gradient(transparent 3px, hsl(var(--foreground) / .5) 3px, hsl(var(--foreground) / .5) 5px, transparent 5px) !important;
 }
+
+/* User messages, measured from Cursor: #3c3c3c box, 1px #575757 border, #cccccc text, ~4px corners. */
+.chat-message.user .rounded-2xl.border {
+  background: #3c3c3c !important; border: 1px solid #575757 !important; border-radius: 4px !important;
+  color: #cccccc !important; box-shadow: none !important;
+}
+.chat-message.user .rounded-2xl.border .prose { color: #cccccc !important; }
