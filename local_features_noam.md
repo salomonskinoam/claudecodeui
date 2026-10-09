@@ -66,7 +66,7 @@ Status: **built** (in this fork), **asked** (requested, not built yet).
 | 30 | This machine only | The server listens on 127.0.0.1 only (the default would open it to the network). | built |
 | 31 | Patient permission prompts | A permission prompt waits up to 24 hours (the default denied it after 55 seconds). | built |
 | 32 | Always running | Runs as a user service that starts at login and restarts on failure, independent of any chat. | built |
-| 33 | Chat names from rename | The name set with rename (in the IDE or the CLI) wins over every other name, including a name stored earlier. | built |
+| 33 | Chat names as in Cursor | The page shows the same name as Cursor: the name set with rename (in the IDE or the CLI) first, else the title Claude Code generates by itself; either wins over a stored name. Only a chat with neither shows its first message. | built |
 | 38 | Update = merge the original into ours | The in-app Update merges the original project's newest release into this fork, so our features stay on top, then rebuilds, pushes to the fork and restarts. It refuses on uncommitted changes, aborts on a merge conflict (listing the files), and on a failed build returns exactly to the version before and rebuilds it. A failed update never leaves a broken state. | built |
 | 39 | Two versions | The version line shows the original project's version as the base plus ours on top: `CloudCLI v<base> + quests <N> (<commit>)`, where N is the number of our commits not in the original project. It links to the fork. | built |
 | 40 | No community buttons | "Report Issue" and "Join Community" are removed (full and collapsed sidebar). | built |

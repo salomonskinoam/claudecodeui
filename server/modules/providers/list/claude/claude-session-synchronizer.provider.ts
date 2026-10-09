@@ -166,19 +166,27 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
   }
 
   /** quests: the last /rename title in a transcript, if any. */
+  /**
+   * quests: the title Cursor shows, from the transcript: the last /rename title, else the last title Claude Code
+   * generated (ai-title). Either wins over a stored name, so the page and the IDE show the same name; a chat
+   * with neither keeps its stored name (the first prompt).
+   */
   private async extractCustomTitle(filePath: string): Promise<string | undefined> {
     const text = await readFile(filePath, 'utf8');
-    const at = text.lastIndexOf('"type":"custom-title"');
-    if (at < 0) {
-      return undefined;
-    }
-    const end = text.indexOf('\n', at);
-    try {
-      const title = JSON.parse(text.slice(text.lastIndexOf('\n', at) + 1, end < 0 ? undefined : end)).customTitle;
-      return typeof title === 'string' && title.trim() ? title : undefined;
-    } catch {
-      return undefined;
-    }
+    const lastTitle = (type: string, field: string): string | undefined => {
+      const at = text.lastIndexOf(`"type":"${type}"`);
+      if (at < 0) {
+        return undefined;
+      }
+      const end = text.indexOf('\n', at);
+      try {
+        const title = JSON.parse(text.slice(text.lastIndexOf('\n', at) + 1, end < 0 ? undefined : end))[field];
+        return typeof title === 'string' && title.trim() ? title : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    return lastTitle('custom-title', 'customTitle') ?? lastTitle('ai-title', 'aiTitle');
   }
 
   /**
