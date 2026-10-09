@@ -6,6 +6,7 @@ import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffec
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import { useProjectCommandState, useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import PaneTabs from '@/modules/project-workspace/PaneTabs';
+import { PlanView } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -20,6 +21,8 @@ import {
   neighbor,
   NEW_CHAT_TAB,
   openLeftTab,
+  planNameOf,
+  planTabId,
   selectRightTab,
   usePanes,
 } from '@/shared/hooks/useSplitPane';
@@ -32,7 +35,9 @@ function ProjectWorkspaceShell({
   navigate,
 }: ProjectWorkspaceShellProps) {
   // quests: chat tabs per pane and the split screen (see useSplitPane).
-  const { sessionId } = useParams<{ sessionId?: string }>();
+  const { sessionId, planName } = useParams<{ sessionId?: string; planName?: string }>();
+  // A plan tab (route /plan/:planName) shows a plan file in place of a chat.
+  const urlTab = sessionId ?? (planName ? planTabId(planName) : NEW_CHAT_TAB);
   const panes = usePanes();
   const { projects } = useProjectSidebarState().sidebarSharedProps;
   const showTabs = !isEmbedded && !isMobile;
@@ -42,13 +47,16 @@ function ProjectWorkspaceShell({
   // gets its session id, ProjectMainRegion turns that tab into the chat's tab in place (replaceNewChatTab).
   useEffect(() => {
     if (showTabs) {
-      openLeftTab(sessionId ?? NEW_CHAT_TAB);
+      openLeftTab(urlTab);
     }
-  }, [showTabs, sessionId]);
+  }, [showTabs, urlTab]);
 
   const nameOf = useCallback((id: string) => {
     if (id === NEW_CHAT_TAB) {
       return 'New chat';
+    }
+    if (planNameOf(id)) {
+      return `Plan: ${planNameOf(id)}`;
     }
     for (const project of projects) {
       const session = project.sessions?.find((s) => s.id === id);
@@ -99,17 +107,18 @@ function ProjectWorkspaceShell({
   // the project of the last chat tab, else the first project.
   const { selectedProject, handleNewSession } = useProjectCommandState();
   useEffect(() => {
-    if (!showTabs || sessionId || selectedProject || projects.length === 0) {
+    if (!showTabs || sessionId || planName || selectedProject || projects.length === 0) {
       return;
     }
     const lastChat = panes.left.filter((id) => id !== NEW_CHAT_TAB).at(-1);
     const owner = projects.find((project) => project.sessions?.some((s) => s.id === lastChat));
     handleNewSession(owner ?? projects[0]);
-  }, [showTabs, sessionId, selectedProject, projects, panes.left, handleNewSession]);
+  }, [showTabs, sessionId, planName, selectedProject, projects, panes.left, handleNewSession]);
 
-  const leftActive = sessionId ?? NEW_CHAT_TAB;
+  const leftActive = urlTab;
   const showLeftTab = useCallback((id: string) => {
-    navigate(id === NEW_CHAT_TAB ? '/' : `/session/${id}`);
+    const plan = planNameOf(id);
+    navigate(id === NEW_CHAT_TAB ? '/' : plan ? `/plan/${plan}` : `/session/${id}`);
   }, [navigate]);
   const closeLeft = useCallback((id: string) => {
     if (id === leftActive) {
@@ -165,12 +174,16 @@ function ProjectWorkspaceShell({
           )}
           {/* The chat view fills the height left under the tab row, so its bottom stays on screen. */}
           <div className="flex min-h-0 flex-1 flex-col">
-            <ProjectMainRegion
-              isMobile={isMobile}
-              ws={ws}
-              sendMessage={sendMessage}
-              navigate={navigate}
-            />
+            {planName ? (
+              <PlanView planName={planName} />
+            ) : (
+              <ProjectMainRegion
+                isMobile={isMobile}
+                ws={ws}
+                sendMessage={sendMessage}
+                navigate={navigate}
+              />
+            )}
           </div>
         </div>
   
@@ -203,7 +216,9 @@ function ProjectWorkspaceShell({
               dotOf={dotOf}
               onDropTab={dropTabRight}
             />
-            {panes.rightActive === sessionId ? (
+            {planNameOf(panes.rightActive) ? (
+              <PlanView planName={planNameOf(panes.rightActive) as string} />
+            ) : panes.rightActive === sessionId ? (
               // Two copies of the app writing one chat would clash, so the right pane steps aside.
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                 This chat is open in the left pane.

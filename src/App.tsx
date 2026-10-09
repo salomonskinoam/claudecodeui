@@ -123,6 +123,8 @@ export default function App() {
                     <Routes>
                       <Route path="/" element={<ProjectWorkspaceRoute />} />
                       <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
+                      {/* quests: a plan tab (~/.claude/plans/<planName>.md), shown in the same workspace. */}
+                      <Route path="/plan/:planName" element={<ProjectWorkspaceRoute />} />
                     </Routes>
                   </Router>
                 </ProtectedRoute>

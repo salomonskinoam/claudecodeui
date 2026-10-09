@@ -203,6 +203,27 @@ app.use('/api/agent', agentRoutes);
 
 app.use('/api/voice', authenticateToken, voiceRoutes);
 
+// quests: one plan file, for the plan tab. Plans are written by Claude Code to ~/.claude/plans/<name>.md (the
+// ExitPlanMode tool call carries planFilePath). Only names of that form are served, from that folder only.
+app.get('/api/quests/plan/:name', authenticateToken, async (req: Request, res: Response) => {
+    const name = String(req.params.name);
+    if (!/^[A-Za-z0-9_-]+$/.test(name)) {
+        res.status(400).json({ error: 'bad plan name' });
+        return;
+    }
+    const file = path.join(os.homedir(), '.claude', 'plans', `${name}.md`);
+    try {
+        const stat = await fsPromises.stat(file);
+        res.json({ name, text: await fsPromises.readFile(file, 'utf8'), modifiedAt: stat.mtimeMs });
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            res.status(404).json({ error: 'no such plan' });
+            return;
+        }
+        throw error;
+    }
+});
+
 // quests: live state of every chat, for the tab dots. { appSessionId: 'running' | 'waiting' }; idle chats are absent.
 // Chats in an IDE or terminal: Claude Code's registry, one file per live process in ~/.claude/sessions, whose
 // status is busy, waiting (a prompt waits on the user, waitingFor says which) or idle. Chats run from this page

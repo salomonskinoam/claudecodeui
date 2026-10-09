@@ -17,6 +17,7 @@ Status: **built** (in this fork), **asked** (requested, not built yet).
 | 7 | Session list on the right | The session list sits on the right edge of the window. Its resize handle is on its left edge; dragging left widens it. | built |
 | 8 | Layout link | A link ending in `#panes=<json>` (`{left: [ids], right: [ids], rightActive: id}`) sets the tab layout, then removes itself from the address. | built |
 | 9 | No chat header strip | The strip above the chat (chat title, project name, Chat / Shell / Files / Source Control buttons) is gone on desktop. Shell, Files and Source Control keep their header, so there is a way back to the chat. | built |
+| 46 | Plans open as tabs | When a chat writes a plan (Claude Code saves it to ~/.claude/plans/<name>.md), the plan opens as its own tab right after that chat's tab, in the chat's pane, and is shown, rendered as markdown, like Cursor's plan preview. The tab re-reads the file every 3 seconds, so a revised plan shows. Only plans written while the chat is open count: plans already in its history never pop up, and a closed plan tab stays closed. Plan tabs drag like chat tabs. | built |
 | 10 | Session list sort order | Sort the session list by a rule the user will give. | asked |
 
 ## Status dots

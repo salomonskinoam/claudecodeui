@@ -9,6 +9,8 @@
 //   bottom  scroll to the bottom and watch 18 s: must stay 0 px from the bottom, no endless loading
 //   scroll  fast scroll up, 1500 px every 60 ms, to the top: a reference row must move exactly 1500 px each
 //           step, also on steps where older history lands (prints jumps; [] means none)
+//   plan    <sessionId> is a plan name here (~/.claude/plans/<name>.md): opens a chat tab, then the plan tab placed
+//           right after it, and prints the left tab order, the URL and the start of the rendered plan
 //   mode    the permission mode button: start mode, after Shift+Tab, after plain Tab (must not change)
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
 //           panes, prints the stored layout after each drag. Restores no layout: use a fresh browser profile.
@@ -19,8 +21,8 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode'].includes(check) || !sessionId) {
-  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode <sessionId>');
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan'].includes(check) || !sessionId) {
+  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan <sessionId>');
   process.exit(2);
 }
 const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
@@ -31,7 +33,8 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/google/chrome/chrome', headless: true, args: ['--disable-smooth-scrolling'] });
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await page.addInitScript((t) => localStorage.setItem('auth-token', t), token);
-  await page.goto(`http://127.0.0.1:3001/session/${sessionId}`);
+  page.on('pageerror', (error) => console.log('page error:', (error.stack || error.message).slice(0, 700)));
+  await page.goto(check === 'plan' ? 'http://127.0.0.1:3001/' : `http://127.0.0.1:3001/session/${sessionId}`);
   await page.waitForTimeout(6000);
   const pane = page.locator('.chat-messages-pane');
 
@@ -123,6 +126,29 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(1500); await layout('left #2 -> before left #1');
     await rows.nth(1).locator('[draggable="true"]').nth(1).dragTo(rows.nth(0).locator('[draggable="true"]').nth(0), { targetPosition: { x: 5, y: 10 } });
     await page.waitForTimeout(1500); await layout('right #2 -> before left #1');
+  }
+
+  if (check === 'plan') {
+    const plan = sessionId;
+    await page.waitForSelector('a[href^="/session/"]', { timeout: 20000 });
+    const chats = (await page.evaluate(() => Array.from(document.querySelectorAll('a[href^="/session/"]')).map((a) => a.getAttribute('href').slice(9)))).slice(0, 2);
+    await page.evaluate(([a, b, p]) => {
+      localStorage.setItem('quests-panes', JSON.stringify({ left: [a, b], right: [], rightActive: null }));
+      // the same placement the page does when a chat writes a plan: right after the chat's tab
+      const panes = JSON.parse(localStorage.getItem('quests-panes'));
+      const at = panes.left.indexOf(a);
+      panes.left.splice(at + 1, 0, `plan:${p}`);
+      localStorage.setItem('quests-panes', JSON.stringify(panes));
+    }, [chats[0], chats[1], plan]);
+    await page.goto(`http://127.0.0.1:3001/plan/${plan}`);
+    await page.waitForTimeout(5000);
+    const r = await page.evaluate(() => ({
+      tabs: Array.from(document.querySelectorAll('div.h-9 > [draggable="true"]')).map((t) => t.textContent.replace('×', '').trim().slice(0, 30)),
+      url: location.pathname,
+      rendered: document.querySelector('.prose h1, .prose h2')?.textContent?.slice(0, 80) ?? null,
+    }));
+    console.log(JSON.stringify(r));
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   }
 
   if (check === 'mode') {

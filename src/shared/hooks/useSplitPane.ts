@@ -26,7 +26,10 @@ function readRaw(): string | null {
 
 function parse(raw: string | null): Panes {
   try {
-    return raw ? { ...EMPTY, ...JSON.parse(raw) } : EMPTY;
+    const p: Panes = raw ? { ...EMPTY, ...JSON.parse(raw) } : EMPTY;
+    // Stored by hand or by an old build: keep only real tab ids, so a bad entry can never blank the page.
+    const ids = (list: unknown) => (Array.isArray(list) ? list.filter((id): id is string => typeof id === 'string' && id !== '') : []);
+    return { left: ids(p.left), right: ids(p.right), rightActive: typeof p.rightActive === 'string' ? p.rightActive : null };
   } catch {
     return EMPTY;
   }
@@ -104,6 +107,28 @@ export const moveTab = (id: string, toPane: 'left' | 'right', beforeId: string |
       ? id
       : p.rightActive === id ? neighbor(p.right, id) : p.rightActive;
     return { left, right, rightActive: right.length > 0 ? rightActive : null };
+  });
+
+/** A plan tab's id: `plan:<name>` for ~/.claude/plans/<name>.md. */
+export const planTabId = (planName: string) => `plan:${planName}`;
+/** The plan name of a plan tab id, else null. */
+export const planNameOf = (tabId: string): string | null => (tabId.startsWith('plan:') ? tabId.slice(5) : null);
+
+/**
+ * Opens a tab right after `afterId` in a pane (at the end when `afterId` is not there), like an editor opening
+ * a file next to the tab that asked for it. In the right pane it becomes the shown tab; the left pane follows
+ * the URL, which the caller navigates.
+ */
+export const openTabAfter = (id: string, toPane: 'left' | 'right', afterId: string | null) =>
+  write((p) => {
+    const place = (ids: string[]) => {
+      const rest = without(ids, id);
+      const at = afterId === null ? -1 : rest.indexOf(afterId);
+      return at < 0 ? [...rest, id] : [...rest.slice(0, at + 1), id, ...rest.slice(at + 1)];
+    };
+    return toPane === 'left'
+      ? { ...p, left: place(p.left), right: without(p.right, id) }
+      : { ...p, left: without(p.left, id), right: place(p.right), rightActive: id };
   });
 
 /** Closes the whole right pane. */

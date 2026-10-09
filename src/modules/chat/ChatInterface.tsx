@@ -29,6 +29,7 @@ import {
 import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import OutsideApprovalBanner from '@/modules/chat/composer/OutsideApprovalBanner';
+import { usePlanTabs } from '@/modules/chat/plan/usePlanTabs';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 
 type ChatInterfaceProps = {
@@ -428,6 +429,8 @@ function ChatInterface({
   // reserve enough bottom space to keep the floating status tab from
   // overlapping the last message.
   const hasActivityIndicator = Boolean(sessionActivity && pendingPermissionRequests.length === 0);
+  // quests: a plan the chat writes opens as its own tab next to this chat's tab, as in Cursor.
+  usePlanTabs(selectedSession?.id || currentSessionId, chatMessages, isLoadingSessionMessages);
 
   const selectedProviderLabel =
     provider === 'cursor'
