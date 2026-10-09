@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Quests IDE
+Comment=CloudCLI UI fork (salomonskinoam/claudecodeui) in its own Firefox window
+Exec=firefox --new-instance -P quests-ide --class QuestsIDE --name QuestsIDE http://localhost:3001
+Icon=/home/noam/src/quests/claudecodeui/public/quests-favicon.svg
+StartupWMClass=QuestsIDE
+Terminal=false
+Categories=Development;
