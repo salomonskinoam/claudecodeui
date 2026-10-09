@@ -54,7 +54,8 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
   claude: {
     provider: 'claude',
     permissionModes: ['default', 'auto', 'acceptEdits', 'bypassPermissions', 'plan'],
-    defaultPermissionMode: 'default',
+    // quests: chats start in auto mode.
+    defaultPermissionMode: 'auto',
     supportsImages: true,
     supportsFiles: true,
     supportsAbort: true,

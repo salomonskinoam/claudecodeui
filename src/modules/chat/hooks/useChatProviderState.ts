@@ -275,7 +275,8 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     if (capabilityDefault && modes.includes(capabilityDefault)) {
       return capabilityDefault;
     }
-    return modes[0] ?? 'default';
+    // quests: auto when the provider has it, also before the capabilities have loaded.
+    return modes.includes('auto') ? 'auto' : modes[0] ?? 'default';
   }, [getPermissionModesForProvider, providerCapabilities]);
 
   const getSupportsEffortForProvider = useCallback((targetProvider: LLMProvider): boolean => {
@@ -406,20 +407,30 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     }
   }, [providerEfforts, providerModels, reconcileStoredEffort]);
 
+  // quests: each chat keeps its own mode, and a chat without one starts at the provider default (auto for
+  // Claude). The last mode picked no longer carries over to every later chat. A brand-new chat only receives
+  // its session id after the first send: the mode picked before that is saved to the new id when it arrives.
+  const permissionModeRef = useRef(permissionMode);
   useEffect(() => {
+    permissionModeRef.current = permissionMode;
+  }, [permissionMode]);
+  const previousSessionIdRef = useRef(selectedSession?.id);
+  useEffect(() => {
+    const previousSessionId = previousSessionIdRef.current;
+    previousSessionIdRef.current = selectedSession?.id;
     const validModes = getPermissionModesForProvider(provider);
     const sessionSavedMode = selectedSession?.id
       ? (localStorage.getItem(`permissionMode-${selectedSession.id}`) as PermissionMode | null)
       : null;
-    // Fall back to the last mode picked for this provider: a brand-new chat
-    // only receives its session id after the first send, so without this the
-    // mode chosen beforehand would snap back to the default as soon as the
-    // session id appears.
-    const providerSavedMode = localStorage.getItem(`permissionMode-last-${provider}`) as PermissionMode | null;
-    const savedMode = [sessionSavedMode, providerSavedMode].find(
-      (mode): mode is PermissionMode => Boolean(mode && validModes.includes(mode)),
-    );
-    setPermissionMode(savedMode ?? getDefaultPermissionModeForProvider(provider));
+    if (sessionSavedMode && validModes.includes(sessionSavedMode)) {
+      setPermissionMode(sessionSavedMode);
+      return;
+    }
+    if (selectedSession?.id && !previousSessionId) {
+      localStorage.setItem(`permissionMode-${selectedSession.id}`, permissionModeRef.current);
+      return;
+    }
+    setPermissionMode(getDefaultPermissionModeForProvider(provider));
   }, [selectedSession?.id, provider, getDefaultPermissionModeForProvider, getPermissionModesForProvider]);
 
   useEffect(() => {
@@ -442,14 +453,12 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
   const selectPermissionMode = useCallback((nextMode: PermissionMode) => {
     setPermissionMode(nextMode);
 
-    // Persist per provider as well as per session: a brand-new chat has no
-    // session id yet, and the per-provider key keeps the choice sticky when
-    // the real id arrives (and for future sessions of this provider).
-    localStorage.setItem(`permissionMode-last-${provider}`, nextMode);
+    // Per session only (quests). A brand-new chat has no id yet; the effect above saves its mode to the id
+    // when it arrives.
     if (selectedSession?.id) {
       localStorage.setItem(`permissionMode-${selectedSession.id}`, nextMode);
     }
-  }, [provider, selectedSession?.id]);
+  }, [selectedSession?.id]);
 
   const cyclePermissionMode = useCallback(() => {
     const modes = getPermissionModesForProvider(provider);

@@ -86,5 +86,25 @@ export const closeRightTab = (id: string) =>
     rightActive: p.rightActive === id ? neighbor(p.right, id) : p.rightActive,
   }));
 
+/**
+ * Moves a tab by drag and drop: within its pane (reorder) or into the other pane, placed before `beforeId`
+ * (null: at the end). A tab moved into the right pane becomes its active tab; a right pane left empty closes.
+ * The left pane's active tab follows the URL, which the caller navigates.
+ */
+export const moveTab = (id: string, toPane: 'left' | 'right', beforeId: string | null) =>
+  write((p) => {
+    const insert = (ids: string[]) => {
+      const rest = without(ids, id);
+      const at = beforeId === null ? -1 : rest.indexOf(beforeId);
+      return at < 0 ? [...rest, id] : [...rest.slice(0, at), id, ...rest.slice(at)];
+    };
+    const left = toPane === 'left' ? insert(p.left) : without(p.left, id);
+    const right = toPane === 'right' ? insert(p.right) : without(p.right, id);
+    const rightActive = toPane === 'right'
+      ? id
+      : p.rightActive === id ? neighbor(p.right, id) : p.rightActive;
+    return { left, right, rightActive: right.length > 0 ? rightActive : null };
+  });
+
 /** Closes the whole right pane. */
 export const closeRightPane = () => write((p) => ({ ...p, right: [], rightActive: null }));

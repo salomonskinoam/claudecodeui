@@ -1174,7 +1174,8 @@ export function useChatComposerState({
         return;
       }
 
-      if (event.key === 'Tab' && !showFileDropdown && !showCommandMenu) {
+      // quests: Shift+Tab cycles the permission mode, as in Claude Code; plain Tab is left alone.
+      if (event.key === 'Tab' && event.shiftKey && !showFileDropdown && !showCommandMenu) {
         event.preventDefault();
         cyclePermissionMode();
         return;

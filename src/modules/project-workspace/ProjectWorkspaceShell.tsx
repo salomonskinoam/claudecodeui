@@ -15,6 +15,7 @@ import {
   closeLeftTab,
   closeRightPane,
   closeRightTab,
+  moveTab,
   isEmbedded,
   neighbor,
   NEW_CHAT_TAB,
@@ -120,6 +121,25 @@ function ProjectWorkspaceShell({
     closeLeftTab(id);
   }, [leftActive, panes.left, showLeftTab]);
 
+  // Drag and drop of tabs (PaneTabs). Into the left pane: the tab is shown there. Out of the left pane: its next
+  // tab is shown (or the new chat). A new chat never moves to the right pane, which shows existing chats only.
+  const dropTabLeft = useCallback((id: string, beforeId: string | null) => {
+    const fromRight = !panes.left.includes(id);
+    moveTab(id, 'left', beforeId);
+    if (fromRight) {
+      showLeftTab(id);
+    }
+  }, [panes.left, showLeftTab]);
+  const dropTabRight = useCallback((id: string, beforeId: string | null) => {
+    if (id === NEW_CHAT_TAB) {
+      return;
+    }
+    if (id === leftActive) {
+      showLeftTab(neighbor(panes.left, id) ?? NEW_CHAT_TAB);
+    }
+    moveTab(id, 'right', beforeId);
+  }, [leftActive, panes.left, showLeftTab]);
+
   return (
     <div
       className="fixed inset-0 flex bg-background"
@@ -140,6 +160,7 @@ function ProjectWorkspaceShell({
               onSelect={showLeftTab}
               onClose={closeLeft}
               dotOf={dotOf}
+              onDropTab={dropTabLeft}
             />
           )}
           {/* The chat view fills the height left under the tab row, so its bottom stays on screen. */}
@@ -180,6 +201,7 @@ function ProjectWorkspaceShell({
               onClose={closeRightTab}
               onClosePane={closeRightPane}
               dotOf={dotOf}
+              onDropTab={dropTabRight}
             />
             {panes.rightActive === sessionId ? (
               // Two copies of the app writing one chat would clash, so the right pane steps aside.

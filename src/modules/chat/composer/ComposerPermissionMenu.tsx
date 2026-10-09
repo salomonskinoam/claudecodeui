@@ -112,13 +112,15 @@ function ComposerPermissionMenu({
           updateAnchor();
           setIsOpen((current) => !current);
         }}
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${activeAppearance.trigger}`}
+        // quests: the current mode is shown by name next to its icon (Shift+Tab cycles it).
+        className={`flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2 transition-colors ${activeAppearance.trigger}`}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={heading}
-        title={t('input.clickToChangeMode')}
+        title={`${t('input.clickToChangeMode')} (Shift+Tab)`}
       >
         <ActiveIcon className="h-4 w-4" />
+        <span>{t(`codex.modes.${permissionMode}`, { defaultValue: permissionMode })}</span>
       </button>
 
       {isOpen && anchor && createPortal(

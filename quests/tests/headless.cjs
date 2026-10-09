@@ -9,6 +9,9 @@
 //   bottom  scroll to the bottom and watch 18 s: must stay 0 px from the bottom, no endless loading
 //   scroll  fast scroll up, 1500 px every 60 ms, to the top: a reference row must move exactly 1500 px each
 //           step, also on steps where older history lands (prints jumps; [] means none)
+//   mode    the permission mode button: start mode, after Shift+Tab, after plain Tab (must not change)
+//   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
+//           panes, prints the stored layout after each drag. Restores no layout: use a fresh browser profile.
 const os = require('node:os');
 const path = require('node:path');
 const { chromium } = require('playwright-core');
@@ -16,8 +19,8 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll'].includes(check) || !sessionId) {
-  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll <sessionId>');
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode'].includes(check) || !sessionId) {
+  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode <sessionId>');
   process.exit(2);
 }
 const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
@@ -91,6 +94,41 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       }
       return out;
     })));
+  }
+
+  if (check === 'tabs') {
+    const others = (await page.evaluate(() => Array.from(document.querySelectorAll('a[href^="/session/"]'))
+      .map((a) => a.getAttribute('href').slice(9)))).filter((id) => id !== sessionId).slice(0, 3);
+    await page.evaluate(([a, b, c, d]) => {
+      localStorage.setItem('quests-panes', JSON.stringify({ left: [a, b, c], right: [d], rightActive: d }));
+      window.dispatchEvent(new Event('quests-panes-change'));
+    }, [sessionId, ...others]);
+    await page.waitForTimeout(3000);
+    const short = (ids) => ids.map((id) => id.slice(0, 4));
+    const layout = async (label) => {
+      const p = await page.evaluate(() => JSON.parse(localStorage.getItem('quests-panes')));
+      console.log(label.padEnd(34), 'left', JSON.stringify(short(p.left)), 'right', JSON.stringify(short(p.right)), 'rightActive', (p.rightActive || '').slice(0, 4), 'url', page.url().split('/').pop().slice(0, 4));
+    };
+    const rows = page.locator('div.h-9:has(> [draggable="true"])');
+    await layout('start');
+    await rows.nth(0).locator('[draggable="true"]').nth(1).dragTo(rows.nth(1).locator('[draggable="true"]').nth(0), { targetPosition: { x: 150, y: 10 } });
+    await page.waitForTimeout(1500); await layout('left #2 -> right, after its tab');
+    await rows.nth(0).locator('[draggable="true"]').nth(1).dragTo(rows.nth(0).locator('[draggable="true"]').nth(0), { targetPosition: { x: 5, y: 10 } });
+    await page.waitForTimeout(1500); await layout('left #2 -> before left #1');
+    await rows.nth(1).locator('[draggable="true"]').nth(1).dragTo(rows.nth(0).locator('[draggable="true"]').nth(0), { targetPosition: { x: 5, y: 10 } });
+    await page.waitForTimeout(1500); await layout('right #2 -> before left #1');
+  }
+
+  if (check === 'mode') {
+    const button = page.locator('button[title$="(Shift+Tab)"]');
+    console.log('mode shown:', await button.innerText());
+    await page.locator('[data-slot="prompt-input-textarea"]').first().focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.waitForTimeout(300);
+    console.log('after Shift+Tab:', await button.innerText());
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(300);
+    console.log('after plain Tab:', await button.innerText());
   }
 
   await browser.close();

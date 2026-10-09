@@ -8,7 +8,7 @@ Status: **built** (in this fork), **asked** (requested, not built yet).
 
 | # | Feature | Behavior | Status |
 |---|---|---|---|
-| 1 | Tabs per pane | Each pane has a row of chat tabs, like an editor. Clicking a chat in the session list opens it as a tab of the left pane. Clicking a tab shows that chat. × or a middle-click closes a tab; closing the active tab moves to the next one. Tabs survive a reload. | built |
+| 1 | Tabs per pane | Each pane has a row of chat tabs, like an editor. Clicking a chat in the session list opens it as a tab of the left pane. Clicking a tab shows that chat. × or a middle-click closes a tab; closing the active tab moves to the next one. Tabs survive a reload. Tabs drag: onto another tab (left half: before it, right half: after it) or onto the empty end of a row, within a pane or into the other pane; a tab dragged into a pane becomes its shown tab, the pane it left shows its next tab, a right pane left empty closes. A blue line marks the landing spot. | built |
 | 2 | Tab colors | Active tab: background `#3d5984`, white text, 2 px red bottom edge `#ff0000`. Inactive tab: text `#dddddd`. | built |
 | 3 | New-chat tab | "New Session" adds a "New chat" tab to the left pane. It stays when you switch to another tab. When the new chat sends its first message, that tab becomes the chat's own tab in the same place. A new chat keeps its input box after a reload (it starts in the project of the last chat tab, else the first project). | built |
 | 4 | Split screen | Ctrl+click on a chat in the session list opens it as a tab of a right pane, which appears next to the left one. The right pane has its own tab row and a × that closes the whole pane. The same chat is never live in both panes: the right pane then shows "This chat is open in the left pane". | built |
@@ -69,6 +69,9 @@ Status: **built** (in this fork), **asked** (requested, not built yet).
 | 38 | Update = merge the original into ours | The in-app Update merges the original project's newest release into this fork, so our features stay on top, then rebuilds, pushes to the fork and restarts. It refuses on uncommitted changes, aborts on a merge conflict (listing the files), and on a failed build returns exactly to the version before and rebuilds it. A failed update never leaves a broken state. | built |
 | 39 | Two versions | The version line shows the original project's version as the base plus ours on top: `CloudCLI v<base> + quests <N> (<commit>)`, where N is the number of our commits not in the original project. It links to the fork. | built |
 | 40 | No community buttons | "Report Issue" and "Join Community" are removed (full and collapsed sidebar). | built |
+| 41 | Permission mode shown | The mode button in the input box shows the current mode by name next to its icon (Default Mode, Auto Mode, Accept Edits, Bypass Permissions, Plan Mode). | built |
+| 42 | Shift+Tab cycles the mode | Shift+Tab in the input box cycles the permission mode, as in Claude Code. Plain Tab does not. | built |
+| 43 | Auto by default, per chat | A chat starts in Auto mode. Each chat keeps its own mode; the last mode picked no longer carries over to later chats. A mode picked in a new chat before its first message stays with that chat. | built |
 
 ## Chat management (the "quests" design)
 
