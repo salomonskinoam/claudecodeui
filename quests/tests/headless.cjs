@@ -28,7 +28,7 @@ const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { r
 const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, { expiresIn: 600 });
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/google/chrome/chrome', headless: true });
+  const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/google/chrome/chrome', headless: true, args: ['--disable-smooth-scrolling'] });
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await page.addInitScript((t) => localStorage.setItem('auth-token', t), token);
   await page.goto(`http://127.0.0.1:3001/session/${sessionId}`);
@@ -71,29 +71,35 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'scroll') {
+    // Scrolls with the mouse wheel, as a user does: the 3-screens-ahead preload waits for the user's own
+    // wheel, touch or keys, so setting scrollTop from code would not test it.
     await pane.evaluate((p) => { p.scrollTop = p.scrollHeight; });
     await page.waitForTimeout(1500);
-    console.log(JSON.stringify(await pane.evaluate(async (p) => {
-      const frame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-      const out = { steps: 0, loads: 0, jumps: [] };
-      let count = p.querySelectorAll('.chat-message').length;
-      while (p.scrollTop > 0 && out.steps < 150) {
-        const top = p.getBoundingClientRect().top;
-        const rows = Array.from(p.querySelectorAll('.chat-message'));
-        const marker = rows.find((m) => m.getBoundingClientRect().top >= top) || rows[0];
-        const before = marker.getBoundingClientRect().top;
-        const step = Math.min(1500, p.scrollTop);
-        p.scrollTop -= step;
-        await frame(); await frame();
-        const moved = marker.getBoundingClientRect().top - before;
-        const now = p.querySelectorAll('.chat-message').length;
-        if (now !== count) { out.loads++; count = now; }
-        if (Math.abs(moved - step) > 2) out.jumps.push(Math.round(moved - step));
-        out.steps++;
-        await new Promise((resolve) => setTimeout(resolve, 60));
+    const box = await pane.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const measure = () => pane.evaluate((p) => {
+      const top = p.getBoundingClientRect().top;
+      let marker = p.querySelector('[data-quests-marker]');
+      if (!marker) {
+        marker = Array.from(p.querySelectorAll('.chat-message')).find((m) => m.getBoundingClientRect().top >= top);
+        marker?.setAttribute('data-quests-marker', '');
       }
-      return out;
-    })));
+      return { scrollTop: p.scrollTop, markerTop: marker ? marker.getBoundingClientRect().top : 0, count: p.querySelectorAll('.chat-message').length };
+    });
+    const out = { steps: 0, loads: 0, jumps: [] };
+    while (out.steps < 150) {
+      await pane.evaluate((p) => p.querySelector('[data-quests-marker]')?.removeAttribute('data-quests-marker'));
+      const before = await measure();
+      if (before.scrollTop <= 0) break;
+      const want = Math.min(1500, before.scrollTop);
+      await page.mouse.wheel(0, -1500);
+      await page.waitForTimeout(80);
+      const after = await measure();
+      if (after.count !== before.count) out.loads++;
+      if (Math.abs(after.markerTop - before.markerTop - want) > 2) out.jumps.push(Math.round(after.markerTop - before.markerTop - want));
+      out.steps++;
+    }
+    console.log(JSON.stringify(out));
   }
 
   if (check === 'tabs') {

@@ -119,6 +119,10 @@ const StickyUserPin = memo(function StickyUserPin({
   const [pinned, setPinned] = useState<HTMLElement | null>(null);
   const [offset, setOffset] = useState(0);
   const pinRef = useRef<HTMLButtonElement | null>(null);
+  // Set by the user's own scrolling (wheel, touch, keys). The 3-screens-ahead preload waits for it: on a fresh
+  // load the view sits at the top for a moment before the chat scrolls to the bottom, and preloading then
+  // competed with that initial scroll, leaving the chat part-way up.
+  const userScrolledRef = useRef(false);
 
   useEffect(() => {
     const pane = paneRef.current;
@@ -153,7 +157,7 @@ const StickyUserPin = memo(function StickyUserPin({
       const noUserLoaded = !above && !next;
       const notFilled = pane.scrollHeight <= pane.clientHeight + 1;
       // And ahead of a scroll up: within 3 screens of the top, so the next page is in before the top is reached.
-      const nearTop = pane.scrollTop < pane.clientHeight * 3;
+      const nearTop = userScrolledRef.current && pane.scrollTop < pane.clientHeight * 3;
       if (hasMoreMessages && !isLoadingMoreMessages && (topTurnUnloaded || noUserLoaded || notFilled || nearTop)) {
         void loadOlderMessages(pane);
       }
@@ -161,8 +165,19 @@ const StickyUserPin = memo(function StickyUserPin({
       setOffset(Math.min(0, Math.round(gap - (pinRef.current?.offsetHeight ?? 0) - 8)));
     };
     update();
+    const markUserScroll = () => {
+      userScrolledRef.current = true;
+    };
     pane.addEventListener('scroll', update, { passive: true });
-    return () => pane.removeEventListener('scroll', update);
+    pane.addEventListener('wheel', markUserScroll, { passive: true });
+    pane.addEventListener('touchmove', markUserScroll, { passive: true });
+    pane.addEventListener('keydown', markUserScroll);
+    return () => {
+      pane.removeEventListener('scroll', update);
+      pane.removeEventListener('wheel', markUserScroll);
+      pane.removeEventListener('touchmove', markUserScroll);
+      pane.removeEventListener('keydown', markUserScroll);
+    };
   }, [paneRef, chatMessages, hasMoreMessages, isLoadingMoreMessages, loadOlderMessages]);
 
   if (!pinned) {
@@ -176,9 +191,12 @@ const StickyUserPin = memo(function StickyUserPin({
         title="Scroll to this message"
         style={{ transform: `translateY(${offset}px)` }}
         onClick={() => pinned.scrollIntoView({ block: 'start' })}
-        className="quests-sticky-user absolute left-12 right-8 top-0 line-clamp-3 whitespace-pre-wrap px-3 py-2 text-left text-sm"
+        className="quests-sticky-user absolute left-12 right-8 top-0 px-3 py-2 text-left text-sm"
       >
-        {pinned.querySelector<HTMLElement>('[dir="auto"]')?.textContent ?? ''}
+        {/* Clamped on an inner span: clamping the padded button let a 4th line show in its bottom padding. */}
+        <span className="line-clamp-3 whitespace-pre-wrap">
+          {pinned.querySelector<HTMLElement>('[dir="auto"]')?.textContent ?? ''}
+        </span>
       </button>
     </div>
   );
@@ -280,14 +298,41 @@ function ChatMessagesPane({
     [messageKeyMap],
   );
 
+  // quests: stick to the bottom. A fresh load opens at the bottom, and while the view is at the bottom (within
+  // 50px) any growth of the content keeps it there: late rendering, older history preloaded above, the
+  // running-chat indicator's padding, new messages. Scrolling up by hand stops the following until the user
+  // comes back down. The paddings sit on the content (not the scroller) so every change resizes it.
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const pane = scrollContainerRef.current;
+    const content = contentRef.current;
+    if (!pane || !content) {
+      return undefined;
+    }
+    let atBottom = true;
+    const onScroll = () => {
+      atBottom = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 50;
+    };
+    const follow = new ResizeObserver(() => {
+      if (atBottom) {
+        pane.scrollTop = pane.scrollHeight;
+      }
+    });
+    pane.addEventListener('scroll', onScroll, { passive: true });
+    follow.observe(content, { box: 'border-box' }); // border-box: the padding grows with the running-chat indicator
+    follow.observe(pane); // the pane itself shrinks when the area under it grows (running-chat indicator)
+    return () => {
+      pane.removeEventListener('scroll', onScroll);
+      follow.disconnect();
+    };
+  }, [scrollContainerRef]);
+
   return (
     <div
       ref={scrollContainerRef}
       onWheel={onWheel}
       onTouchMove={onTouchMove}
-      className={`chat-messages-pane relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-3 sm:pt-4 ${
-        hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
-      }`}
+      className="chat-messages-pane relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
     >
       <StickyUserPin
         paneRef={scrollContainerRef}
@@ -321,7 +366,11 @@ function ChatMessagesPane({
           </div>
         </div>
       )}
-      <div className="w-full space-y-3 pl-12 pr-8 sm:space-y-4">
+      {/* quests: the top padding sits here, not on the scrolling container, so the pinned message sticks flush under the tab row. */}
+      <div
+        ref={contentRef}
+        className={`w-full space-y-3 pl-12 pr-8 pt-4 sm:space-y-4 ${hasActivityIndicator ? 'pb-14' : 'pb-4'}`}
+      >
       {(isLoadingSessionMessages || isProcessing) && chatMessages.length === 0 ? (
         <div className="mt-8 text-center text-gray-500 dark:text-gray-400">
           <div className="flex items-center justify-center space-x-2">
