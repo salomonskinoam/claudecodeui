@@ -372,11 +372,12 @@ function SidebarSessionItem({
           aria-disabled={isSelecting && !isSelectable ? true : undefined}
           className={cn(
             buttonVariants({ variant: 'ghost' }),
-            'h-auto w-full justify-start rounded-md border bg-card p-2 text-left font-normal transition-all duration-150',
-            isSelecting ? 'pr-2' : 'pr-11',
-            isSelected ? 'border-primary/20 bg-primary/5' : 'border-border/30',
-            !isSelected && isProcessing ? 'border-border/60 bg-muted/20 hover:bg-muted/25' : 'hover:bg-accent/50',
-            isChecked && 'border-primary/40 bg-primary/10',
+            // quests: a lean row like Cursor's session list, measured: 26px tall, no box, no icon,
+            // name #cccccc, selected row #00345e.
+            'h-[26px] w-full justify-start rounded-sm border-0 px-2 py-0 text-left font-normal',
+            isSelecting ? 'pr-2' : 'pr-9',
+            isSelected ? 'bg-[#00345e] hover:bg-[#00345e]' : 'bg-transparent hover:bg-[#2a2d2e]',
+            isChecked && 'bg-primary/10',
           )}
           // Left-click keeps in-app navigation; Ctrl/Cmd+click opens the session in the
           // right pane (quests split screen); middle-click and the native right-click
@@ -403,14 +404,6 @@ function SidebarSessionItem({
         >
           <div className="flex w-full min-w-0 items-center gap-2">
             {selectionIcon}
-            <div
-              className={cn(
-                'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
-                isSelected ? 'bg-primary/10' : 'bg-muted/50',
-              )}
-            >
-              <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
-            </div>
             {inLeftPane && (
               <span className={cn('flex-shrink-0 text-sm', isSelected ? 'font-bold' : 'opacity-50')} title="Open in the left pane">
                 ◀
@@ -424,7 +417,7 @@ function SidebarSessionItem({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <div
-                  className="min-w-0 flex-1 truncate text-sm font-normal text-foreground"
+                  className="min-w-0 flex-1 truncate text-[15px] font-normal text-[#cccccc]"
                   title={sessionView.sessionName}
                 >
                   {sessionView.sessionName}
@@ -445,16 +438,13 @@ function SidebarSessionItem({
                 ) : compactSessionAge && (
                   <span
                     className={cn(
-                      'ml-auto flex-shrink-0 text-[11px] text-muted-foreground transition-opacity duration-200',
+                      'ml-auto flex-shrink-0 text-[12.5px] text-[#828283] transition-opacity duration-200',
                       isEditing ? 'opacity-0' : !isSelecting && 'group-hover:opacity-0',
                     )}
                   >
                     {compactSessionAge}
                   </span>
                 )}
-              </div>
-              <div className="mt-0.5 flex items-center">
-                {sessionView.messageCount > 0 && <Badge variant="secondary" className="px-1 py-0 text-xs">{sessionView.messageCount}</Badge>}
               </div>
             </div>
           </div>

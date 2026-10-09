@@ -123,7 +123,7 @@ export default function SidebarProjectSessions({
       : t('sessions.selectAll');
 
   return (
-    <div className="ml-3 space-y-1 border-l border-border pl-3">
+    <div className="space-y-1">
       {isCompact ? (
         <div className="px-3 pb-1 pt-1">
           <button
