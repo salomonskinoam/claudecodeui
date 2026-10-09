@@ -28,6 +28,7 @@ import {
 } from '@/shared/context/SessionProtectionContext';
 import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
+import OutsideApprovalBanner from '@/modules/chat/composer/OutsideApprovalBanner';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 
 type ChatInterfaceProps = {
@@ -534,6 +535,12 @@ function ChatInterface({
             </div>
           )}
 
+          {/* quests: a chat running in Cursor that waits for an approval: say so, show the command, link to Cursor. */}
+          <OutsideApprovalBanner
+            sessionId={selectedSession?.id || currentSessionId}
+            chatMessages={chatMessages}
+            runsHere={pendingPermissionRequests.length > 0 || Boolean(sessionActivity && !sessionActivity.background && sessionActivity.canInterrupt !== false)}
+          />
           <ChatComposer
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}

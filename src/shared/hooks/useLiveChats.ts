@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
 import { authenticatedFetch } from '@/shared/api';
-import { isEmbedded } from '@/shared/hooks/useSplitPane';
 
 /**
  * quests: one status dot per chat, the same on the tabs and in the sidebar.
@@ -10,7 +9,7 @@ import { isEmbedded } from '@/shared/hooks/useSplitPane';
  *   done     orange  it stopped while out of view, and has not been shown since
  * No dot: idle and already seen.
  * Live states come from GET /api/quests/live (every chat on this machine: Cursor, terminal and this page),
- * polled every two seconds by the main page; the split-screen iframe shows no tabs or sidebar and does not poll.
+ * polled every two seconds, in the main page and in the split-screen pane (whose approval banner needs it).
  */
 export type ChatDot = 'waiting' | 'running' | 'done';
 
@@ -66,7 +65,7 @@ export function setChatsInView(ids: Array<string | null | undefined>): void {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (timer === null && !isEmbedded) {
+  if (timer === null) {
     void poll();
     timer = window.setInterval(() => void poll(), 2000);
   }
