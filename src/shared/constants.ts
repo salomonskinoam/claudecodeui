@@ -38,6 +38,9 @@ export const CLOUDCLI_WORDMARK_FONT_FAMILY =
  */
 export const APP_VERSION: string = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
 
+/** quests: our version on top of APP_VERSION; empty outside a Vite build, like APP_VERSION. */
+export const QUESTS_VERSION: string = typeof __QUESTS_VERSION__ === 'string' ? __QUESTS_VERSION__ : '';
+
 // ---------------------------
 
 //----------------- SETTINGS NAVIGATION ------------

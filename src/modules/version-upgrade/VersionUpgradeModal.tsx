@@ -32,7 +32,8 @@ export function VersionUpgradeModal({
         ? t('versionUpdate.npmUpgradeCommand')
         : IS_PLATFORM
             ? 'npm run update:platform'
-            : 'git checkout main && git pull && npm install';
+            // quests: the fork's own update (scripts/quests-update.sh).
+            : 'merge the original release into ours, rebuild, restart (rolls back on failure)';
     const [isUpdating, setIsUpdating] = useState(false);
     const [updateOutput, setUpdateOutput] = useState('');
     const [updateError, setUpdateError] = useState('');

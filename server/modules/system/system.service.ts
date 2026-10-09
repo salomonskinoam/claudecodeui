@@ -32,7 +32,8 @@ export function createSystemUpdateService(dependencies: SystemUpdateDependencies
       const updateCommand = dependencies.isPlatform
         ? 'npm run update:platform'
         : dependencies.installMode === 'git'
-          ? 'git checkout main && git pull && npm install'
+          // quests: merge the original project's newest release into our fork, rebuild, restart; rolls back on failure.
+          ? './scripts/quests-update.sh'
           : 'npm install -g @cloudcli-ai/cloudcli@latest';
       const workingDirectory = dependencies.isPlatform || dependencies.installMode === 'git'
         ? dependencies.appRoot

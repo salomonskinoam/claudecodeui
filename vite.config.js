@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
@@ -8,6 +9,11 @@ import { getConnectableHost, normalizeLoopbackHost } from './shared/networkHosts
 // version the server process is actually running. Reading package.json here and
 // injecting it keeps the frontend free of imports that reach outside src/.
 const pkg = createRequire(import.meta.url)('./package.json')
+
+// quests: our version on top of the original project's: the number of our commits not in upstream/main
+// (remote "upstream" = siteboon/claudecodeui, added by scripts/quests-update.sh), plus the commit.
+const git = (args) => execSync(`git ${args}`, { cwd: fileURLToPath(new URL('.', import.meta.url)) }).toString().trim()
+const questsVersion = `${git('rev-list --count upstream/main..HEAD')} (${git('rev-parse --short HEAD')})`
 
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
@@ -27,7 +33,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      __APP_VERSION__: JSON.stringify(pkg.version)
+      __APP_VERSION__: JSON.stringify(pkg.version),
+      __QUESTS_VERSION__: JSON.stringify(questsVersion)
     },
     resolve: {
       alias: {
