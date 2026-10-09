@@ -327,6 +327,8 @@ export function useChatSessionState({
   const sessionActivity = (activeSessionId && processingSessions?.get(activeSessionId)) || null;
   const isProcessing = sessionActivity !== null && !sessionActivity.background;
   const canAbortSession = isProcessing && sessionActivity.canInterrupt;
+  // quests: a run in an IDE or the CLI is listed as processing but cannot be interrupted from here.
+  const isRunOutsidePage = isProcessing && sessionActivity.canInterrupt === false;
 
   // Ref mirror so effects can read the latest map without re-running on
   // every activity transition.
@@ -819,8 +821,9 @@ export function useChatSessionState({
 
     const reloadExternalMessages = async () => {
       try {
-        // Skip store refresh during active streaming
-        if (!isProcessing) {
+        // Skip store refresh during active streaming. quests: only while this page streams the run; a run
+        // outside the page (an IDE or the CLI, not interruptible from here) reaches us only as transcript changes.
+        if (!isProcessing || isRunOutsidePage) {
           const shouldStickToBottom = isActiveRef.current && isNearBottom();
           await requestLatestMessages(selectedSession.id);
 
@@ -845,6 +848,7 @@ export function useChatSessionState({
     selectedProject,
     selectedSession,
     isProcessing,
+    isRunOutsidePage,
   ]);
 
   // Search navigation target
@@ -1162,6 +1166,7 @@ export function useChatSessionState({
     visibleMessageCount,
     visibleMessages,
     loadEarlierMessages,
+    loadOlderMessages,
     revealMessage,
     loadAllMessages,
     loadFullTranscript,

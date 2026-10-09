@@ -779,15 +779,13 @@ export function useProjectsState({
         return;
       }
 
-      // The transcript of the currently viewed session changed on disk while
-      // no run is active here (e.g. edited from another client or the CLI):
-      // signal the chat view to reload its messages.
+      // The transcript of the currently viewed session changed on disk: signal the chat view to reload its
+      // messages. quests: always, even while the session counts as processing. A chat running in an IDE or the
+      // CLI is listed as processing ("Running in the Claude CLI") and only reaches the page through its
+      // transcript, so dropping these left it frozen until it went idle. The chat view itself skips the reload
+      // while this page streams the run (useChatSessionState).
       const currentSelectedSession = selectedSessionRef.current;
-      if (
-        currentSelectedSession
-        && upsert.sessionId === currentSelectedSession.id
-        && !isSessionProcessing(upsert.sessionId)
-      ) {
+      if (currentSelectedSession && upsert.sessionId === currentSelectedSession.id) {
         setExternalMessageUpdate((prev) => prev + 1);
       } else {
         markSessionAttention(upsert.sessionId);

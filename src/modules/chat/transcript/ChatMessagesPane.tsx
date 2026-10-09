@@ -57,6 +57,8 @@ type ChatMessagesPaneProps = {
   visibleMessageCount: number;
   visibleMessages: ChatMessage[];
   loadEarlierMessages: () => void;
+  /** quests: fetches the next older page from the server; the pinned user message preloads with it. */
+  loadOlderMessages: (container: HTMLDivElement) => Promise<boolean>;
   revealMessage: (message: ChatMessage) => void;
   /** The session's running background tasks from the activity map, for the strip to list ones whose rows are not loaded. */
   backgroundTasks?: BackgroundTaskSummary[];
@@ -97,15 +99,22 @@ const getGroupedMessageKey = (message: ChatMessage): string =>
  * the last user message whose top has scrolled above the view. Scrolling up hands the pin to the one before, and
  * as the next user message comes up under the pin it pushes the pin up and out, so the two never overlap.
  * Clicking the pin scrolls to the message. Read straight from the page: every loaded message stays mounted
- * (lazyRows is off), so the message above is always there. Its own component, so scrolling re-renders the pin
+ * (lazyRows is off), and when the turn's user message is older than the loaded page, the earlier page is
+ * preloaded. System notices recorded as user messages are skipped. Its own component, so scrolling re-renders the pin
  * only, never the transcript.
  */
 const StickyUserPin = memo(function StickyUserPin({
   paneRef,
   chatMessages,
+  hasMoreMessages,
+  isLoadingMoreMessages,
+  loadOlderMessages,
 }: {
   paneRef: RefObject<HTMLDivElement>;
   chatMessages: ChatMessage[];
+  hasMoreMessages: boolean;
+  isLoadingMoreMessages: boolean;
+  loadOlderMessages: (container: HTMLDivElement) => Promise<boolean>;
 }) {
   const [pinned, setPinned] = useState<HTMLElement | null>(null);
   const [offset, setOffset] = useState(0);
@@ -121,6 +130,11 @@ const StickyUserPin = memo(function StickyUserPin({
       let above: HTMLElement | null = null;
       let next: HTMLElement | null = null;
       for (const message of pane.querySelectorAll<HTMLElement>('.chat-message.user')) {
+        // Only messages the user wrote: system notices recorded as user messages (a finished background
+        // command, for example) have no text box and would pin as an empty box.
+        if (!message.querySelector<HTMLElement>('[dir="auto"]')?.innerText.trim()) {
+          continue;
+        }
         if (message.getBoundingClientRect().top < paneTop - 1) {
           above = message;
         } else {
@@ -129,13 +143,24 @@ const StickyUserPin = memo(function StickyUserPin({
         }
       }
       setPinned(above);
+      // Preload the earlier page (this runs again after each load) while: the turn at the top of the view has
+      // its user message older than the loaded page; no user message is loaded at all; or the loaded messages
+      // do not fill the pane. Collapsed tool calls are only 9px tall, so a page of them often fits without a
+      // scrollbar, and the app loads older history only on a scroll to the top.
+      const firstRow = pane.querySelector<HTMLElement>('[data-message-timestamp]');
+      const topTurnUnloaded = !above && firstRow !== null && firstRow.getBoundingClientRect().top < paneTop - 1;
+      const noUserLoaded = !above && !next;
+      const notFilled = pane.scrollHeight <= pane.clientHeight + 1;
+      if (hasMoreMessages && !isLoadingMoreMessages && (topTurnUnloaded || noUserLoaded || notFilled)) {
+        void loadOlderMessages(pane);
+      }
       const gap = next ? next.getBoundingClientRect().top - paneTop : Infinity;
       setOffset(Math.min(0, Math.round(gap - (pinRef.current?.offsetHeight ?? 0) - 8)));
     };
     update();
     pane.addEventListener('scroll', update, { passive: true });
     return () => pane.removeEventListener('scroll', update);
-  }, [paneRef, chatMessages]);
+  }, [paneRef, chatMessages, hasMoreMessages, isLoadingMoreMessages, loadOlderMessages]);
 
   if (!pinned) {
     return null;
@@ -190,6 +215,7 @@ function ChatMessagesPane({
   visibleMessageCount,
   visibleMessages,
   loadEarlierMessages,
+  loadOlderMessages,
   revealMessage,
   backgroundTasks,
   sendMessage,
@@ -260,7 +286,13 @@ function ChatMessagesPane({
         hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
       }`}
     >
-      <StickyUserPin paneRef={scrollContainerRef} chatMessages={chatMessages} />
+      <StickyUserPin
+        paneRef={scrollContainerRef}
+        chatMessages={chatMessages}
+        hasMoreMessages={hasMoreMessages}
+        isLoadingMoreMessages={isLoadingMoreMessages}
+        loadOlderMessages={loadOlderMessages}
+      />
       {chatMessages.length > 0 && (
         <div className="pointer-events-none sticky right-4 top-3 z-10 mb-2 flex items-start justify-between gap-2 sm:px-4">
           {/* Running background work stays in view while the transcript scrolls under it. */}

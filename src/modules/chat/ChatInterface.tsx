@@ -148,6 +148,7 @@ function ChatInterface({
     visibleMessageCount,
     visibleMessages,
     loadEarlierMessages,
+    loadOlderMessages,
     revealMessage,
     loadAllMessages,
     loadFullTranscript,
@@ -491,6 +492,8 @@ function ChatInterface({
               visibleMessageCount={visibleMessageCount}
               visibleMessages={visibleMessages}
               loadEarlierMessages={loadEarlierMessages}
+              // quests: the pinned user message preloads older pages from the server (loadOlderMessages).
+              loadOlderMessages={loadOlderMessages}
               revealMessage={revealMessage}
               backgroundTasks={sessionActivity?.tasks}
               sendMessage={sendMessage}
