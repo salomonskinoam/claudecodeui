@@ -131,8 +131,9 @@ const StickyUserPin = memo(function StickyUserPin({
       let next: HTMLElement | null = null;
       for (const message of pane.querySelectorAll<HTMLElement>('.chat-message.user')) {
         // Only messages the user wrote: system notices recorded as user messages (a finished background
-        // command, for example) have no text box and would pin as an empty box.
-        if (!message.querySelector<HTMLElement>('[dir="auto"]')?.innerText.trim()) {
+        // command, for example) have no text box and would pin as an empty box. textContent, not innerText:
+        // the browser skips rendering off-screen rows, and innerText is then empty.
+        if (!message.querySelector<HTMLElement>('[dir="auto"]')?.textContent?.trim()) {
           continue;
         }
         if (message.getBoundingClientRect().top < paneTop - 1) {
@@ -175,7 +176,7 @@ const StickyUserPin = memo(function StickyUserPin({
         onClick={() => pinned.scrollIntoView({ block: 'start' })}
         className="quests-sticky-user absolute left-12 right-8 top-0 line-clamp-3 whitespace-pre-wrap px-3 py-2 text-left text-sm"
       >
-        {pinned.querySelector<HTMLElement>('[dir="auto"]')?.innerText ?? ''}
+        {pinned.querySelector<HTMLElement>('[dir="auto"]')?.textContent ?? ''}
       </button>
     </div>
   );
