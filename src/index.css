@@ -588,20 +588,17 @@
     clip-path: inset(-8px -8px 0 -8px);
   }
 
+  /* quests: every loaded message is rendered for real. Skipping off-screen rows (content-visibility: auto)
+     stood in estimated heights of 96-240px, while a collapsed tool call is 9px, so rows changed height as
+     they scrolled into view and the view jumped on a fast scroll up. */
   .chat-message {
     contain: layout style paint;
-    content-visibility: auto;
-    contain-intrinsic-size: auto 180px;
   }
 
-  .chat-message.assistant {
-    contain-intrinsic-size: auto 240px;
-  }
-
-  .chat-message.user,
-  .chat-message.tool,
-  .chat-message.error {
-    contain-intrinsic-size: auto 96px;
+  /* quests: no browser scroll anchoring in the transcript; the chat restores the position itself when older
+     rows are inserted above (useChatSessionState), and two mechanisms together cancelled scroll steps. */
+  .chat-messages-pane {
+    overflow-anchor: none;
   }
 
   /* Mobile touch optimization and safe areas */

@@ -1,6 +1,7 @@
 import type { NormalizedMessage } from '@/shared/types';
 
-export const SESSION_MESSAGES_PAGE_SIZE = 20;
+// quests: 100 (was 20): fewer, bigger loads of older history, each further ahead of a fast scroll up.
+export const SESSION_MESSAGES_PAGE_SIZE = 100;
 
 export type SessionMessagesRequestOptions = {
   limit?: number | null;

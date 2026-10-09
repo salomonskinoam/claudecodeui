@@ -481,7 +481,6 @@ export function useChatSessionState({
 
       isLoadingMoreRef.current = true;
       setIsLoadingMoreMessages(true);
-      const scrollRestoreState = captureScrollRestoreState(container);
 
       try {
         const result = await sessionStore.fetchMore(selectedSession.id, {
@@ -512,7 +511,9 @@ export function useChatSessionState({
           return false;
         }
 
-        pendingScrollRestoreRef.current = scrollRestoreState;
+        // quests: measure the anchor now, right before the older rows are inserted, not when the request went
+        // out: a fast scroll during the fetch was otherwise counted as shift and undone, snapping the view back.
+        pendingScrollRestoreRef.current = captureScrollRestoreState(container);
         setVisibleMessageCount((prev) => prev + SESSION_MESSAGES_PAGE_SIZE);
         if (!slot.hasMore) {
           allMessagesLoadedRef.current = true;
@@ -581,16 +582,10 @@ export function useChatSessionState({
 
     const container = scrollContainerRef.current;
     if (pendingScrollRestoreRef.current) {
-      const { height, top, anchor, anchorOffset } = pendingScrollRestoreRef.current;
-      if (anchor?.isConnected && anchorOffset !== null) {
-        const nextAnchorOffset = (
-          anchor.getBoundingClientRect().top
-          - container.getBoundingClientRect().top
-        );
-        container.scrollTop += nextAnchorOffset - anchorOffset;
-      } else {
-        container.scrollTop = top + Math.max(container.scrollHeight - height, 0);
-      }
+      // quests: older rows were just inserted above. Add their height to the position as it is now, so the
+      // view stays put and a fast scroll made during the fetch is kept. The browser's own scroll anchoring is
+      // off for this pane (index.css), so this is the only adjustment.
+      container.scrollTop += container.scrollHeight - pendingScrollRestoreRef.current.height;
       pendingScrollRestoreRef.current = null;
       return;
     }
