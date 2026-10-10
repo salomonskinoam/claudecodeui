@@ -95,6 +95,10 @@ These continue the numbering of the chat ledger (1 to 8 were the queue decisions
 | Ranking between roots | None for now. If needed later: a hand-written ranking list of masters. Then the highest root that needs input comes first, a click (permission prompt) above a text answer (question), together with its blockers. |
 | Naming | The master's name plus the item number, for example "oct_09 rag2 axes harness 5.1", set through rename. |
 
+> there has to be a choice with enter or with <something>+enter in the ui to choose if to stay on current chat or draw a new one from the pile. default should be to stay
+
+Ruling, as read: in the page's input box, Enter sends and stays on the chat (the default). A modifier plus Enter sends and then opens the next chat from the top of the queue. The modifier is Alt: today Enter and Ctrl+Enter send, Shift+Enter makes a new line, and Alt+Enter is free. This replaces the "Next" key of decision 5; the "Next" button stays for the case where there is nothing to send.
+
 ## Still open after the answers
 
 19. What a spawned chat is and when it runs. Noam's example in point 11: a sidequest that needs data from him, with only that in its context, which "would float sometime later". Two readings. Reading A: the chat is created with its first message in place, does not run, and waits in the queue; it starts when Noam reaches it and answers. No money is spent before he looks. Reading B: the chat starts at once in the background, works until it needs Noam, and then enters the queue. For a blocker, reading B is what makes it short. For a sidequest that needs data from Noam, reading B wastes a run that stops at once. A possible rule: blockers start at once, sidequests wait.
