@@ -9,32 +9,18 @@ Noam's statement of what quests must do, 2026-10-09, in the chat that designs th
 
 The output style he points to (noam_worlds, `.claude/output-styles/noam.md`) has these rules: number every item; numbers are permanent for the whole chat, never reused, never restarted; split into 5.1, 5.1.1 instead of opening a new number; an item reaches the user only if it blocks the work or already went wrong; a blocking item carries its history with quotes, its context in full names, all the information needed to decide, and one question.
 
-## Terms, as read
+## Terms
 
-| Term | Reading |
+| Term | Meaning |
 |---|---|
-| Quest | One unit of work. It lives in one chat. One chat is one quest. |
-| Main quest | A quest Noam opened himself. The root of a tree. |
-| Master | The quest a side quest was split from. Its parent in the tree. |
-| Side quest | A quest split off from a master. It runs in its own chat. It has exactly one master. |
-| Blocker | A side quest its master cannot continue without. Ranked above its master. Meant to be short. Noam solves it on its own. |
-| Non-blocker | A side quest its master does not wait for. Ranked below its master. |
-| Turned-into quest | A chat whose goal changed. The old goal is then either finished, or it became a side quest of the new goal. |
-| Splitting point | A moment in a chat where a piece of work can become its own quest. |
-| Ledger item | One numbered point in a chat's reply (1, 5.1, 5.1.1). The tree Noam answers against. |
-| Summary | A short card on every chat, always the same format, kept up to date, readable at a glance. |
-| Queue | The ordered list of quests. Noam always talks to the top one. |
-| Auto-initiated chat | A chat the system starts on its own, from a split, before Noam asks for it. |
+| Ticket | A GitHub issue in salomonskinoam/tickets. The unit of work that leaves a chat. Rules: `~/src/tickets/REQUIREMENTS.md` (commit 8442f98). |
+| Quest | A ticket of kind quest: root work, or a chat's own ticket when Noam opened the chat by hand. |
+| Sidequest | A ticket that does not block its parent. Ranked below its parent. |
+| Blocker | A ticket that blocks the chats named in its "Blocks" section. Ranked above them. Meant to be a short chat Noam solves on its own. |
+| Parent | The ticket a ticket hangs under, as a GitHub sub-issue. |
+| Ledger item | One numbered point in a chat's reply (1, 5.1, 5.1.1). An item that keeps growing a branch becomes a ticket when Noam says so. |
 | Token saver | The retrieval search behind a chat that finds earlier threads by their ledger numbers. The tree shape exists so each thread is found whole. |
-
-## Shape, as read
-
-1. Quests form a tree. Main quests are roots. Side quests hang under their master. A chat may have several side quests.
-2. The queue is a walk over that tree with a rule: a blocker comes before its master; a non-blocker comes after its master.
-3. The ledger item is the natural splitting point. A reply's numbered item that blocks the work is a blocker candidate; an item that is informational or a later improvement is a non-blocker candidate.
-4. Short chats are the goal. Today a chat lasts 1 to 2 days. Splitting at ledger items is how a chat gets short: a blocker becomes its own chat that Noam clears in one sitting.
-5. The summary makes switching cheap. Because the queue sends Noam to a chat he has not seen for a while, every chat carries a summary of the same shape. The summary is the thing read at a glance, before the chat itself.
-6. Main versus side is first ruled by Noam. The system records each ruling with the state it was taken in. Over time it proposes the ruling itself, from the pattern of past rulings, and asks less.
+| Queue | The ordered list of what needs Noam next. The quests page shows it; Noam always talks to the top one. |
 
 ## Open points
 
@@ -78,33 +64,35 @@ These continue the numbering of the chat ledger (1 to 8 were the queue decisions
 >
 > 17. good susggestion
 
-## What is now fixed, as read
-
-| Point | Ruling |
-|---|---|
-| Three kinds | quest (a root), sidequest (a non-blocker under a master), blocker (under a master). A quest ranks above a sidequest, always. A blocker ranks above its master. |
-| The object | A chat. A spawned chat can message its master and its siblings. |
-| Spawning | Manual for now: Noam writes "make a quest", "make a sidequest" or "make a blocker" in his message, with the context the new chat gets. Automatic later. |
-| Who splits | Noam, by what he writes. If he does not say it, nothing splits. If he says it, the page asks in a popup before the chat is made. |
-| Where it runs | A hook that fires after each enter (each message Noam sends). The hook sends the chat's summary and last turn to an agent. For now that agent only carries out what Noam wrote. The data it receives is saved. |
-| The summary | Written by that same agent, after each enter. |
-| A blocker's content | Exactly the item as it stands in the master, nothing added. |
-| No one-liners | A one-line question is never made into a chat, by Noam or by the agent. |
-| Scope | Every spawned chat gets a clear instruction: do not make more work than you were assigned. A hook check for this may come later. |
-| Learning | None for now. |
-| Ranking between roots | None for now. If needed later: a hand-written ranking list of masters. Then the highest root that needs input comes first, a click (permission prompt) above a text answer (question), together with its blockers. |
-| Naming | The master's name plus the item number, for example "oct_09 rag2 axes harness 5.1", set through rename. |
-
 > there has to be a choice with enter or with <something>+enter in the ui to choose if to stay on current chat or draw a new one from the pile. default should be to stay
 
-Ruling, as read: in the page's input box, Enter sends and stays on the chat (the default). A modifier plus Enter sends and then opens the next chat from the top of the queue. The modifier is Alt: today Enter and Ctrl+Enter send, Shift+Enter makes a new line, and Alt+Enter is free. This replaces the "Next" key of decision 5; the "Next" button stays for the case where there is nothing to send.
+## Current state, 2026-10-20
 
-## Still open after the answers
+The ticket system (repo salomonskinoam/tickets, cloned at `~/src/tickets`, commit 8442f98) was built between 2026-10-13 and 2026-10-16 and answers most of the open points above. Its rules, as they bear on quests:
 
-19. What a spawned chat is and when it runs. Noam's example in point 11: a sidequest that needs data from him, with only that in its context, which "would float sometime later". Two readings. Reading A: the chat is created with its first message in place, does not run, and waits in the queue; it starts when Noam reaches it and answers. No money is spent before he looks. Reading B: the chat starts at once in the background, works until it needs Noam, and then enters the queue. For a blocker, reading B is what makes it short. For a sidequest that needs data from Noam, reading B wastes a run that stops at once. A possible rule: blockers start at once, sidequests wait.
+| Point | Rule now | Answers |
+|---|---|---|
+| The unit split off a chat | A ticket. Noam says "make a quest", "make a sidequest", "make a blocker", "ticket this" or "handle it later"; the ticket-create skill writes it; a hook with a model checks the body before it is created. One point per ticket, never a one-line question. | 9, 10, 12 |
+| Automatic splitting or starting | None. Noam says when an item becomes a ticket, and Noam opens chats from tickets. | 10, 16 |
+| A chat from a ticket | A Claude Code chat Noam opens with the ticket link in its first prompt. It claims the ticket and works on that one only. | 9 |
+| Talking to master and siblings | Every ticket names the chat that opened it (session id, `claude --resume <session id>`). A chat that updates its ticket messages its parent and offspring chats that are live. | 9 |
+| Scope | Every ticket has a "Do not" section: a chat makes no more work than it was given. | 9 |
+| Depth | A chat working on a sub-ticket that creates another ticket raises a popup first. | 12 |
+| The summary | The ticket body: history with Noam's words and dates, context, "Done when", "Do not", "Needs Noam", plus update comments. No per-turn summary hook. | 14 |
+| Priority | A blocker ranks above the chats it blocks; a sidequest below its parent; unrelated quests have no ranking. | 15 |
+| Naming | Title: the chat name plus a short subject. No chat item numbers anywhere in a ticket. | 17 |
+| Where it is stored | GitHub, so it survives a disk failure. | |
+| The picture | `python3 ~/src/tickets/forest.py` draws the tree from GitHub alone. | |
+| The quests page | "will later read the open tickets as its queue. Not built now." | |
 
-20. The form of a spawned chat. Reading A: a Claude Code session in its own worktree (through the repo's tools/require_worktree.sh), so Cursor can open it, the registry sees it, and it can message its master and siblings with the cross-session tools. Reading B: a chat run from the page's server through the Agent SDK, visible only in the page. Reading A matches "it can communicate with master and siblings", which exists today only between Claude Code sessions.
+Still standing from this chat: Enter sends and stays on the chat; Alt+Enter sends and opens the next one from the top of the queue (today Enter and Ctrl+Enter send, Shift+Enter makes a new line, Alt+Enter is free). The recap popup is on hold (Claude Code has `/recap`).
 
-21. Where the hook lives. The hook must fire in Cursor chats, so it is a Claude Code hook (UserPromptSubmit). Its script can live in the quests repo and be named from the user-level ~/.claude/settings.json, so nothing of quests enters noam_worlds. The script posts the session id, the working directory and the message to the page's server; the server saves them and runs the agent. This is a technical route, chosen here, not a decision for Noam.
+## Open for the queue page
 
-18. What changes in the earlier decisions 1 to 8. They assumed the queue unit is a chat with three kinds of wait. The tree adds a fourth kind: a split that is not yet a chat. Decision 1 (which chats enter) and decision 3 (order) are reopened by points 9 and 15. Decisions 2, 4, 5, 6 and 8 stand as asked.
+22. What the queue holds. Source one: live chats that wait for Noam (permission prompt, question, finished turn), from Claude Code's registry `~/.claude/sessions/*.json`. Source two: open tickets that no chat has claimed, from GitHub. Both, or one.
+
+23. Order. A chat takes its place from the ticket it claimed: blocker above what it blocks, sidequest below its parent. Unrelated quests have no ranking, so a queue still needs a tie rule: Noam's words of 2026-10-09, "click is higher prio than text", give permission prompt, then question, then finished turn; oldest first inside each. A chat with no ticket (one that only answers questions) has no place in the tree.
+
+24. Opening an unclaimed ticket from the page. Cursor's Claude extension accepts `cursor://anthropic.claude-code/open?prompt=<text>`, which opens a new chat with that text; untested whether it only fills the box or also sends. The page would fill it with the ticket link, so the new chat claims the ticket on its first turn.
+
+25. Leaving the queue. A chat leaves when Noam sends it a message; a ticket leaves when a chat claims it. A finished chat with nothing to answer needs a "dismiss" that holds until its next finished turn.
