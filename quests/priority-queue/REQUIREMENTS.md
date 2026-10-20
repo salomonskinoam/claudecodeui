@@ -64,6 +64,12 @@ Earlier rulings that still stand, verbatim:
 
 (30 was about how the end-of-turn rule is written: reuse the two closing lines of the noam_worlds output style, or a separate line owned by the queue.)
 
+2026-10-20 20:22, verbatim (answers to: what a chat ends on when its work is finished; whether "blocker <what>" opens a ticket by itself; where a child ticket of kind quest ranks in its family):
+
+> when finished it should end on Done <what>
+> blocker nor anything else opens a ticket by itself. we are not there yet.
+> a child of kind quest is not a child. it is a root quest. it should be linked to the parent, but that does not make it a part of the family. the auto rank it should get is below the rank of the parent, meaning last after everything.
+
 ## The requirements, as read
 
 ### Sources
@@ -77,8 +83,8 @@ Earlier rulings that still stand, verbatim:
 
 | # | Requirement | Source |
 |---|---|---|
-| 3 | The order is one list over all entries. It is shaped by a forest: a root is a ticket with no open parent (or a chat with no ticket). Roots have no order between them: each gets an arbitrary place when it appears, and that place sticks. | 19:18 |
-| 4 | Inside a family (a root and everything under it) the order follows the ticket kinds and never changes by hand: a blocker ranks above the chats it blocks; a sidequest ranks below its parent; side quests are always below quests. Changing a ticket's kind moves it by this rule. | 23, 19:18, 28, ticket rules |
+| 3 | The order is one list over all entries. It is shaped by a forest. A root is a ticket of kind quest, or a ticket with no open parent, or a chat with no ticket. A ticket of kind quest is always a root, also when it has a parent: it stays linked to that parent, but it is not part of the parent's family. Roots have no order between them: each gets an arbitrary place when it appears, and that place sticks. | 19:18, 20:22 |
+| 4 | A family is a root and the blockers and side quests under it. Inside a family the order follows the ticket kinds and never changes by hand: a blocker ranks above the chats it blocks; a side quest ranks below its parent; side quests are always below quests. Changing a ticket's kind moves it by this rule. | 23, 19:18, 28, 20:22, ticket rules |
 | 5 | The kind orders only inside a family. Between families only the place of the roots counts: a side quest of a higher root can rank above a quest of a lower root ("root priority takes precedence over quest type"). | 19:18 |
 | 6 | When a root is done (its ticket closed) before its children, the children become roots. They keep the done root's place, in their order inside that place (quests above side quests). | 19:18 |
 | 7 | A permission prompt ranks above everything: a chat waiting on a permission prompt in the lowest family ranks above every entry of the highest family. | 28, 20:11 |
@@ -86,7 +92,7 @@ Earlier rulings that still stand, verbatim:
 | 9 | Noam changes one thing by hand: the place of a root. Never the order inside a family, and never across the levels of rules 7 and 8. | 28 |
 | 10 | Dragging a root moves the root alone. Entries of other families may end up between members of its family, above them or below them. When the root would pass a member of its own family that must stay on the other side, that member joins the dragged block; the block grows each time and moves on as one block. | 23, 20:11 |
 | 11 | The drag is live while the mouse button is held. Released inside the widget: the shown order becomes the order. Released outside: undo, every moved entry goes back to its place. | 23 |
-| 12 | A new entry (a new ticket, a newly waiting chat, or one from the coming automatic machine) is placed by rules 4 to 8; a new root goes after every existing root. | 23 |
+| 12 | A new entry (a new ticket, a newly waiting chat, or one from the coming automatic machine) is placed by rules 4 to 8; a new root goes after every existing root, last. This holds for a new quest with a parent too: it goes last, below its parent and below everything else. | 23, 20:22 |
 | 13 | The order is held in a local database in the quests server, the working copy, read by the page with no delay; every change is mirrored to GitHub within seconds and restored from there after a disk loss. | 26 |
 
 ### The display
@@ -109,12 +115,8 @@ Earlier rulings that still stand, verbatim:
 
 | # | Requirement | Source |
 |---|---|---|
-| 20 | Every reply of every chat ends with a third last line owned by the queue, after the output style's own two closing lines: "waiting for <what>" (no queue place; it gets one when the awaited thing returns), "question <what>" with background and history as in the output style's gate items, or "blocker <what>". | 28, 30 |
+| 20 | Every reply of every chat ends with a third last line owned by the queue, after the output style's own two closing lines: "waiting for <what>" (no queue place; it gets one when the awaited thing returns), "question <what>" with background and history as in the output style's gate items, "blocker <what>", or "Done <what>" when the chat's work is finished. | 28, 30, 20:22 |
 | 21 | A hook lets no reply pass without that line. A reply without it goes back to the chat with what is missing and the instructions for the line. | 30 |
 | 22 | The line and its hook belong to the queue's part of the harness, kept apart from the harness of the business logic (the noam_worlds repo's `.claude/` and `sdk/plugins/hor/`). Two output styles cannot be active at once, so the queue's instructions do not come as an output style. | 28, 30 |
 
-## Open
-
-- What a chat ends on when its work is finished.
-- Whether "blocker <what>" creates the blocker ticket by itself, or asks Noam first (the ticket rules say Noam says when an item becomes a ticket).
-- Where a child ticket of kind quest ranks in its family. Proposal: below its parent, above the parent's side quests.
+| 23 | Nothing opens a ticket by itself: not a "blocker" ending, not anything else. Tickets are opened only when Noam says so, as the ticket rules say. | 20:22 |
