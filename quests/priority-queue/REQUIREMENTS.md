@@ -24,27 +24,45 @@ Earlier rulings that still stand, verbatim:
 
 > 2026-10-09 21:12: there has to be a choice with enter or with <something>+enter in the ui to choose if to stay on current chat or draw a new one from the pile. default should be to stay
 
+2026-10-20 19:18, verbatim:
+
+> the list of priorities is actually a forest: roots have no ordering between them (so one is assigned arbitrarily, and then that is the order) and then it's a tree.
+> if a root is done before its child(ren), they both become roots. side quests keep their status and are always under quests. but root priority takes precedence over quest type, and even if the root is done, the children keep its relative priority.
+>
+> 24. we used an open source claude code wrapper library and updated it
+> so it probably makes sense to represent this as a tree rather than as a forest. it's in ../quests/claudecodeui this is our updated fork.
+>
+> 26. local plus mirror clearly.
+>
+> 27. find it. i said above
+>
+> 28. there needs to be enforcement that each chat always ends on either "waiting for <what>" (and get a queue place when that returns) or "question <what> with background and history like today". or "blocker <what>". otherwise chats are expected to be independent. This requirement is tricky because it involves the harness, and we want to separate the part of the harness that is used for the prio queue from the one that's business logic.
+> permission prompt is above tree order, it is always highest prio.
+> so yes, kind of wait it what tie breaks waiters within a priority.
+> as i said, the only thing a user can change is the relative prio between roots, but not inside the family (unless changing quest type) and not between priorities.
+> 29 so you're supposed to understand i got it wrong and meant salimonskinoam bro
+
+(29 was about the GitHub account of this repo's remote; the remote is salomonskinoam/claudecodeui, which is the account meant.)
+
 ## The requirements, as read
 
 | # | Requirement | Source |
 |---|---|---|
-| 1 | The queue holds both: chats that wait for Noam (permission prompt, question, finished turn; from Claude Code's registry `~/.claude/sessions/*.json`), and open tickets no chat has claimed (from GitHub). | 22 |
-| 2 | Precedence comes from the tickets: a blocker ranks above every chat it blocks; a sidequest ranks below its parent. These relations are never broken. | 23, ticket rules |
-| 3 | Entries with no relative ranking get an arbitrary order. That order sticks until the next change. Every change keeps every precedence. | 23 |
-| 4 | A live list of the ranking: one line per entry, its name only, the highest priority on top. A directed-forest view comes later. | 23 |
-| 5 | Dragging an entry changes its absolute place and never breaks a precedence. With A a blocker of B: B can never go above A, A can never go below B, other entries can go between, above or below them. Dragging A below B carries B along below it; dragging B above A carries A along above it. | 23 |
-| 6 | The drag is live while the mouse button is held. Released inside the list: the shown order becomes the order. Released outside: undo, every moved entry goes back to its place. | 23 |
-| 7 | A new entry (from the coming automatic machine, or any new ticket or waiting chat) is placed by every precedence that applies to it, and after every existing entry it has no precedence with. | 23 |
-| 8 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 |
-| 9 | Sending a message does not take a chat out of the queue. The page stays on the same chat until Noam asks for the next one. | 25 |
-| 10 | A button and the shortcut Alt+Enter "bring me the next one in line": the highest entry that needs Noam opens. If the input box holds text, Alt+Enter first sends it, as Enter does. Plain Enter sends and stays. | 25, 2026-10-09 21:12 |
-| 11 | The interface is "the new UI". Not identified yet: see open point 27 below. | 24 |
-| 12 | The order is persistent and refreshes fast enough for a live list. Where it is held and how fast: see open point 26 below. | 26 |
-
-## Open
-
-26. What holds the order, and how fast it updates. Proposed to Noam 2026-10-20; not ruled.
-
-27. Which interface "the new UI" is. No new interface exists in this repo or elsewhere under `~/src` (checked 2026-10-20). The one new interface on the machine is the Claude desktop app (package `claude-desktop` 2.26454.2, Claude Code sessions in it since 2026-10-17).
-
-28. How the tie rule of 23 (permission prompt, then question, then finished turn, oldest first) and the sticky order of 23 meet: whether an entry moves when its kind of wait changes, or keeps its place once placed.
+| 1 | The queue holds both: chats that wait for Noam (from Claude Code's registry `~/.claude/sessions/*.json`), and open tickets no chat has claimed (from GitHub, salomonskinoam/tickets). | 22 |
+| 2 | The order is a forest. A root is a ticket with no open parent (or a chat with no ticket). Roots have no order between them: each gets an arbitrary place when it appears, and that place sticks. | 19:18 |
+| 3 | Inside a tree the order follows the ticket kinds: a blocker ranks above the chats it blocks; a sidequest ranks below its parent; side quests are always below quests. | 23, 19:18, ticket rules |
+| 4 | The root's place comes before the kind: everything in a higher tree ranks above everything in a lower tree, whatever its kind. | 19:18 |
+| 5 | When a root is done (its ticket closed) before its children, the children become roots. They keep the done root's place among the roots, in their order inside that place (quests above side quests). | 19:18 |
+| 6 | A permission prompt ranks above the whole tree order: a chat waiting on a permission prompt is always first. | 28 |
+| 7 | Entries with the same priority are ordered by kind of wait: permission prompt, then question, then finished turn; oldest first inside each. | 23, 28 |
+| 8 | Noam can change one thing: the order between roots. Never the order inside a family (except by changing a ticket's kind, which moves it by rule 3), and never across the levels of rules 6 and 7. | 28 |
+| 9 | Dragging a root moves its whole tree. The drag is live while the mouse button is held. Released inside the list: the shown order becomes the order. Released outside: undo, every moved entry goes back to its place. | 23, 28 |
+| 10 | A new entry (a new ticket, a newly waiting chat, or one from the coming automatic machine) is placed by rules 3 to 7; a new root goes after every existing root. | 23 |
+| 11 | A live display of the order: one line per entry, its name only, the highest priority on top. A directed-forest view comes later. | 23 |
+| 12 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 |
+| 13 | Sending a message does not take a chat out of the queue. The page stays on the same chat until Noam asks for the next one. | 25 |
+| 14 | A button and the shortcut Alt+Enter "bring me the next one in line": the highest entry that needs Noam opens. If the input box holds text, Alt+Enter first sends it, as Enter does. Plain Enter sends and stays. | 25, 2026-10-09 21:12 |
+| 15 | Every chat ends each turn on exactly one of three: "waiting for <what>" (no queue place; it gets one when the awaited thing returns), "question <what>" with background and history as in the output style's gate items, or "blocker <what>". This is enforced. | 28 |
+| 16 | The enforcement belongs to the queue's part of the harness, kept apart from the harness of the business logic (the noam_worlds repo's `.claude/` and `sdk/plugins/hor/`). | 28 |
+| 17 | The order is held in a local database in the quests server, the working copy, read by the page with no delay; every change is mirrored to GitHub within seconds and restored from there after a disk loss. | 26 |
+| 18 | The interface is the quests page: this repo, the updated fork of CloudCLI UI ("we used an open source claude code wrapper library and updated it"). | 24, 27 |
