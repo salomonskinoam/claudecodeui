@@ -44,25 +44,77 @@ Earlier rulings that still stand, verbatim:
 
 (29 was about the GitHub account of this repo's remote; the remote is salomonskinoam/claudecodeui, which is the account meant.)
 
+2026-10-20 20:11, verbatim:
+
+> unclear from your rules: a permission prompt is also above the root priority. so permission of low prio is still above anything else of high prio.
+>
+> dragging a root *can* move its whole tree. it happens only if the thing being dragged is trying to go above or below something else that would break internal order. so "the block gets bigger" and you drag further, and it drags as a block.
+>
+> in the thing showing the order in the ui, each tree from a root should have its different, auto generated color.
+>
+> 30. it doesn't seem we can use 2 styles together.
+>
+> i do think it's better to separate and add a third last line for the queue, and a hook to not allow a response to pass without it in the text. if it's not there, return to the chat with the issue and the instructions of how to talk.
+>
+> the session list should keep showing as a list. the projects are a poor attempt at what we're doing- we're overriding this. so there, it should be a list, flat, with things from the same root with the same background color.
+>
+> then, there will be a SEPARATE widget, showing a forest, horizontal, with the top level being the different roots, and each one collapsable or openable when you click a node. each node will highlight its corresponding list item on hover and vice versa, and on click it will be the same as on click on the list item (open it). on hover will show the name of the ticket. to uncollapse or collapse, it's another small button per node.
+>
+> are you putting all of this in the ticket verbatim? this is the entire design so keep it
+
+(30 was about how the end-of-turn rule is written: reuse the two closing lines of the noam_worlds output style, or a separate line owned by the queue.)
+
 ## The requirements, as read
+
+### Sources
 
 | # | Requirement | Source |
 |---|---|---|
 | 1 | The queue holds both: chats that wait for Noam (from Claude Code's registry `~/.claude/sessions/*.json`), and open tickets no chat has claimed (from GitHub, salomonskinoam/tickets). | 22 |
-| 2 | The order is a forest. A root is a ticket with no open parent (or a chat with no ticket). Roots have no order between them: each gets an arbitrary place when it appears, and that place sticks. | 19:18 |
-| 3 | Inside a tree the order follows the ticket kinds: a blocker ranks above the chats it blocks; a sidequest ranks below its parent; side quests are always below quests. | 23, 19:18, ticket rules |
-| 4 | The root's place comes before the kind: everything in a higher tree ranks above everything in a lower tree, whatever its kind. | 19:18 |
-| 5 | When a root is done (its ticket closed) before its children, the children become roots. They keep the done root's place among the roots, in their order inside that place (quests above side quests). | 19:18 |
-| 6 | A permission prompt ranks above the whole tree order: a chat waiting on a permission prompt is always first. | 28 |
-| 7 | Entries with the same priority are ordered by kind of wait: permission prompt, then question, then finished turn; oldest first inside each. | 23, 28 |
-| 8 | Noam can change one thing: the order between roots. Never the order inside a family (except by changing a ticket's kind, which moves it by rule 3), and never across the levels of rules 6 and 7. | 28 |
-| 9 | Dragging a root moves its whole tree. The drag is live while the mouse button is held. Released inside the list: the shown order becomes the order. Released outside: undo, every moved entry goes back to its place. | 23, 28 |
-| 10 | A new entry (a new ticket, a newly waiting chat, or one from the coming automatic machine) is placed by rules 3 to 7; a new root goes after every existing root. | 23 |
-| 11 | A live display of the order: one line per entry, its name only, the highest priority on top. A directed-forest view comes later. | 23 |
-| 12 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 |
-| 13 | Sending a message does not take a chat out of the queue. The page stays on the same chat until Noam asks for the next one. | 25 |
-| 14 | A button and the shortcut Alt+Enter "bring me the next one in line": the highest entry that needs Noam opens. If the input box holds text, Alt+Enter first sends it, as Enter does. Plain Enter sends and stays. | 25, 2026-10-09 21:12 |
-| 15 | Every chat ends each turn on exactly one of three: "waiting for <what>" (no queue place; it gets one when the awaited thing returns), "question <what>" with background and history as in the output style's gate items, or "blocker <what>". This is enforced. | 28 |
-| 16 | The enforcement belongs to the queue's part of the harness, kept apart from the harness of the business logic (the noam_worlds repo's `.claude/` and `sdk/plugins/hor/`). | 28 |
-| 17 | The order is held in a local database in the quests server, the working copy, read by the page with no delay; every change is mirrored to GitHub within seconds and restored from there after a disk loss. | 26 |
-| 18 | The interface is the quests page: this repo, the updated fork of CloudCLI UI ("we used an open source claude code wrapper library and updated it"). | 24, 27 |
+| 2 | The interface is the quests page: this repo, the updated fork of CloudCLI UI ("we used an open source claude code wrapper library and updated it"). | 24, 27 |
+
+### The order
+
+| # | Requirement | Source |
+|---|---|---|
+| 3 | The order is one list over all entries. It is shaped by a forest: a root is a ticket with no open parent (or a chat with no ticket). Roots have no order between them: each gets an arbitrary place when it appears, and that place sticks. | 19:18 |
+| 4 | Inside a family (a root and everything under it) the order follows the ticket kinds and never changes by hand: a blocker ranks above the chats it blocks; a sidequest ranks below its parent; side quests are always below quests. Changing a ticket's kind moves it by this rule. | 23, 19:18, 28, ticket rules |
+| 5 | The kind orders only inside a family. Between families only the place of the roots counts: a side quest of a higher root can rank above a quest of a lower root ("root priority takes precedence over quest type"). | 19:18 |
+| 6 | When a root is done (its ticket closed) before its children, the children become roots. They keep the done root's place, in their order inside that place (quests above side quests). | 19:18 |
+| 7 | A permission prompt ranks above everything: a chat waiting on a permission prompt in the lowest family ranks above every entry of the highest family. | 28, 20:11 |
+| 8 | Entries with the same priority are ordered by kind of wait: permission prompt, then question, then finished turn; oldest first inside each. | 23, 28 |
+| 9 | Noam changes one thing by hand: the place of a root. Never the order inside a family, and never across the levels of rules 7 and 8. | 28 |
+| 10 | Dragging a root moves the root alone. Entries of other families may end up between members of its family, above them or below them. When the root would pass a member of its own family that must stay on the other side, that member joins the dragged block; the block grows each time and moves on as one block. | 23, 20:11 |
+| 11 | The drag is live while the mouse button is held. Released inside the widget: the shown order becomes the order. Released outside: undo, every moved entry goes back to its place. | 23 |
+| 12 | A new entry (a new ticket, a newly waiting chat, or one from the coming automatic machine) is placed by rules 4 to 8; a new root goes after every existing root. | 23 |
+| 13 | The order is held in a local database in the quests server, the working copy, read by the page with no delay; every change is mirrored to GitHub within seconds and restored from there after a disk loss. | 26 |
+
+### The display
+
+| # | Requirement | Source |
+|---|---|---|
+| 14 | The session list stays a list: flat, one line per entry, name only, in queue order, the highest priority on top, live. The projects grouping of CloudCLI UI is replaced by it ("the projects are a poor attempt at what we're doing- we're overriding this"). | 23, 20:11 |
+| 15 | Every family has its own color, generated automatically. In the session list, every entry of a family has that color as its background. | 20:11 |
+| 16 | A separate widget shows the forest, horizontal, the roots on the top level. Each node has a small button that collapses or opens it. Clicking a node opens its chat, the same as clicking its line in the list. Hovering a node shows the ticket's name and highlights its line in the list; hovering a line highlights its node. | 20:11 |
+| 17 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 |
+
+### Using it
+
+| # | Requirement | Source |
+|---|---|---|
+| 18 | Sending a message does not take a chat out of the queue. The page stays on the same chat until Noam asks for the next one. | 25 |
+| 19 | A button and the shortcut Alt+Enter "bring me the next one in line": the highest entry that needs Noam opens. If the input box holds text, Alt+Enter first sends it, as Enter does. Plain Enter sends and stays. | 25, 2026-10-09 21:12 |
+
+### The end of every turn
+
+| # | Requirement | Source |
+|---|---|---|
+| 20 | Every reply of every chat ends with a third last line owned by the queue, after the output style's own two closing lines: "waiting for <what>" (no queue place; it gets one when the awaited thing returns), "question <what>" with background and history as in the output style's gate items, or "blocker <what>". | 28, 30 |
+| 21 | A hook lets no reply pass without that line. A reply without it goes back to the chat with what is missing and the instructions for the line. | 30 |
+| 22 | The line and its hook belong to the queue's part of the harness, kept apart from the harness of the business logic (the noam_worlds repo's `.claude/` and `sdk/plugins/hor/`). Two output styles cannot be active at once, so the queue's instructions do not come as an output style. | 28, 30 |
+
+## Open
+
+- What a chat ends on when its work is finished.
+- Whether "blocker <what>" creates the blocker ticket by itself, or asks Noam first (the ticket rules say Noam says when an item becomes a ticket).
+- Where a child ticket of kind quest ranks in its family. Proposal: below its parent, above the parent's side quests.
