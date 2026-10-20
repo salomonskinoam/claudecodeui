@@ -76,6 +76,12 @@ Earlier rulings that still stand, verbatim:
 > 20. right. blockers are always from this chat + the ticket blockers.
 > 23.
 
+2026-10-20 20:50, verbatim (20.1 and 23 are rules of the table below at commit ffae817; 33 asked where the popup of rule 6.1 comes up: in the chats, in the quests page, or both):
+
+> 20.1 no, it should only name open blockers. we shouldn't spam closed tickets, that's the whole point of all of this. add to the philosophy
+> 23.ok
+> 33.  ok
+
 ## The requirements, as read
 
 ### Sources
@@ -123,7 +129,7 @@ Earlier rulings that still stand, verbatim:
 | # | Requirement | Source |
 |---|---|---|
 | 20 | Every reply of every chat ends with a third last line owned by the queue, after the output style's own two closing lines: "waiting for <what>" (no queue place; it gets one when the awaited thing returns), "question <what>" with background and history as in the output style's gate items, "blocker <what>", or "Done <what>" when the chat's work is finished. | 28, 30, 20:22 |
-| 20.1 | A "blocker <what>" ending names every blocker of the chat: the ones raised in the chat itself, plus the open blocker tickets that name it. | 20:35 |
+| 20.1 | A "blocker <what>" ending names only the open blockers of the chat: the open ones raised in the chat itself, plus the open blocker tickets that name it. Closed blockers are never named ("we shouldn't spam closed tickets, that's the whole point of all of this"; written into the tickets repo's philosophy.md, commit in salomonskinoam/tickets). | 20:35, 20:50 |
 | 21 | A hook lets no reply pass without that line. A reply without it goes back to the chat with what is missing and the instructions for the line. | 30 |
 | 22 | The line and its hook belong to the queue's part of the harness, kept apart from the harness of the business logic (the noam_worlds repo's `.claude/` and `sdk/plugins/hor/`). Two output styles cannot be active at once, so the queue's instructions do not come as an output style. | 28, 30 |
 | 23 | Nothing opens a ticket by itself: not a "blocker" ending, not anything else. Tickets are opened only when Noam says so, as the ticket rules say. | 20:22 |
