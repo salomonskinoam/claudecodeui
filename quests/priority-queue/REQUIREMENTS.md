@@ -86,6 +86,15 @@ Earlier rulings that still stand, verbatim:
 
 > 33. both
 
+2026-10-21 17:46, verbatim (answers to open points 35 to 38 below):
+
+> 35. seems alright
+> 36. no, it should open a new chat with some basic text typed in "we are starting this ticket <link>"
+> and let the user go on from there.
+> it should show also a clickable link to the ticket.
+> 37.  good idea. is it always detectable that the chat is now open in cursor?
+> 38. sure let's do it that way for now
+
 ## The requirements, as read
 
 ### Sources
@@ -110,7 +119,8 @@ Earlier rulings that still stand, verbatim:
 | 10 | Dragging a root moves the root alone. Entries of other families may end up between members of its family, above them or below them. When the root would pass a member of its own family that must stay on the other side, that member joins the dragged block; the block grows each time and moves on as one block. | 23, 20:11 |
 | 11 | The drag is live while the mouse button is held. Released inside the widget: the shown order becomes the order. Released outside: undo, every moved entry goes back to its place. | 23 |
 | 12 | A new entry (a new ticket, a newly waiting chat, or one from the coming automatic machine) is placed by rules 4 to 8; a new root goes after every existing root, last. This holds for a new quest with a parent too: it goes last, below its parent and below everything else. | 23, 20:22 |
-| 13 | The order is held in a local database in the quests server, the working copy, read by the page with no delay; every change is mirrored to GitHub within seconds and restored from there after a disk loss. | 26 |
+| 12.1 | The list holds every open ticket and every chat that has a ticket or a live process, in queue order; "bring me the next one in line" skips the entries that do not need Noam. A chat leaves when its ticket is closed, or, with no ticket, when it is finalized. A chat's state is read from its last closing line in its transcript, so a chat whose editor tab was closed keeps its place. | 21 Oct 17:46 |
+| 13 | The order is held in a local database in the quests server, the working copy, read by the page with no delay; every change is mirrored to GitHub within seconds, as one file in the private repository salomonskinoam/tickets ("for now"), and restored from there after a disk loss. | 26, 21 Oct 17:46 |
 
 ### The display
 
@@ -119,6 +129,7 @@ Earlier rulings that still stand, verbatim:
 | 14 | The session list stays a list: flat, one line per entry, name only, in queue order, the highest priority on top, live. The projects grouping of CloudCLI UI is replaced by it ("the projects are a poor attempt at what we're doing- we're overriding this"). | 23, 20:11 |
 | 15 | Every family has its own color, generated automatically. In the session list, every entry of a family has that color as its background. | 20:11 |
 | 16 | A separate widget shows the forest, horizontal, the roots on the top level. Each node has a small button that collapses or opens it. Clicking a node opens its chat, the same as clicking its line in the list. Hovering a node shows the ticket's name and highlights its line in the list; hovering a line highlights its node. | 20:11 |
+| 16.1 | Every entry for a ticket shows a clickable link to the ticket's GitHub page. | 21 Oct 17:46 |
 | 17 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 |
 
 ### Using it
@@ -126,6 +137,8 @@ Earlier rulings that still stand, verbatim:
 | # | Requirement | Source |
 |---|---|---|
 | 18 | Sending a message does not take a chat out of the queue. The page stays on the same chat until Noam asks for the next one. | 25 |
+| 18.1 | Clicking a ticket that no chat has claimed opens a new chat in the page with the text "we are starting this ticket <link>" typed into its input box, not sent; Noam goes on from there. | 21 Oct 17:46 |
+| 18.2 | A chat that is open in another editor (Cursor, the Claude desktop app, a terminal) is shown in the page read-only, with its "Open in Cursor" link; Noam answers it there. Two processes on one transcript break a chat. | 21 Oct 17:46 |
 | 19 | A button and the shortcut Alt+Enter "bring me the next one in line": the highest entry that needs Noam opens. If the input box holds text, Alt+Enter first sends it, as Enter does. Plain Enter sends and stays. | 25, 2026-10-09 21:12 |
 
 ### The end of every turn
@@ -140,14 +153,6 @@ Earlier rulings that still stand, verbatim:
 
 ## Open
 
-Questions put to Noam on 2026-10-20 after 21:05, not ruled yet.
+34. How the four endings of rule 20 map to the queue. Proposal: "question" and "Done" give the chat a queue place; "waiting for" gives none until the awaited thing returns; "blocker" gives none (its open blockers carry the priority). Tie order inside one priority: permission prompt, question, Done; oldest first. Put to Noam 2026-10-20; not answered.
 
-34. How the four endings of rule 20 map to the queue. Proposal: "question" and "Done" give the chat a queue place; "waiting for" gives none until the awaited thing returns; "blocker" gives none (its open blockers carry the priority). Tie order inside one priority: permission prompt, question, Done; oldest first.
-
-35. What the list shows, and when an entry leaves. Proposal: every open ticket and every chat that has a ticket or a live process, all in queue order; "next" skips the ones that do not need Noam. A chat leaves when its ticket is closed, or, with no ticket, when it is finalized. A chat's state is read from its last closing line in the transcript, so a chat whose Cursor tab is closed keeps its place.
-
-36. What clicking a ticket that no chat has claimed does. Proposal: it opens the ticket's GitHub page.
-
-37. Where Noam answers a chat that runs in Cursor, when "next" brings it up. Two processes on one transcript break a chat. Proposal: the page shows it read-only, with its "Open in Cursor" link.
-
-38. Where the mirror of the order lives on GitHub. The quests fork is public; the tickets repo is private but holds only issues as its store. Proposal: a file in the private tickets repo.
+39. Which folder the new chat of rule 18.1 starts in.
