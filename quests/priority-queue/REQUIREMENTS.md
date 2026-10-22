@@ -112,6 +112,10 @@ Earlier rulings that still stand, verbatim:
 
 > 41 is fine. family is parents siblings and immediate children
 
+2026-10-22 19:43, verbatim (given while reviewing the plan, `quests/priority-queue/PLAN.md`):
+
+> when creating a chat, i want it named "<mm_dd> <world> <2 word objective> #<ticket num>
+
 ## The requirements, as read
 
 ### Sources
@@ -155,6 +159,7 @@ Earlier rulings that still stand, verbatim:
 |---|---|---|
 | 18 | Sending a message does not take a chat out of the queue. The page stays on the same chat until Noam asks for the next one. | 25 |
 | 18.1 | Clicking a ticket that no chat has claimed opens a new chat in the page with the text "we are starting this ticket <link>" typed into its input box, not sent; Noam goes on from there. The new chat starts in the folder of the chat that opened the ticket (its session id is in the ticket's "Parent chat" section); almost always the noam_worlds repo. | 21 Oct 17:46, 22:26 |
+| 18.1.1 | A chat created from a ticket is named "<mm_dd> <world> <2 word objective> #<ticket number>", for example "10_22 quests priority queue #32". | 22 Oct 19:43 |
 | 18.2 | A chat that is open in another editor (Cursor, the Claude desktop app, a terminal) is shown in the page read-only, with its "Open in Cursor" link; Noam answers it there. Two processes on one transcript break a chat. Detected from two signals: a live process for the chat in Claude Code's registry `~/.claude/sessions/*.json`, and the chat's entry in Cursor's saved tab list (`~/.config/Cursor/User/workspaceStorage/<id>/state.vscdb`, key `Anthropic.claude-code`, field `panelTabSessions`). | 21 Oct 17:46, 22:26 |
 | 18.3 | When Noam leaves a chat without sending it a message (no Enter), by picking another chat by hand, the chat he left goes to the top of the queue, below every permission prompt: Noam chose it. This "on top latch" holds one chat at a time; a new latched chat sends the previous one back to its place. Noam can release the latch; a released chat goes back to its place in the queue. | 21 Oct 22:19, 22:26 |
 | 18.4 | The latched chat moves as in rule 10: alone, while no family rule breaks; a member of its family that would end on the wrong side joins it as a block. Family members that break no rule do not move. | 22:26 |
