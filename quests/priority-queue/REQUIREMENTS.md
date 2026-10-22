@@ -99,6 +99,15 @@ Earlier rulings that still stand, verbatim:
 
 > important req: if the user didn't click enter on a chat, but that chat was unfocused in favor of another chat manually selected, the current chat goes to the top of the queue, but still after permission requests
 
+2026-10-21 22:26, verbatim (34: how the four endings of rule 20 map to the queue; 37: the page shows a chat open in another editor read-only, detected from Claude Code's registry and Cursor's saved tab list; 39: which folder a new chat from a ticket starts in; 40: how rule 18.3 meets the family order and how long the chat stays on top, options A the chat alone, B its family moves with it as a block, C only as far as the family allows):
+
+> 34. correct
+> 37 sounds good
+> 39 The parent chat's folder. and it's always going to be noam_worlds most likely
+> 40 that is correct because the user chose this chat so it becomes on top. possible to release the "on top latch". there is only one chat on top. if released, it goes to its location in the queue. and all of that is still with option B that it moves while preserving family rules. but it doesn't move family members if no rules were broken.
+>
+> req: all chats should notify their immediate family if they exist, about events that happen to them. best added in some instruction file. but i want the req documented.
+
 ## The requirements, as read
 
 ### Sources
@@ -118,7 +127,7 @@ Earlier rulings that still stand, verbatim:
 | 6 | When a root is done (its ticket closed) before its children, the children become roots. They keep the done root's place, in their order by rule 4. | 19:18 |
 | 6.1 | Closing a root that still has open blockers raises a popup first: "are you sure", with an explanation of what is flagged as its blockers. The options: "yes"; convert the blockers to quests; convert them to side quests; close the blockers too; other (a kind Noam types). The popup comes up both in the chats (the ticket-work close step and the finalize-chat skill, in salomonskinoam/tickets) and in the quests page. | 20:35, 21:05 |
 | 7 | A permission prompt ranks above everything: a chat waiting on a permission prompt in the lowest family ranks above every entry of the highest family. | 28, 20:11 |
-| 8 | Entries with the same priority are ordered by kind of wait: permission prompt, then question, then finished turn; oldest first inside each. | 23, 28 |
+| 8 | Entries with the same priority are ordered by kind of wait: permission prompt, then question, then Done; oldest first inside each. | 23, 28, 34 |
 | 9 | Noam changes one thing by hand: the place of a root. Never the order inside a family, and never across the levels of rules 7 and 8. | 28 |
 | 10 | Dragging a root moves the root alone. Entries of other families may end up between members of its family, above them or below them. When the root would pass a member of its own family that must stay on the other side, that member joins the dragged block; the block grows each time and moves on as one block. | 23, 20:11 |
 | 11 | The drag is live while the mouse button is held. Released inside the widget: the shown order becomes the order. Released outside: undo, every moved entry goes back to its place. | 23 |
@@ -141,9 +150,10 @@ Earlier rulings that still stand, verbatim:
 | # | Requirement | Source |
 |---|---|---|
 | 18 | Sending a message does not take a chat out of the queue. The page stays on the same chat until Noam asks for the next one. | 25 |
-| 18.1 | Clicking a ticket that no chat has claimed opens a new chat in the page with the text "we are starting this ticket <link>" typed into its input box, not sent; Noam goes on from there. | 21 Oct 17:46 |
-| 18.2 | A chat that is open in another editor (Cursor, the Claude desktop app, a terminal) is shown in the page read-only, with its "Open in Cursor" link; Noam answers it there. Two processes on one transcript break a chat. | 21 Oct 17:46 |
-| 18.3 | When Noam leaves a chat without sending it a message (no Enter), by picking another chat by hand, the chat he left goes to the top of the queue, below every permission prompt. | 21 Oct 22:19 |
+| 18.1 | Clicking a ticket that no chat has claimed opens a new chat in the page with the text "we are starting this ticket <link>" typed into its input box, not sent; Noam goes on from there. The new chat starts in the folder of the chat that opened the ticket (its session id is in the ticket's "Parent chat" section); almost always the noam_worlds repo. | 21 Oct 17:46, 22:26 |
+| 18.2 | A chat that is open in another editor (Cursor, the Claude desktop app, a terminal) is shown in the page read-only, with its "Open in Cursor" link; Noam answers it there. Two processes on one transcript break a chat. Detected from two signals: a live process for the chat in Claude Code's registry `~/.claude/sessions/*.json`, and the chat's entry in Cursor's saved tab list (`~/.config/Cursor/User/workspaceStorage/<id>/state.vscdb`, key `Anthropic.claude-code`, field `panelTabSessions`). | 21 Oct 17:46, 22:26 |
+| 18.3 | When Noam leaves a chat without sending it a message (no Enter), by picking another chat by hand, the chat he left goes to the top of the queue, below every permission prompt: Noam chose it. This "on top latch" holds one chat at a time; a new latched chat sends the previous one back to its place. Noam can release the latch; a released chat goes back to its place in the queue. | 21 Oct 22:19, 22:26 |
+| 18.4 | The latched chat moves as in rule 10: alone, while no family rule breaks; a member of its family that would end on the wrong side joins it as a block. Family members that break no rule do not move. | 22:26 |
 | 19 | A button and the shortcut Alt+Enter "bring me the next one in line": the highest entry that needs Noam opens. If the input box holds text, Alt+Enter first sends it, as Enter does. Plain Enter sends and stays. | 25, 2026-10-09 21:12 |
 
 ### The end of every turn
@@ -151,15 +161,18 @@ Earlier rulings that still stand, verbatim:
 | # | Requirement | Source |
 |---|---|---|
 | 20 | Every reply of every chat ends with a third last line owned by the queue, after the output style's own two closing lines: "waiting for <what>" (no queue place; it gets one when the awaited thing returns), "question <what>" with background and history as in the output style's gate items, "blocker <what>", or "Done <what>" when the chat's work is finished. | 28, 30, 20:22 |
+| 20.0 | The endings decide the queue place: "question" and "Done" give the chat a place; "waiting for" gives none until the awaited thing returns; "blocker" gives none, its open blockers carry the priority. | 34 |
 | 20.1 | A "blocker <what>" ending names only the open blockers of the chat: the open ones raised in the chat itself, plus the open blocker tickets that name it. Closed blockers are never named ("we shouldn't spam closed tickets, that's the whole point of all of this"; written into the tickets repo's philosophy.md, salomonskinoam/tickets commit 439802f). | 20:35, 20:50 |
 | 21 | A hook lets no reply pass without that line. A reply without it goes back to the chat with what is missing and the instructions for the line. | 30 |
 | 22 | The line and its hook belong to the queue's part of the harness, kept apart from the harness of the business logic (the noam_worlds repo's `.claude/` and `sdk/plugins/hor/`). Two output styles cannot be active at once, so the queue's instructions do not come as an output style. | 28, 30 |
 | 23 | Nothing opens a ticket by itself: not a "blocker" ending, not anything else. Tickets are opened only when Noam says so, as the ticket rules say. | 20:22 |
 
+### The family
+
+| # | Requirement | Source |
+|---|---|---|
+| 24 | Every chat tells its immediate family, if it has one, about the events that happen to it. Its home is an instruction file the chats read. | 22:26 |
+
 ## Open
 
-34. How the four endings of rule 20 map to the queue. Proposal: "question" and "Done" give the chat a queue place; "waiting for" gives none until the awaited thing returns; "blocker" gives none (its open blockers carry the priority). Tie order inside one priority: permission prompt, question, Done; oldest first. Put to Noam 2026-10-20; not answered.
-
-39. Which folder the new chat of rule 18.1 starts in.
-
-40. How rule 18.3 meets the family order (rules 4 and 9) and how long the chat stays on top.
+41. What "immediate family" and "events" cover in rule 24.
