@@ -108,6 +108,10 @@ Earlier rulings that still stand, verbatim:
 >
 > req: all chats should notify their immediate family if they exist, about events that happen to them. best added in some instruction file. but i want the req documented.
 
+2026-10-21 22:33, verbatim (41: what "immediate family" and "events" cover in rule 24; proposed: family is the parent chat and the child chats; events are every new closing line of rule 20 and every ticket update; a live chat gets a message, a chat that is not live a comment on its ticket; the home is the queue's instruction text of rule 22):
+
+> 41 is fine. family is parents siblings and immediate children
+
 ## The requirements, as read
 
 ### Sources
@@ -143,7 +147,7 @@ Earlier rulings that still stand, verbatim:
 | 15 | Every family has its own color, generated automatically. In the session list, every entry of a family has that color as its background. | 20:11 |
 | 16 | A separate widget shows the forest, horizontal, the roots on the top level. Each node has a small button that collapses or opens it. Clicking a node opens its chat, the same as clicking its line in the list. Hovering a node shows the ticket's name and highlights its line in the list; hovering a line highlights its node. | 20:11 |
 | 16.1 | Every entry for a ticket shows a clickable link to the ticket's GitHub page. | 21 Oct 17:46 |
-| 17 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 |
+| 17 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 | Every chat tells its immediate family, if it has one, about the events that happen to it. Immediate family: its parent chat (the chat that opened its ticket), its sibling chats (the chats on the other sub-tickets of the same parent ticket), and its immediate children (the chats on its ticket's own sub-tickets, the linked root quests of rule 3 included). Events: every new closing line of rule 20 (waiting for, question, blocker, Done) and every ticket update (a commit, a push, an eval, a decision). A live chat gets a message; a chat that is not live gets a comment on its ticket. The home is the queue's instruction text of rule 22. | 22:26, 22:33 |
 
 ### Using it
 
@@ -172,7 +176,3 @@ Earlier rulings that still stand, verbatim:
 | # | Requirement | Source |
 |---|---|---|
 | 24 | Every chat tells its immediate family, if it has one, about the events that happen to it. Its home is an instruction file the chats read. | 22:26 |
-
-## Open
-
-41. What "immediate family" and "events" cover in rule 24.
