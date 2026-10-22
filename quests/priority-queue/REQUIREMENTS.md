@@ -95,6 +95,10 @@ Earlier rulings that still stand, verbatim:
 > 37.  good idea. is it always detectable that the chat is now open in cursor?
 > 38. sure let's do it that way for now
 
+2026-10-21 22:19, verbatim:
+
+> important req: if the user didn't click enter on a chat, but that chat was unfocused in favor of another chat manually selected, the current chat goes to the top of the queue, but still after permission requests
+
 ## The requirements, as read
 
 ### Sources
@@ -139,6 +143,7 @@ Earlier rulings that still stand, verbatim:
 | 18 | Sending a message does not take a chat out of the queue. The page stays on the same chat until Noam asks for the next one. | 25 |
 | 18.1 | Clicking a ticket that no chat has claimed opens a new chat in the page with the text "we are starting this ticket <link>" typed into its input box, not sent; Noam goes on from there. | 21 Oct 17:46 |
 | 18.2 | A chat that is open in another editor (Cursor, the Claude desktop app, a terminal) is shown in the page read-only, with its "Open in Cursor" link; Noam answers it there. Two processes on one transcript break a chat. | 21 Oct 17:46 |
+| 18.3 | When Noam leaves a chat without sending it a message (no Enter), by picking another chat by hand, the chat he left goes to the top of the queue, below every permission prompt. | 21 Oct 22:19 |
 | 19 | A button and the shortcut Alt+Enter "bring me the next one in line": the highest entry that needs Noam opens. If the input box holds text, Alt+Enter first sends it, as Enter does. Plain Enter sends and stays. | 25, 2026-10-09 21:12 |
 
 ### The end of every turn
@@ -156,3 +161,5 @@ Earlier rulings that still stand, verbatim:
 34. How the four endings of rule 20 map to the queue. Proposal: "question" and "Done" give the chat a queue place; "waiting for" gives none until the awaited thing returns; "blocker" gives none (its open blockers carry the priority). Tie order inside one priority: permission prompt, question, Done; oldest first. Put to Noam 2026-10-20; not answered.
 
 39. Which folder the new chat of rule 18.1 starts in.
+
+40. How rule 18.3 meets the family order (rules 4 and 9) and how long the chat stays on top.
