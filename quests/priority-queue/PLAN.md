@@ -72,6 +72,7 @@ The full list, as ruled by Noam between 2026-10-09 and 2026-10-21. Numbers are t
 | 18.2 | A chat open in another editor (Cursor, the Claude desktop app, a terminal) is read-only in the page, with its "Open in Cursor" link. |
 | 18.3 | Leaving a chat without Enter, by picking another chat by hand, puts it on top (below permission prompts): the "on top latch", one chat at a time, releasable. |
 | 18.4 | The latched chat moves as in rule 10. |
+| 18.5 | When a chat ranked higher than the current one becomes ready for Noam, its line blinks. |
 | 19 | A button and Alt+Enter "bring me the next one in line". Alt+Enter first sends typed text. Plain Enter sends and stays. |
 | 20 | Every reply ends with a third closing line owned by the queue: "waiting for <what>", "question <what>", "blocker <what>" or "Done <what>". |
 | 20.0 | "question" and "Done" give a queue place; "waiting for" none until the awaited thing returns; "blocker" none. |
@@ -158,7 +159,7 @@ New module `server/modules/queue/`.
 | Step | Part | What |
 |---|---|---|
 | 4 | Order module | `src/modules/queue/queueOrder.ts` (section 4) and `quests/priority-queue/order.test.mjs`. |
-| 5 | The list | `src/modules/queue/useQueue.ts` (fetch plus websocket) and `QueueList.tsx`, which replaces the project list in `SidebarContent.tsx`. One line per entry: dot, name, family color as background (color from the root key, fixed lightness for the dark theme), "Open in Cursor" link on chats, ticket link on tickets. Roots draggable with native drag events as in `PaneTabs.tsx`; the order recomputed live while the button is held; release inside sends `PUT order`, release outside restores. The latched line has a release button. |
+| 5 | The list | `src/modules/queue/useQueue.ts` (fetch plus websocket) and `QueueList.tsx`, which replaces the project list in `SidebarContent.tsx`. One line per entry: dot, name, family color as background (color from the root key, fixed lightness for the dark theme), "Open in Cursor" link on chats, ticket link on tickets. Roots draggable with native drag events as in `PaneTabs.tsx`; the order recomputed live while the button is held; release inside sends `PUT order`, release outside restores. The latched line has a release button. A line ranked above the shown chat blinks when it becomes ready for Noam (rule 18.5). The forest widget sits above the list; sidebar logos are removed. |
 | 6 | Using it | In `handleKeyDown`: Alt+Enter submits typed text, then opens the next entry that needs Noam (not the current chat). A "Next" button beside the input box does the same without sending. Latch: when Noam picks another chat by hand (list, tab, forest node) and the chat he leaves got no message since it was shown, `PUT latch`. Read-only: a chat with a live process outside the page, or in Cursor's tab list, gets a banner with "Open in Cursor" instead of the input box. |
 | 7 | New chat from a ticket | Find the parent chat's folder (session id from the ticket's "Parent chat" section, its `project_path`; a worktree path maps to its repo's main folder), `writeDraftText('project:<id>', 'we are starting this ticket <link>')`, open a new chat in that project. When the chat gets its session id (first message sent), the server names it with the Agent SDK's `renameSession(sessionId, name)`, the same rename that Cursor and the page already show first (row 33 of `local_features_noam.md`): `<mm_dd>` the local date, `<world>` the ticket's world label, `<2 word objective>` as decided in open decision 7, `#<ticket number>`. |
 | 8 | The forest widget | `src/modules/queue/QueueForest.tsx`, plain nested boxes, no library: roots across the top, children growing below each, a small button per node to collapse or open. Shared hover state with the list. |
@@ -182,8 +183,8 @@ Every build follows the memory rule: `free -m` first with several GB free, one h
 
 ## 7. Open decisions
 
-1. Where the forest widget sits. Proposal: a panel under the list in the right sidebar that can be folded away.
-2. The stop hook sends a reply back once; the second try passes even without the line (the guard of `stop_check.sh`, which prevents an endless loop). Proposal: keep that guard.
+1. Ruled 2026-10-23 14:30: the forest widget sits above the list of chats in the right sidebar; logos there are removed to save room.
+2. Ruled 2026-10-23 14:30 ("ok"): the stop hook sends a reply back once; the second try passes (the guard of `stop_check.sh`).
 3. The page cannot close tickets today, so rule 6.1 in the page needs a close action first. Proposal: a "close" button on ticket lines, which raises the same popup.
 4. A chat with no ticket counts as finalized when its last closing line is "Done" and it has no live process. Proposal: that rule.
 5. Rule 24 sends a family message on every changed closing line. Proposal: only when the kind of the line changes (for example from "waiting for" to "question"), not on every new text.
