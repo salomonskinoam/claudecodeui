@@ -124,6 +124,15 @@ Earlier rulings that still stand, verbatim:
 >
 > I also want when a higher prio chat is ready for action and we are active on a lower prio chat, the new one should blink to say it's ready and more important
 
+2026-10-26 10:03, verbatim (answers to the open decisions of `quests/priority-queue/PLAN.md`: 3 a close button on ticket lines in the page; 4 when a chat with no ticket counts as finalized; 5 family messages only when the kind of the closing line changes; 6 the closing-line hook goes live after its check; 7 who writes the two-word objective of a chat name; 8 how "New Session" chats are named):
+
+> 3. yes
+> 4. finalization is always user initiated, so i am not really following the question.
+> 5. AND when the user says to notify family
+> 6. ok
+> 7. popup to ask the user, and an ability for the user to say "let haiku choose". but the format should always be kept.
+> 8. they should also get a name by the format, and just let the user name them at the start right after asking about the worktree
+
 ## The requirements, as read
 
 ### Sources
@@ -148,7 +157,7 @@ Earlier rulings that still stand, verbatim:
 | 10 | Dragging a root moves the root alone. Entries of other families may end up between members of its family, above them or below them. When the root would pass a member of its own family that must stay on the other side, that member joins the dragged block; the block grows each time and moves on as one block. | 23, 20:11 |
 | 11 | The drag is live while the mouse button is held. Released inside the widget: the shown order becomes the order. Released outside: undo, every moved entry goes back to its place. | 23 |
 | 12 | A new entry (a new ticket, a newly waiting chat, or one from the coming automatic machine) is placed by rules 4 to 8; a new root goes after every existing root, last. This holds for a new quest with a parent too: it goes last, below its parent and below everything else. | 23, 20:22 |
-| 12.1 | The list holds every open ticket and every chat that has a ticket or a live process, in queue order; "bring me the next one in line" skips the entries that do not need Noam. A chat leaves when its ticket is closed, or, with no ticket, when it is finalized. A chat's state is read from its last closing line in its transcript, so a chat whose editor tab was closed keeps its place. | 21 Oct 17:46 |
+| 12.1 | The list holds every open ticket and every chat that has a ticket or a live process, in queue order; "bring me the next one in line" skips the entries that do not need Noam. A chat leaves when its ticket is closed, or, with no ticket, when Noam finalizes it (finalizing is always his call: the chat runs /finalize-chat). A chat's state is read from its last closing line in its transcript, so a chat whose editor tab was closed keeps its place. | 21 Oct 17:46, 26 Oct 10:03 |
 | 13 | The order is held in a local database in the quests server, the working copy, read by the page with no delay; every change is mirrored to GitHub within seconds, as one file in the private repository salomonskinoam/tickets ("for now"), and restored from there after a disk loss. | 26, 21 Oct 17:46 |
 
 ### The display
@@ -160,7 +169,8 @@ Earlier rulings that still stand, verbatim:
 | 16 | A separate widget shows the forest, horizontal, the roots on the top level. Each node has a small button that collapses or opens it. Clicking a node opens its chat, the same as clicking its line in the list. Hovering a node shows the ticket's name and highlights its line in the list; hovering a line highlights its node. | 20:11 |
 | 16.0 | The forest widget sits above the list of chats, in the right sidebar. Logos are removed there to save room. | 23 Oct 14:30 |
 | 16.1 | Every entry for a ticket shows a clickable link to the ticket's GitHub page. | 21 Oct 17:46 |
-| 17 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 | Every chat tells its immediate family, if it has one, about the events that happen to it. Immediate family: its parent chat (the chat that opened its ticket), its sibling chats (the chats on the other sub-tickets of the same parent ticket), and its immediate children (the chats on its ticket's own sub-tickets, the linked root quests of rule 3 included). Events: every new closing line of rule 20 (waiting for, question, blocker, Done) and every ticket update (a commit, a push, an eval, a decision). A live chat gets a message; a chat that is not live gets a comment on its ticket. The home is the queue's instruction text of rule 22. | 22:26, 22:47 |
+| 16.2 | Every ticket line has a "close" button. It raises the popup of rule 6.1 when the ticket is a root with open blockers. | 26 Oct 10:03 |
+| 17 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 | Every chat tells its immediate family, if it has one, about the events that happen to it. Immediate family: its parent chat (the chat that opened its ticket), its sibling chats (the chats on the other sub-tickets of the same parent ticket), and its immediate children (the chats on its ticket's own sub-tickets, the linked root quests of rule 3 included). Events: a change of the kind of the closing line of rule 20 (waiting for, question, blocker, Done), every ticket update (a commit, a push, an eval, a decision), and every time Noam says to notify the family. A live chat gets a message; a chat that is not live gets a comment on its ticket. The home is the queue's instruction text of rule 22. | 22:26, 22:47, 26 Oct 10:03 |
 
 ### Using it
 
@@ -168,7 +178,7 @@ Earlier rulings that still stand, verbatim:
 |---|---|---|
 | 18 | Sending a message does not take a chat out of the queue. The page stays on the same chat until Noam asks for the next one. | 25 |
 | 18.1 | Clicking a ticket that no chat has claimed opens a new chat in the page with the text "we are starting this ticket <link>" typed into its input box, not sent; Noam goes on from there. The new chat starts in the folder of the chat that opened the ticket (its session id is in the ticket's "Parent chat" section); almost always the noam_worlds repo. | 21 Oct 17:46, 22:26 |
-| 18.1.1 | A chat created from a ticket is named "<mm_dd> <world> <2 word objective> #<ticket number>", for example "10_22 quests priority queue #32". | 22 Oct 19:43 |
+| 18.1.1 | Every chat is named "<mm_dd> <world> <2 word objective>", plus " #<ticket number>" when it comes from a ticket; for example "10_22 quests priority queue #32". The format is always kept. A popup asks Noam for the name; it offers "let Haiku choose". A chat from a ticket is asked in the page when it is created; a chat made with "New Session" asks right after the worktree question at its start. | 22 Oct 19:43, 26 Oct 10:03 |
 | 18.2 | A chat that is open in another editor (Cursor, the Claude desktop app, a terminal) is shown in the page read-only, with its "Open in Cursor" link; Noam answers it there. Two processes on one transcript break a chat. Detected from two signals: a live process for the chat in Claude Code's registry `~/.claude/sessions/*.json`, and the chat's entry in Cursor's saved tab list (`~/.config/Cursor/User/workspaceStorage/<id>/state.vscdb`, key `Anthropic.claude-code`, field `panelTabSessions`). | 21 Oct 17:46, 22:26 |
 | 18.3 | When Noam leaves a chat without sending it a message (no Enter), by picking another chat by hand, the chat he left goes to the top of the queue, below every permission prompt: Noam chose it. This "on top latch" holds one chat at a time; a new latched chat sends the previous one back to its place. Noam can release the latch; a released chat goes back to its place in the queue. | 21 Oct 22:19, 22:26 |
 | 18.4 | The latched chat moves as in rule 10: alone, while no family rule breaks; a member of its family that would end on the wrong side joins it as a block. Family members that break no rule do not move. | 22:26 |
@@ -182,7 +192,7 @@ Earlier rulings that still stand, verbatim:
 | 20 | Every reply of every chat ends with a third last line owned by the queue, after the output style's own two closing lines: "waiting for <what>" (no queue place; it gets one when the awaited thing returns), "question <what>" with background and history as in the output style's gate items, "blocker <what>", or "Done <what>" when the chat's work is finished. | 28, 30, 20:22 |
 | 20.0 | The endings decide the queue place: "question" and "Done" give the chat a place; "waiting for" gives none until the awaited thing returns; "blocker" gives none, its open blockers carry the priority. | 34 |
 | 20.1 | A "blocker <what>" ending names only the open blockers of the chat: the open ones raised in the chat itself, plus the open blocker tickets that name it. Closed blockers are never named ("we shouldn't spam closed tickets, that's the whole point of all of this"; written into the tickets repo's philosophy.md, salomonskinoam/tickets commit 439802f). | 20:35, 20:50 |
-| 21 | A hook lets no reply pass without that line. A reply without it goes back to the chat with what is missing and the instructions for the line, once; the second try passes, so a chat cannot loop forever. | 30, 23 Oct 14:30 |
+| 21 | A hook (live once its check passes) lets no reply pass without that line. A reply without it goes back to the chat with what is missing and the instructions for the line, once; the second try passes, so a chat cannot loop forever. | 30, 23 Oct 14:30 |
 | 22 | The line and its hook belong to the queue's part of the harness, kept apart from the harness of the business logic (the noam_worlds repo's `.claude/` and `sdk/plugins/hor/`). Two output styles cannot be active at once, so the queue's instructions do not come as an output style. | 28, 30 |
 | 23 | Nothing opens a ticket by itself: not a "blocker" ending, not anything else. Tickets are opened only when Noam says so, as the ticket rules say. | 20:22 |
 

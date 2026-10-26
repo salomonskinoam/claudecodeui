@@ -59,16 +59,17 @@ The full list, as ruled by Noam between 2026-10-09 and 2026-10-21. Numbers are t
 | 10 | Dragging a root moves it alone; other families may end up between its members. A family member that would end on the wrong side joins the dragged block; the block grows and moves on as one. |
 | 11 | The drag is live while the mouse button is held. Released inside: the new order stands. Released outside: undo. |
 | 12 | A new entry is placed by rules 4 to 8; a new root goes last (also a new quest with a parent). |
-| 12.1 | The list holds every open ticket and every chat with a ticket or a live process. "Next" skips entries that do not need Noam. A chat leaves when its ticket closes, or, with no ticket, when it is finalized. A chat's state comes from its last closing line, so a closed editor tab keeps its place. |
+| 12.1 | The list holds every open ticket and every chat with a ticket or a live process. "Next" skips entries that do not need Noam. A chat leaves when its ticket closes, or, with no ticket, when Noam finalizes it (always his call: the chat runs /finalize-chat). A chat's state comes from its last closing line, so a closed editor tab keeps its place. |
 | 13 | The order lives in the quests server's local database, mirrored to GitHub within seconds as one file in salomonskinoam/tickets, restored from there after a disk loss. |
 | 14 | The session list is one flat list in queue order, name only, top first, live. It replaces the projects grouping. |
 | 15 | Each family has its own generated color, used as the background of its lines. |
 | 16 | A separate widget shows the forest, horizontal, roots on the top level, a small collapse button per node. Clicking a node opens it like its line. Hovering a node shows the ticket name and highlights its line, and the other way around. |
 | 16.1 | Every ticket entry has a clickable link to the ticket. |
+| 16.2 | Every ticket line has a "close" button, which raises the popup of rule 6.1. |
 | 17 | Every chat line has an "Open in Cursor" link. |
 | 18 | Sending a message does not take a chat out of the queue; the page stays on the chat. |
 | 18.1 | Clicking an unclaimed ticket opens a new chat in the page with "we are starting this ticket <link>" typed in, not sent, in the folder of the chat that opened the ticket. |
-| 18.1.1 | A chat created from a ticket is named "<mm_dd> <world> <2 word objective> #<ticket number>", for example "10_22 quests priority queue #32". Noam, 2026-10-22 19:43: "when creating a chat, i want it named "<mm_dd> <world> <2 word objective> #<ticket num>"". |
+| 18.1.1 | Every chat is named "<mm_dd> <world> <2 word objective>", plus " #<ticket number>" when it comes from a ticket ("10_22 quests priority queue #32"). The format is always kept. A popup asks Noam for the name and offers "let Haiku choose". A chat from a ticket is asked in the page when it is created; a "New Session" chat asks right after the worktree question at its start. |
 | 18.2 | A chat open in another editor (Cursor, the Claude desktop app, a terminal) is read-only in the page, with its "Open in Cursor" link. |
 | 18.3 | Leaving a chat without Enter, by picking another chat by hand, puts it on top (below permission prompts): the "on top latch", one chat at a time, releasable. |
 | 18.4 | The latched chat moves as in rule 10. |
@@ -80,7 +81,7 @@ The full list, as ruled by Noam between 2026-10-09 and 2026-10-21. Numbers are t
 | 21 | A hook lets no reply pass without the line and sends it back with instructions. |
 | 22 | That hook and its instructions belong to the queue's harness, apart from the noam_worlds harness, and not as an output style. |
 | 23 | Nothing opens a ticket by itself. |
-| 24 | Every chat tells its parent, sibling and child chats about its events (every changed closing line, every ticket update): a message when live, else a comment on their ticket. Home: the queue's instruction text. |
+| 24 | Every chat tells its parent, sibling and child chats about its events (a change of the kind of its closing line, every ticket update, and whenever Noam says to notify the family): a message when live, else a comment on their ticket. Home: the queue's instruction text. |
 
 ## 4. The model
 
@@ -106,7 +107,7 @@ A chat with a ticket is not a second entry; it is its ticket's entry.
 | blocker | closing line "blocker" | no |
 | none yet | no closing line (chats from before the hook) | no |
 
-A chat with no ticket counts as finalized, and leaves, when its last closing line is "Done" and it has no live process.
+A chat with no ticket leaves when it runs /finalize-chat (seen in its transcript); finalizing is always Noam's call.
 
 ### The constraints
 
@@ -134,7 +135,8 @@ Lives in the quests repo, `quests/hooks/`, wired through `~/.claude/settings.jso
 
 | File | Event | What it does |
 |---|---|---|
-| `quests/hooks/queue_start.sh` | SessionStart (startup, resume, compact) | Prints the closing-line rule (four endings, the third line after the output style's two, "blocker" names only open blockers) and the family rule: the chat's parent, siblings and children with their session ids, read from GitHub with the claim and sub-issue data. |
+| `quests/hooks/queue_start.sh` | SessionStart (startup, resume, compact) | Prints the closing-line rule (four endings, the third line after the output style's two, "blocker" names only open blockers), the family rule (parent, siblings and children with their session ids, read from GitHub; notify on a change of the line's kind, on a ticket update, and when Noam says so), and the naming rule: on startup, right after the worktree question, ask Noam for "<mm_dd> <world> <2 word objective>" with a popup offering "let Haiku choose", then run `quests/tools/rename_chat.mjs`. |
+| `quests/tools/rename_chat.mjs` | run by a chat or by the server | `rename_chat.mjs <session id> <name>` sets the name with the Agent SDK's `renameSession`. With `--haiku <text>` it first asks Claude Haiku (through the Agent SDK on the subscription) for the world and the two words, and keeps the format. |
 | `quests/hooks/queue_stop.sh` | Stop | Last assistant text by the `jq` line of `stop_check.sh`; its last non-empty line must match `^(waiting for|question|blocker|Done) .+`. Missing: exit 2 with what is missing and the instruction text. |
 
 ### 5.2 The close popup in the chats (step 2)
@@ -160,8 +162,8 @@ New module `server/modules/queue/`.
 |---|---|---|
 | 4 | Order module | `src/modules/queue/queueOrder.ts` (section 4) and `quests/priority-queue/order.test.mjs`. |
 | 5 | The list | `src/modules/queue/useQueue.ts` (fetch plus websocket) and `QueueList.tsx`, which replaces the project list in `SidebarContent.tsx`. One line per entry: dot, name, family color as background (color from the root key, fixed lightness for the dark theme), "Open in Cursor" link on chats, ticket link on tickets. Roots draggable with native drag events as in `PaneTabs.tsx`; the order recomputed live while the button is held; release inside sends `PUT order`, release outside restores. The latched line has a release button. A line ranked above the shown chat blinks when it becomes ready for Noam (rule 18.5). The forest widget sits above the list; sidebar logos are removed. |
-| 6 | Using it | In `handleKeyDown`: Alt+Enter submits typed text, then opens the next entry that needs Noam (not the current chat). A "Next" button beside the input box does the same without sending. Latch: when Noam picks another chat by hand (list, tab, forest node) and the chat he leaves got no message since it was shown, `PUT latch`. Read-only: a chat with a live process outside the page, or in Cursor's tab list, gets a banner with "Open in Cursor" instead of the input box. |
-| 7 | New chat from a ticket | Find the parent chat's folder (session id from the ticket's "Parent chat" section, its `project_path`; a worktree path maps to its repo's main folder), `writeDraftText('project:<id>', 'we are starting this ticket <link>')`, open a new chat in that project. When the chat gets its session id (first message sent), the server names it with the Agent SDK's `renameSession(sessionId, name)`, the same rename that Cursor and the page already show first (row 33 of `local_features_noam.md`): `<mm_dd>` the local date, `<world>` the ticket's world label, `<2 word objective>` as decided in open decision 7, `#<ticket number>`. |
+| 6 | Using it | Each ticket line gets a "close" button (rule 16.2), which checks for open blockers and raises the popup of rule 6.1. In `handleKeyDown`: Alt+Enter submits typed text, then opens the next entry that needs Noam (not the current chat). A "Next" button beside the input box does the same without sending. Latch: when Noam picks another chat by hand (list, tab, forest node) and the chat he leaves got no message since it was shown, `PUT latch`. Read-only: a chat with a live process outside the page, or in Cursor's tab list, gets a banner with "Open in Cursor" instead of the input box. |
+| 7 | New chat from a ticket | Find the parent chat's folder (session id from the ticket's "Parent chat" section, its `project_path`; a worktree path maps to its repo's main folder), `writeDraftText('project:<id>', 'we are starting this ticket <link>')`, open a new chat in that project. Before it opens, a popup asks Noam for the two words (the world filled from the ticket's world label, or its other label), with "let Haiku choose" (Haiku reads the ticket title). When the chat gets its session id, the server names it through `rename_chat.mjs`, the same rename that Cursor and the page show first (row 33 of `local_features_noam.md`). |
 | 8 | The forest widget | `src/modules/queue/QueueForest.tsx`, plain nested boxes, no library: roots across the top, children growing below each, a small button per node to collapse or open. Shared hover state with the list. |
 
 ### 5.5 Records
@@ -181,13 +183,17 @@ Every step adds or updates its rows in `local_features_noam.md` (new section "Pr
 
 Every build follows the memory rule: `free -m` first with several GB free, one heavy step at a time, `NODE_OPTIONS=--max-old-space-size=1536` under `nice`, `npm run build:client` when only the page changed; after a server change `systemctl --user restart quests-ui.service`.
 
-## 7. Open decisions
+## 7. Decisions
 
-1. Ruled 2026-10-23 14:30: the forest widget sits above the list of chats in the right sidebar; logos there are removed to save room.
-2. Ruled 2026-10-23 14:30 ("ok"): the stop hook sends a reply back once; the second try passes (the guard of `stop_check.sh`).
-3. The page cannot close tickets today, so rule 6.1 in the page needs a close action first. Proposal: a "close" button on ticket lines, which raises the same popup.
-4. A chat with no ticket counts as finalized when its last closing line is "Done" and it has no live process. Proposal: that rule.
-5. Rule 24 sends a family message on every changed closing line. Proposal: only when the kind of the line changes (for example from "waiting for" to "question"), not on every new text.
-6. Turning on the stop hook makes every running chat on the machine, in every repo, add the line from its next reply on. Proposal: turn it on at the end of step 1, after the check.
-7. Who writes the two-word objective of the chat name (rule 18.1.1). Options: Claude Haiku picks two words from the ticket title (runs through the page's Agent SDK on the subscription, about 4 seconds, measured 2026-10-09); the page shows a small name field filled from the ticket title for Noam to accept or edit; or the new chat proposes the two words on its first turn and the server renames it. Proposal: Haiku, no step for Noam. Also: a ticket with no world label (for example a quests ticket labeled only `quests`) takes that non-kind label as its world.
-8. Rule 18.1.1 covers chats created from a ticket. Chats created with "New Session" have no ticket number. Proposal: they keep today's naming (rename by hand, else Claude Code's generated title).
+All ruled by Noam, verbatim in `quests/priority-queue/REQUIREMENTS.md`.
+
+| # | Decision | Ruling |
+|---|---|---|
+| 1 | Where the forest widget sits | Above the list of chats in the right sidebar; logos there removed (2026-10-23 14:30). |
+| 2 | Retry of the closing-line hook | One retry, then the reply passes (2026-10-23 14:30, "ok"). |
+| 3 | Close in the page | A "close" button on ticket lines (2026-10-26 10:03, "yes"). |
+| 4 | When a chat with no ticket leaves | When Noam finalizes it; finalizing is always his call (2026-10-26 10:03). |
+| 5 | When the family is told | On a change of the kind of the closing line, and when Noam says so (2026-10-26 10:03). |
+| 6 | When the closing-line hook goes live | Right after its check in step 1 (2026-10-26 10:03, "ok"). |
+| 7 | The two-word objective | A popup asks Noam, with "let Haiku choose"; the format is always kept (2026-10-26 10:03). |
+| 8 | "New Session" chats | Named by the same format, asked right after the worktree question (2026-10-26 10:03). |
