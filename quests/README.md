@@ -9,7 +9,7 @@ Everything of the quests setup lives in this repo (fork of siteboon/claudecodeui
 | `system/quests-ide.desktop` | "Quests IDE": the page in its own Firefox window (profile `quests-ide`, window class `QuestsIDE`), rainbow icon | Link: `~/.local/share/applications/quests-ide.desktop` |
 | `../scripts/start-local.sh` | Starts the server (used by the service) | |
 | `../scripts/quests-update.sh` | The in-app Update: merges the original project's newest release into ours, rebuilds, pushes, restarts; rolls back on failure | Run by the page's Update button |
-| `tests/headless.cjs` | Headless checks of the running page: live feed, pin, bottom, fast scroll | `node quests/tests/headless.cjs <check> <sessionId>` |
+| `tests/headless.cjs` | Headless checks of the running page: live feed, pin, bottom, fast scroll, tabs, mode, plan, and the priority queue (queue, drag, next, latch, readonly, forest, ticketchat) | `node quests/tests/headless.cjs <check> <sessionId>` |
 | `tools/set_window_class.py` | Gives an open X11 window the `QuestsIDE` class | |
 | `tools/mockup.py` | The first throwaway mockup of the chat graph page | |
 | `hooks/queue_start.sh` | Priority queue: at every chat start, the closing-line rule, the chat's family, and (fresh start) the name rule | `~/.claude/settings.json`, SessionStart |

@@ -7,8 +7,10 @@ import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
 import { openRightTab } from '@/shared/hooks/useSplitPane';
 
 import CloseTicketDialog from '@/modules/queue/CloseTicketDialog';
+import NameChatDialog from '@/modules/queue/NameChatDialog';
 import { dragQueue, familyColors, previewQueue, setQueueHover, setQueueLatch, useQueue, useQueueHover } from '@/modules/queue/useQueue';
 import type { QueueEntry } from '@/modules/queue/useQueue';
+import { setQueueOpener } from '@/modules/queue/queueNavigation';
 
 const DRAG_TYPE = 'application/x-quests-queue';
 
@@ -16,8 +18,8 @@ type QueueListProps = {
   /** The page's session id of the chat on screen in the left pane. */
   shownSessionId: string | null;
   onNewSession: () => void;
-  /** A ticket that no chat has claimed was clicked. */
-  onStartTicket: (entry: QueueEntry) => void;
+  /** Start a new chat for a ticket that no chat has claimed, under the name chosen for it. */
+  onStartTicket: (entry: QueueEntry, name: string) => void;
 };
 
 /** Opens an entry's chat as a left-pane tab (Ctrl/Cmd: right pane); an unclaimed ticket starts a new chat. */
@@ -42,7 +44,9 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
   const queue = useQueue();
   const hover = useQueueHover();
   const dots = useChatDots();
-  const open = useOpenEntry(onStartTicket);
+  const [naming, setNaming] = useState<QueueEntry | null>(null);
+  const open = useOpenEntry(setNaming);
+  useEffect(() => setQueueOpener(open));
   const [preview, setPreview] = useState<string[] | null>(null);
   const [closing, setClosing] = useState<QueueEntry | null>(null);
   const dragged = useRef<string | null>(null);
@@ -176,6 +180,13 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
         })}
       </div>
       {closing && <CloseTicketDialog entry={closing} entries={queue.entries} onDone={() => setClosing(null)} />}
+      {naming && (
+        <NameChatDialog
+          entry={naming}
+          onCancel={() => setNaming(null)}
+          onStart={(name) => { onStartTicket(naming, name); setNaming(null); }}
+        />
+      )}
     </div>
   );
 }

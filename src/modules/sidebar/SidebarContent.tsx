@@ -9,7 +9,8 @@ import SidebarFooter from '@/modules/sidebar/SidebarFooter';
 import SidebarHeader from '@/modules/sidebar/SidebarHeader';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import SidebarRecentConversations from '@/modules/sidebar/SidebarRecentConversations';
-import { QueueList } from '@/modules/queue';
+import { QueueForest, QueueList, setPendingChatName } from '@/modules/queue';
+import { writeDraftText } from '@/shared/chatDrafts';
 
 function HighlightedSnippet({ snippet, highlights }: { snippet: string; highlights: { start: number; end: number }[] }) {
   const parts: ReactNode[] = [];
@@ -673,15 +674,25 @@ export default function SidebarContent({
             </div>
           )
         ) : (
-          // quests: the priority queue replaces the grouping by project.
+          // quests: the priority queue replaces the grouping by project; its forest sits above the list.
+          <>
+          <QueueForest />
           <QueueList
             shownSessionId={projectListProps.selectedSession?.id ?? null}
             onNewSession={() => {
               const project = projectListProps.selectedProject ?? projects[0];
               if (project) projectListProps.onNewSession(project);
             }}
-            onStartTicket={(entry) => { if (entry.url) window.open(entry.url, '_blank', 'noreferrer'); }}
+            onStartTicket={(entry, name) => {
+              // The folder of the chat that opened the ticket; else the shown chat's project.
+              const project = projects.find((p) => p.fullPath === entry.startFolder) ?? projectListProps.selectedProject ?? projects[0];
+              if (!project) return;
+              writeDraftText(`project:${project.projectId}`, `we are starting this ticket ${entry.url}`);
+              setPendingChatName(name);
+              projectListProps.onNewSession(project);
+            }}
           />
+          </>
         )}
       </ScrollArea>
 

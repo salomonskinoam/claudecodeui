@@ -25,8 +25,8 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag'].includes(check) || !sessionId) {
-  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag <sessionId>');
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat'].includes(check) || !sessionId) {
+  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat <sessionId>');
   process.exit(2);
 }
 const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
@@ -214,6 +214,90 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     console.log(JSON.stringify({ releasedOutside: second, unchanged: JSON.stringify((await apiQueue()).order) === JSON.stringify(after.order) }));
     await put('/order', { order: before.order });
     console.log(JSON.stringify({ restored: JSON.stringify((await apiQueue()).order) === JSON.stringify(before.order) }));
+  }
+
+  const putLatch = (key) => page.evaluate(async (k) => fetch('/api/quests/queue/latch', {
+    method: 'PUT', headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: k }),
+  }), key);
+
+  if (check === 'next') {
+    // Alt+Enter with an empty input box brings the next entry that needs the user (nothing is sent).
+    const q = await apiQueue();
+    const current = q.entries.find((e) => e.sessionId === sessionId)?.key;
+    const expected = q.view.find((k) => k !== current && q.entries.find((e) => e.key === k).needsNoam);
+    await page.locator('[data-slot="prompt-input-textarea"]').first().focus();
+    await page.keyboard.press('Alt+Enter');
+    await page.waitForTimeout(2500);
+    const e = q.entries.find((x) => x.key === expected);
+    console.log(JSON.stringify({
+      expected, url: await page.evaluate(() => location.pathname),
+      opened: e.sessionId ? await page.evaluate((id) => location.pathname === `/session/${id}`, e.sessionId)
+        : await page.locator(`text=Name the chat for ticket #${e.number}`).isVisible(),
+    }));
+  }
+
+  if (check === 'latch') {
+    // Leave the chat without sending, by clicking another line: it takes the latch. Then the latch is released.
+    const q = await apiQueue();
+    const mine = q.entries.find((e) => e.sessionId === sessionId);
+    const other = q.view.find((k) => k !== mine.key && q.entries.find((e) => e.key === k).sessionId);
+    await page.locator(`[data-quests-queue="list"] [data-queue-key="${other}"]`).click();
+    await page.waitForTimeout(2500);
+    const after = await apiQueue();
+    const permissions = after.view.filter((k) => after.entries.find((e) => e.key === k).state === 'permission').length;
+    // On top: below the permission prompts, with nothing above it but members of its own family (its blockers).
+    const onTop = after.view.slice(permissions, after.view.indexOf(mine.key))
+      .every((k) => after.entries.find((e) => e.key === k).rootKey === mine.rootKey);
+    console.log(JSON.stringify({ left: mine.key, clicked: other, latch: after.latch, onTop, position: after.view.indexOf(mine.key) }));
+    await putLatch(null);
+    console.log(JSON.stringify({ released: (await apiQueue()).latch === null }));
+  }
+
+  if (check === 'readonly') {
+    console.log(JSON.stringify({
+      banner: await page.locator('[data-quests-queue="outside"]').isVisible(),
+      inputBox: await page.locator('[data-slot="prompt-input-textarea"]').count(),
+    }));
+  }
+
+  if (check === 'forest') {
+    const q = await apiQueue();
+    const root = q.entries.find((e) => e.rootKey === e.key && q.entries.some((c) => c.parentKey === e.key && c.rootKey === e.key));
+    const kids = q.entries.filter((c) => c.parentKey === root.key && c.rootKey === root.key).map((c) => c.key);
+    const roots = await page.evaluate(() => Array.from(document.querySelectorAll('[data-quests-queue="forest"] > div > div > [data-forest-key]')).map((n) => n.dataset.forestKey));
+    await page.locator(`[data-forest-key="${root.key}"]`).hover();
+    const lineLit = await page.locator(`[data-quests-queue="list"] [data-queue-key="${root.key}"]`).evaluate((n) => n.className.includes('brightness-150'));
+    await page.locator(`[data-quests-queue="list"] [data-queue-key="${kids[0]}"]`).hover();
+    const nodeLit = await page.locator(`[data-forest-key="${kids[0]}"]`).evaluate((n) => n.className.includes('outline-1'));
+    await page.locator(`[data-forest-key="${root.key}"] button`).click();
+    const folded = await page.locator(`[data-forest-key="${kids[0]}"]`).count() === 0;
+    const target = q.entries.find((e) => e.sessionId && e.sessionId !== sessionId);
+    await page.locator(`[data-forest-key="${target.key}"]`).click();
+    await page.waitForTimeout(2000);
+    console.log(JSON.stringify({
+      rootsSideBySide: roots.length === q.entries.filter((e) => e.rootKey === e.key).length, root: root.key, kids, lineLit, nodeLit, folded,
+      clickOpened: await page.evaluate((id) => location.pathname === `/session/${id}`, target.sessionId),
+    }));
+    await putLatch(null); // the click above is a switch by hand: undo the latch it set
+  }
+
+  if (check === 'ticketchat') {
+    // Click an unclaimed ticket, name the chat, start it: the new chat opens with the ticket text typed in, unsent.
+    // The text is then cleared, so no draft is left behind. Nothing is sent.
+    const q = await apiQueue();
+    const t = q.entries.find((e) => e.state === 'unclaimed');
+    await page.locator(`[data-quests-queue="list"] [data-queue-key="${t.key}"]`).click();
+    await page.locator('input[placeholder="world"]').fill('test');
+    await page.locator('input[placeholder="two words"]').fill('queue check');
+    await page.locator('button:has-text("Start")').click();
+    await page.waitForTimeout(3000);
+    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    const text = await box.inputValue();
+    console.log(JSON.stringify({ ticket: t.key, url: await page.evaluate(() => location.pathname), text, ok: text === `we are starting this ticket ${t.url}` }));
+    await box.fill('');
+    await page.waitForTimeout(1500);
+    await putLatch(null); // leaving the shown chat by hand may have set the latch
   }
 
   if (check === 'mode') {

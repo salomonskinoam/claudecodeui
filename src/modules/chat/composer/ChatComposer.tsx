@@ -36,6 +36,7 @@ import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessageP
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
+import { openNextInQueue } from '@/modules/queue';
 
 type MentionableFile = {
   name: string;
@@ -494,6 +495,16 @@ export default function ChatComposer({
               onSelectPermissionMode={onSelectPermissionMode}
               providerLabel={providerLabel}
             />
+
+            {/* quests: bring the next chat in line (Alt+Enter also sends what is typed first). */}
+            <button
+              type="button"
+              title="Next chat in line (Alt+Enter sends first)"
+              className="h-[26px] rounded-sm border border-[#505050] px-2 text-[14px] text-[#cccccc] hover:bg-[#2a2d2e]"
+              onClick={() => openNextInQueue()}
+            >
+              Next
+            </button>
 
             <PromptInputSubmit
               onClick={

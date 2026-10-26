@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { queueDb } from '@/modules/database/index.js';
+import { queueDb, sessionsDb } from '@/modules/database/index.js';
 import { drag as dragOrder, repair, rootOf, view as viewOrder, needsNoam, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import {
   TICKETS_REPO, getCursorTabs, getLive, getTickets, noteRecentTranscripts, refreshCursorTabs, refreshLive, refreshTickets, run,
@@ -28,6 +28,8 @@ export type QueueEntry = QueueOrderEntry & {
   parentChatSid: string | null;
   /** For tickets: the numbers of its open blockers (for the close popup). */
   openBlockers: number[];
+  /** For tickets: the folder a new chat for it starts in, the folder of the chat that opened it (a worktree cut back to its repo). */
+  startFolder: string | null;
 };
 
 const KINDS: QueueKind[] = ['quest', 'sidequest', 'blocker'];
@@ -91,6 +93,7 @@ export function buildEntries(): QueueEntry[] {
       parentKey: t.parent && t.parent.state === 'OPEN' && open.has(t.parent.number) ? `ticket:${t.parent.number}` : null,
       blocks, state: st.state, since: st.since || time(t.createdAt), needsNoam: false, closingLine: st.line,
       world: t.labels.find((l) => !NOT_WORLDS.has(l)) ?? null, parentChatSid: t.parentChatSid, openBlockers: openBlockersOf(t.number),
+      startFolder: (t.parentChatSid && sessions.get(t.parentChatSid)?.project_path?.replace(/\/\.claude\/worktrees\/[^/]+$/, '')) || null,
       ...chatFields(sid),
     });
   }
@@ -102,7 +105,7 @@ export function buildEntries(): QueueEntry[] {
     entries.push({
       key: `chat:${sid}`, kind: 'chat', title: name, url: null, number: null, parentKey: null, blocks: [],
       state: st.state, since: st.since, needsNoam: false, closingLine: st.line, world: null, parentChatSid: null, openBlockers: [],
-      ...chatFields(sid),
+      startFolder: null, ...chatFields(sid),
     });
   }
   const byKey = new Map(entries.map((e) => [e.key, e as QueueOrderEntry]));
@@ -224,6 +227,25 @@ export async function closeTicket(number: number, choice: CloseChoice): Promise<
 export async function renameChat(providerSessionId: string, name: string): Promise<string> {
   const { stdout } = await run('node', [RENAME_SCRIPT, providerSessionId, name]);
   return stdout.trim();
+}
+
+/**
+ * Name a chat the page just created. Its Claude Code session id appears in the page's database once Claude
+ * answers the first message, so wait for it (up to two minutes), then rename.
+ */
+export function renamePageChatWhenReady(sessionId: string, name: string): void {
+  let tries = 0;
+  const attempt = () => {
+    const provider = sessionsDb.getSessionById(sessionId)?.provider_session_id;
+    if (provider) {
+      renameChat(provider, name).catch((error: unknown) => console.error('[Queue] rename failed', { sessionId, error: String(error) }));
+    } else if (tries++ < 60) {
+      setTimeout(attempt, 2000).unref?.();
+    } else {
+      console.error('[Queue] rename gave up: no Claude session id', { sessionId, name });
+    }
+  };
+  attempt();
 }
 
 /** Claude Haiku's name for a new chat from a ticket: "<mm_dd> <world> <word> <word> #<n>". */

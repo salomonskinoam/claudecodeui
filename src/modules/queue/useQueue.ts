@@ -28,6 +28,7 @@ export type QueueEntry = {
   closingLine: string | null;
   parentChatSid: string | null;
   openBlockers: number[];
+  startFolder: string | null;
 };
 
 export type Queue = { entries: QueueEntry[]; order: string[]; latch: string | null; view: string[] };

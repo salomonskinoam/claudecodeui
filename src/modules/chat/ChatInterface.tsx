@@ -29,6 +29,7 @@ import {
 import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import OutsideApprovalBanner from '@/modules/chat/composer/OutsideApprovalBanner';
+import { OutsideChatBanner } from '@/modules/queue';
 import { usePlanTabs } from '@/modules/chat/plan/usePlanTabs';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 
@@ -544,6 +545,8 @@ function ChatInterface({
             chatMessages={chatMessages}
             runsHere={pendingPermissionRequests.length > 0 || Boolean(sessionActivity && !sessionActivity.background && sessionActivity.canInterrupt !== false)}
           />
+          {/* quests: a chat open in another editor is read-only here; the banner takes the input box's place. */}
+          <OutsideChatBanner sessionId={selectedSession?.id || currentSessionId || null}>
           <ChatComposer
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
@@ -615,6 +618,7 @@ function ChatInterface({
           isTextareaExpanded={isTextareaExpanded}
           sendByCtrlEnter={sendByCtrlEnter}
         />
+          </OutsideChatBanner>
         </div>
       </div>
 

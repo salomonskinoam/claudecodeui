@@ -8,6 +8,7 @@ import { useProjectCommandState, useProjectSidebarState } from '@/modules/projec
 import PaneTabs from '@/modules/project-workspace/PaneTabs';
 import { PlanView } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
+import { noteShownChat } from '@/modules/queue';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
 import ProjectQuickSettingsRegion from '@/modules/project-workspace/ProjectQuickSettingsRegion';
@@ -73,6 +74,10 @@ function ProjectWorkspaceShell({
       setChatsInView([sessionId, showSplit ? panes.rightActive : null]);
     }
   }, [showTabs, sessionId, showSplit, panes.rightActive]);
+  // quests priority queue: a chat left without a message, by a switch made by hand, takes the "on top latch".
+  useEffect(() => {
+    if (showTabs) noteShownChat(sessionId ?? null);
+  }, [showTabs, sessionId]);
   const dots = useChatDots();
   const dotOf = useCallback((id: string): ChatDot | null => dots[id] ?? null, [dots]);
 

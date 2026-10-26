@@ -31,6 +31,7 @@ import { describeBackgroundTask, ownBackgroundTasks } from '@/modules/chat/utils
 import { useFileMentions } from '@/modules/chat/hooks/useFileMentions';
 import { useInputHistory } from '@/modules/chat/hooks/useInputHistory';
 import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
+import { noteSentInChat, openNextInQueue } from '@/modules/queue';
 
 type UseChatComposerStateArgs = {
   selectedProject: Project | null;
@@ -989,6 +990,7 @@ export function useChatComposerState({
         return;
       }
       submittingScopesRef.current.add(scope);
+      noteSentInChat(); // quests: a chat the user wrote to does not take the "on top latch" when left
       try {
         await submitMessage(event, queuedSubmission);
       } finally {
@@ -1181,6 +1183,14 @@ export function useChatComposerState({
         return;
       }
 
+      // quests: Alt+Enter sends what is typed (as Enter does), then brings the next chat in line.
+      if (event.key === 'Enter' && event.altKey && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        if (input.trim() || attachedFiles.length > 0) void handleSubmit(event);
+        openNextInQueue();
+        return;
+      }
+
       if (event.key === 'Enter') {
         const endedJustNow =
           performance.now() - lastCompositionEndAtRef.current < SAFARI_IME_RACE_WINDOW_MS;
@@ -1198,7 +1208,9 @@ export function useChatComposerState({
       }
     },
     [
+      attachedFiles.length,
       cyclePermissionMode,
+      input,
       handleCommandMenuKeyDown,
       handleFileMentionsKeyDown,
       handleHistoryKeyDown,
