@@ -47,6 +47,7 @@ import {
     initializeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
+import { closeQueue, initializeQueue, queueRoutes } from './modules/queue/index.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -197,6 +198,8 @@ app.use('/api/browser-use', authenticateToken, browserUseRoutes);
 // Unified provider MCP routes (protected)
 app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
+// quests: the priority queue of chats and tickets.
+app.use('/api/quests/queue', authenticateToken, queueRoutes);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
@@ -248,7 +251,9 @@ app.get('/api/quests/live', authenticateToken, async (_req: Request, res: Respon
         }
         const state = entry.status === 'busy' ? 'running' : entry.status === 'waiting' ? 'waiting' : null;
         if (state && entry.sessionId) {
-            states[sessionsDb.getSessionByProviderSessionId(entry.sessionId)?.session_id ?? entry.sessionId] = state;
+            const id = sessionsDb.getSessionByProviderSessionId(entry.sessionId)?.session_id ?? entry.sessionId;
+            // One chat with two live processes: running wins, whatever order the files are read in.
+            if (states[id] !== 'running') states[id] = state;
         }
     }
     for (const run of chatRunRegistry.listRunningRuns()) {
@@ -426,6 +431,8 @@ async function startServer() {
             // Sends anything that came due while the server was not running,
             // then keeps polling.
             initializeScheduledMessageDispatcher(providerRuntimeService);
+            // quests: the priority queue's polls (tickets, live chats, closing lines)
+            initializeQueue();
 
             // Start server-side plugin processes for enabled plugins
             startEnabledPluginServers().catch(err => {
@@ -437,6 +444,7 @@ async function startServer() {
         closeScheduledMessageDispatcher();
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
+            closeQueue();
             try {
                 await browserUseService.stopAllSessions();
             } catch (err) {

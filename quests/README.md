@@ -15,6 +15,7 @@ Everything of the quests setup lives in this repo (fork of siteboon/claudecodeui
 | `hooks/queue_start.sh` | Priority queue: at every chat start, the closing-line rule, the chat's family, and (fresh start) the name rule | `~/.claude/settings.json`, SessionStart |
 | `hooks/queue_stop.sh` | Priority queue: sends a reply without its closing line back to the chat once | `~/.claude/settings.json`, Stop |
 | `tools/rename_chat.mjs` | Names a chat in the one format, or lets Claude Haiku choose (`--haiku <text>`) | `node quests/tools/rename_chat.mjs <session id> "<name>"` |
+| `tests/api.cjs` | Calls the running page's API as the user, for checks | `node quests/tests/api.cjs GET /api/quests/queue` |
 | `priority-queue/` | The priority queue's requirements (Noam's words verbatim) and plan | |
 | `examples/` | Use-case examples for the chat management design (side quest) | |
 

@@ -24,4 +24,6 @@ export { userDb } from '@/modules/database/repositories/users.js';
 export { userPreferencesDb } from '@/modules/database/repositories/user-preferences.db.js';
 export { vapidKeysDb } from '@/modules/database/repositories/vapid-keys.js';
 export { scheduledMessagesDb } from './repositories/scheduled-messages.db.js';
+export { queueDb } from './repositories/queue.db.js';
+export type { QueueChatRow, QueueSessionRow } from './repositories/queue.db.js';
 export type { ScheduledMessageRow, ScheduledMessageStatus } from './repositories/scheduled-messages.db.js';

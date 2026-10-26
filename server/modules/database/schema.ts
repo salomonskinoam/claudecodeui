@@ -96,6 +96,24 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 `;
 
+// quests priority queue: the stored order ('order': JSON list of entry keys, 'latch': one key or null),
+// and each chat's last closing line, read from its transcript.
+export const QUEUE_TABLES_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS queue_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS queue_chats (
+    provider_session_id TEXT PRIMARY KEY,
+    -- waiting for | question | blocker | done, or NULL when the last reply has no closing line
+    line_kind TEXT,
+    line_text TEXT,
+    line_at TEXT,
+    finalized INTEGER NOT NULL DEFAULT 0
+);
+`;
+
 export const SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS scheduled_messages (
     id TEXT PRIMARY KEY,

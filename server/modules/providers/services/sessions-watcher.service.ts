@@ -5,6 +5,7 @@ import { promises as fsPromises } from 'node:fs';
 import chokidar, { type FSWatcher } from 'chokidar';
 
 import { sessionSynchronizerService } from '@/modules/providers/services/session-synchronizer.service.js';
+import { noteTranscript } from '@/modules/queue/index.js';
 import { broadcastSessionUpsertedBatch } from '@/modules/websocket/index.js';
 import type { LLMProvider } from '@/shared/types.js';
 
@@ -181,6 +182,8 @@ async function onUpdate(
       sessionId: result.sessionId,
     });
     queuePendingWatcherUpdate(eventType, provider, result.sessionId);
+    // quests: the chat's queue state comes from the closing line of its last reply.
+    if (provider === 'claude') await noteTranscript(filePath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Session watcher sync failed for provider "${provider}"`, {

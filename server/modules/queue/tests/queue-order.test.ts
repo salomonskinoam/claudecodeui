@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { drag, next, repair, view, type QueueOrderEntry } from '../queue-order.ts';
+import { drag, next, repair, view, type QueueOrderEntry } from '../queue-order.js';
 
 const e = (key: string, kind: QueueOrderEntry['kind'], extra: Partial<QueueOrderEntry> = {}): QueueOrderEntry =>
   ({ key, kind, parentKey: null, blocks: [], state: 'none', since: 0, ...extra });

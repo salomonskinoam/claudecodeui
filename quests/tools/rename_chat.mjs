@@ -2,6 +2,7 @@
 // quests priority queue: name a chat "<mm_dd> <world> <word> <word>" (plus " #<ticket>"), the one name format.
 //   node rename_chat.mjs <session id> "<name>"
 //   node rename_chat.mjs <session id> --haiku "<text>" [--ticket <n>]   Claude Haiku picks the world and the two words
+//   node rename_chat.mjs - --haiku "<text>" [--ticket <n>]              only print Haiku's name
 // The name is written with the Agent SDK's renameSession: the same custom-title line a rename in Cursor writes.
 import { mkdirSync, rmSync } from 'node:fs';
 import os from 'node:os';
@@ -43,5 +44,6 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
   const [sessionId, ...rest] = process.argv.slice(2);
   const flag = (f) => { const i = rest.indexOf(f); return i >= 0 ? rest[i + 1] : undefined; };
   const name = rest[0] === '--haiku' ? await haikuName(flag('--haiku'), flag('--ticket')) : rest[0];
-  console.log(await renameChat(sessionId, name));
+  // Session id "-": only print the name (the page's "Let Haiku choose" proposes before the chat exists).
+  console.log(sessionId === '-' ? name : await renameChat(sessionId, name));
 }
