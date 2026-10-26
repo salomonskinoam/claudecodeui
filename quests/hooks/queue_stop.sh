@@ -3,11 +3,8 @@
 # Every reply must end with the queue's closing line; a reply without it goes back to the chat once.
 in="$(cat)"
 [ "$(jq -r '.stop_hook_active // false' <<<"$in")" = "true" ] && exit 0  # the second try passes
-tp="$(jq -r '.transcript_path' <<<"$in")"
-# The tail is enough for the last reply; a whole transcript can be tens of MB.
-last="$(tail -c 4000000 "$tp" | tail -n +2 | jq -rs '[.[] | select(.type == "assistant" and (.isSidechain | not))
-  | select(any(.message.content[]?; .type == "text"))] | last | .message.content[] | select(.type == "text") | .text' \
-  | sed '/^[[:space:]]*$/d' | tail -n 1)"
+# Claude Code hands the reply to the hook; the transcript may not hold it yet when the hook runs.
+last="$(jq -r '.last_assistant_message // ""' <<<"$in" | sed '/^[[:space:]]*$/d' | tail -n 1)"
 grep -Eiq '^(waiting for|question|blocker|done)\b[ :]*.+' <<<"$last" && exit 0
 cat >&2 <<EOF
 Your reply has no queue closing line. Its last line was: ${last:0:200}
