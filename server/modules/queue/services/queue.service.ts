@@ -248,7 +248,7 @@ export function renamePageChatWhenReady(sessionId: string, name: string): void {
   attempt();
 }
 
-/** Claude Haiku's name for a new chat from a ticket: "<mm_dd> <world> <word> <word> #<n>". */
+/** Claude Haiku's name for a new chat from a ticket: "<mon_dd> <world> <word> <word> #<n>". */
 export async function suggestName(number: number): Promise<string> {
   const t = getTickets().find((x) => x.number === number);
   const text = t ? `${t.title} (labels: ${t.labels.join(', ')})` : String(number);

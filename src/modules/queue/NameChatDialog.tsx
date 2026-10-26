@@ -8,13 +8,13 @@ type NameChatDialogProps = { entry: QueueEntry; onStart: (name: string) => void;
 
 const today = () => {
   const d = new Date();
-  return `${String(d.getMonth() + 1).padStart(2, '0')}_${String(d.getDate()).padStart(2, '0')}`;
+  return `${d.toLocaleString("en", { month: "short" }).toLowerCase()}_${String(d.getDate()).padStart(2, '0')}`;
 };
 const field = 'rounded-sm border border-[#505050] bg-[#3c3c3c] px-2 py-1 text-[14px] text-[#cccccc]';
 const btn = 'rounded-sm border border-[#454647] px-3 py-1 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e] disabled:opacity-50';
 
 /**
- * quests priority queue: the name of a new chat for a ticket, always "<mm_dd> <world> <word> <word> #<ticket>".
+ * quests priority queue: the name of a new chat for a ticket, always "<mon_dd> <world> <word> <word> #<ticket>".
  * The user types the world and the two words, or lets Claude Haiku choose them from the ticket.
  */
 export default function NameChatDialog({ entry, onStart, onCancel }: NameChatDialogProps) {
@@ -28,7 +28,7 @@ export default function NameChatDialog({ entry, onStart, onCancel }: NameChatDia
   const haiku = () => {
     setBusy(true);
     postQueue<{ name: string }>('/suggest-name', { number: entry.number }).then(({ name: n }) => {
-      const m = n.match(/^\d\d_\d\d (\S+) (\S+ \S+) #\d+$/);
+      const m = n.match(/^[a-z]{3}_\d\d (\S+) (\S+ \S+) #\d+$/);
       if (!m) throw new Error(`Haiku gave "${n}"`);
       setWorld(m[1]);
       setWords(m[2]);

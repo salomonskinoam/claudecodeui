@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// quests priority queue: name a chat "<mm_dd> <world> <word> <word>" (plus " #<ticket>"), the one name format.
+// quests priority queue: name a chat "<mon_dd> <world> <word> <word>" (plus " #<ticket>"), the one name format.
 //   node rename_chat.mjs <session id> "<name>"
 //   node rename_chat.mjs <session id> --haiku "<text>" [--ticket <n>]   Claude Haiku picks the world and the two words
 //   node rename_chat.mjs - --haiku "<text>" [--ticket <n>]              only print Haiku's name
@@ -10,11 +10,11 @@ import path from 'node:path';
 
 import { query, renameSession } from '../../node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs';
 
-export const NAME_FORMAT = /^\d\d_\d\d \S+ \S+ \S+( #\d+)?$/;
+export const NAME_FORMAT = /^[a-z]{3}_\d\d \S+ \S+ \S+( #\d+)?$/;
 
 export function today() {
   const d = new Date();
-  return `${String(d.getMonth() + 1).padStart(2, '0')}_${String(d.getDate()).padStart(2, '0')}`;
+  return `${d.toLocaleString("en", { month: "short" }).toLowerCase()}_${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export async function haikuName(text, ticket) {
@@ -35,7 +35,7 @@ export async function haikuName(text, ticket) {
 }
 
 export async function renameChat(sessionId, name) {
-  if (!NAME_FORMAT.test(name)) throw new Error(`"${name}" is not "<mm_dd> <world> <word> <word>" with an optional " #<ticket>"`);
+  if (!NAME_FORMAT.test(name)) throw new Error(`"${name}" is not "<mon_dd> <world> <word> <word>" with an optional " #<ticket>"`);
   await renameSession(sessionId, name);
   return name;
 }
