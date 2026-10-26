@@ -3,6 +3,7 @@ import type { DragEvent } from 'react';
 
 import { type ChatDot, CHAT_DOT_STYLE } from '@/shared/hooks/useLiveChats';
 import { cn } from '@/shared/utils';
+import { hoverQueueSession } from '@/modules/queue';
 
 /** The drag payload type: a tab id, so drops from outside the tab rows are ignored. */
 const TAB_DRAG_TYPE = 'application/x-quests-tab';
@@ -93,6 +94,8 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
               dropBefore === id && 'shadow-[inset_2px_0_0_0_#3794ff]',
             )}
             title={nameOf(id)}
+            onMouseEnter={() => hoverQueueSession(id)}
+            onMouseLeave={() => hoverQueueSession(null)}
             onClick={() => onSelect(id)}
             onAuxClick={(event) => event.button === 1 && onClose(id)}
           >

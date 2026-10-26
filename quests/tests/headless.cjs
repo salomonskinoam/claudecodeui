@@ -25,8 +25,8 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat'].includes(check) || !sessionId) {
-  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat <sessionId>');
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover'].includes(check) || !sessionId) {
+  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover <sessionId>');
   process.exit(2);
 }
 const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
@@ -296,6 +296,18 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await box.fill('');
     await page.waitForTimeout(1500);
     await putLatch(null); // leaving the shown chat by hand may have set the latch
+  }
+
+  if (check === 'tabhover') {
+    // Hovering the chat's tab lights up its line in the list and its node in the forest.
+    const key = (await apiQueue()).entries.find((e) => e.sessionId === sessionId).key;
+    await page.locator('div.h-9 > [draggable="true"]').first().hover();
+    await page.waitForTimeout(300);
+    console.log(JSON.stringify({
+      key,
+      line: await page.locator(`[data-quests-queue="list"] [data-queue-key="${key}"]`).evaluate((n) => n.className.includes('brightness-150')),
+      node: await page.locator(`[data-forest-key="${key}"]`).evaluate((n) => n.className.includes('outline-1')),
+    }));
   }
 
   if (check === 'mode') {

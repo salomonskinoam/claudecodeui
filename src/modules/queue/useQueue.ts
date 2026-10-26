@@ -84,6 +84,11 @@ export function setQueueHover(key: string | null): void {
   publish();
 }
 
+/** A tab under the mouse lights up its chat's line in the list and its node in the forest. */
+export function hoverQueueSession(sessionId: string | null): void {
+  setQueueHover(sessionId ? queue.entries.find((e) => e.sessionId === sessionId)?.key ?? null : null);
+}
+
 /** The current queue, without subscribing (for key handlers). */
 export const currentQueue = () => queue;
 
