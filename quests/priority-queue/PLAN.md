@@ -99,8 +99,8 @@ next: first entry of the view that needs Noam and is not the shown chat
 ### Step 7. New chat from a ticket (page)
 
 | File | Change |
-| `src/modules/queue/NameChatDialog.tsx` (new) | Name popup: date fixed, world from the ticket's label, two words, "Let Haiku choose" (`POST suggest-name`), "Start". |
-| `src/modules/queue/startTicketChat.ts` (new) | The folder: the session id in the ticket's "## Parent chat" section, that chat's `project_path`, a worktree path cut back to its repo. Then `writeDraftText('project:<id>', 'we are starting this ticket <link>')` and the page's new-session action in that project. When the chat gets its session id (`replaceNewChatTab`), `POST rename`. |
+|---|---|
+| `src/modules/queue/startTicketChat.ts` (new) | The folder: the session id in the ticket's "## Parent chat" section, that chat's `project_path`, a worktree path cut back to its repo. Then `writeDraftText('project:<id>', 'we are starting this ticket <link>')` and the page's new-session action in that project. The chat names itself at its start through the start hook's name popup, adding " #<ticket number>". |
 
 ### Step 8. The forest widget (page)
 
