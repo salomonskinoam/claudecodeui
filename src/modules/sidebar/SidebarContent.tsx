@@ -9,7 +9,7 @@ import SidebarFooter from '@/modules/sidebar/SidebarFooter';
 import SidebarHeader from '@/modules/sidebar/SidebarHeader';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import SidebarRecentConversations from '@/modules/sidebar/SidebarRecentConversations';
-import { QueueForest, QueueList, setPendingChatName } from '@/modules/queue';
+import { QueueForest, QueueList } from '@/modules/queue';
 import { writeDraftText } from '@/shared/chatDrafts';
 
 function HighlightedSnippet({ snippet, highlights }: { snippet: string; highlights: { start: number; end: number }[] }) {
@@ -683,12 +683,11 @@ export default function SidebarContent({
               const project = projectListProps.selectedProject ?? projects[0];
               if (project) projectListProps.onNewSession(project);
             }}
-            onStartTicket={(entry, name) => {
+            onStartTicket={(entry) => {
               // The folder of the chat that opened the ticket; else the shown chat's project.
               const project = projects.find((p) => p.fullPath === entry.startFolder) ?? projectListProps.selectedProject ?? projects[0];
               if (!project) return;
               writeDraftText(`project:${project.projectId}`, `we are starting this ticket ${entry.url}`);
-              setPendingChatName(name);
               projectListProps.onNewSession(project);
             }}
           />

@@ -2,7 +2,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 
 import {
-  closeTicket, dragTo, getQueue, previewDrag, renameChat, renamePageChatWhenReady, setLatch, setOrder, suggestName, type CloseChoice,
+  closeTicket, dragTo, getQueue, previewDrag, setLatch, setOrder, type CloseChoice,
 } from '@/modules/queue/services/queue.service.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -46,25 +46,6 @@ router.post('/close', asyncHandler(async (req: Request, res: Response) => {
   }
   await closeTicket(number, choice as CloseChoice);
   res.json(createApiSuccessResponse(getQueue()));
-}));
-
-router.post('/rename', asyncHandler(async (req: Request, res: Response) => {
-  const { providerSessionId, sessionId, name } = req.body ?? {};
-  if (typeof name !== 'string') throw bad('name is required.');
-  if (typeof providerSessionId === 'string') {
-    res.json(createApiSuccessResponse({ name: await renameChat(providerSessionId, name) }));
-  } else if (typeof sessionId === 'string') {
-    renamePageChatWhenReady(sessionId, name); // a chat the page just created: renamed once Claude gave it its id
-    res.json(createApiSuccessResponse({ name, pending: true }));
-  } else {
-    throw bad('providerSessionId or sessionId is required.');
-  }
-}));
-
-router.post('/suggest-name', asyncHandler(async (req: Request, res: Response) => {
-  const { number } = req.body ?? {};
-  if (!Number.isInteger(number)) throw bad('number is required.');
-  res.json(createApiSuccessResponse({ name: await suggestName(number) }));
 }));
 
 export default router;

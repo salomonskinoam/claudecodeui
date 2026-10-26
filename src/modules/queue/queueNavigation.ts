@@ -1,4 +1,4 @@
-import { currentQueue, postQueue, setQueueLatch } from '@/modules/queue/useQueue';
+import { currentQueue, setQueueLatch } from '@/modules/queue/useQueue';
 import type { QueueEntry } from '@/modules/queue/useQueue';
 
 /**
@@ -32,17 +32,6 @@ export function noteShownChat(sessionId: string | null): void {
   if (!left || !leftQuietly) return;
   const entry = currentQueue().entries.find((e) => e.sessionId === left);
   if (entry && !entry.heldOutside) void setQueueLatch(entry.key).catch((error: unknown) => console.error(error));
-}
-
-/** The name chosen for the next chat the page creates (a chat for a ticket); applied once it has its id. */
-let pendingName: string | null = null;
-export const setPendingChatName = (name: string) => { pendingName = name; };
-
-export function notePageChatCreated(sessionId: string): void {
-  if (!pendingName) return;
-  const name = pendingName;
-  pendingName = null;
-  void postQueue('/rename', { sessionId, name }).catch((error: unknown) => console.error(error));
 }
 
 export function openNextInQueue(): boolean {

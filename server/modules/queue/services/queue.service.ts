@@ -1,12 +1,9 @@
-import path from 'node:path';
-
-import { queueDb, sessionsDb } from '@/modules/database/index.js';
+import { queueDb } from '@/modules/database/index.js';
 import { drag as dragOrder, repair, rootOf, view as viewOrder, needsNoam, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import {
   TICKETS_REPO, getCursorTabs, getLive, getTickets, noteRecentTranscripts, refreshCursorTabs, refreshLive, refreshTickets, run,
   type Ticket,
 } from '@/modules/queue/services/queue-sources.service.js';
-import { findApplicationRoot, getModuleDirectory } from '@/shared/utils.js';
 
 /** One line of the queue, as the page shows it. */
 export type QueueEntry = QueueOrderEntry & {
@@ -36,7 +33,6 @@ const KINDS: QueueKind[] = ['quest', 'sidequest', 'blocker'];
 const NOT_WORLDS = new Set([...KINDS, 'priority-high', 'waiting on Noam']);
 const OUTSIDE = new Set(['claude-vscode', 'claude-desktop', 'cli']);
 const LINE_STATE: Record<string, QueueState> = { question: 'question', done: 'done', 'waiting for': 'waiting', blocker: 'blocker' };
-const RENAME_SCRIPT = path.join(findApplicationRoot(getModuleDirectory(import.meta.url)), 'quests', 'tools', 'rename_chat.mjs');
 
 const kindOf = (t: Ticket): QueueKind => KINDS.find((k) => t.labels.includes(k)) ?? 'quest';
 const time = (s: string | null | undefined): number => (s ? Date.parse(s) : 0);
@@ -222,38 +218,6 @@ export async function closeTicket(number: number, choice: CloseChoice): Promise<
   await run('gh', ['issue', 'comment', String(number), ...R, '--body', `Closed from the quests page by Noam, ${when}.`]);
   await run('gh', ['issue', 'close', String(number), ...R]);
   await refreshTickets();
-}
-
-export async function renameChat(providerSessionId: string, name: string): Promise<string> {
-  const { stdout } = await run('node', [RENAME_SCRIPT, providerSessionId, name]);
-  return stdout.trim();
-}
-
-/**
- * Name a chat the page just created. Its Claude Code session id appears in the page's database once Claude
- * answers the first message, so wait for it (up to two minutes), then rename.
- */
-export function renamePageChatWhenReady(sessionId: string, name: string): void {
-  let tries = 0;
-  const attempt = () => {
-    const provider = sessionsDb.getSessionById(sessionId)?.provider_session_id;
-    if (provider) {
-      renameChat(provider, name).catch((error: unknown) => console.error('[Queue] rename failed', { sessionId, error: String(error) }));
-    } else if (tries++ < 60) {
-      setTimeout(attempt, 2000).unref?.();
-    } else {
-      console.error('[Queue] rename gave up: no Claude session id', { sessionId, name });
-    }
-  };
-  attempt();
-}
-
-/** Claude Haiku's name for a new chat from a ticket: "<mon_dd> <world> <word> <word> #<n>". */
-export async function suggestName(number: number): Promise<string> {
-  const t = getTickets().find((x) => x.number === number);
-  const text = t ? `${t.title} (labels: ${t.labels.join(', ')})` : String(number);
-  const { stdout } = await run('node', [RENAME_SCRIPT, '-', '--haiku', text, '--ticket', String(number)]);
-  return stdout.trim();
 }
 
 // ---- the polls ------------------------------------------------------------------------------------------

@@ -4,7 +4,6 @@ import { useProjectMainState } from '@/modules/project-workspace/context/Project
 import type { SessionEstablishedContext, SessionNavigationOptions,ProjectWorkspaceShellProps } from '@/shared/types';
 import WorkspaceMain from '@/modules/project-workspace/WorkspaceMain';
 import { replaceNewChatTab } from '@/shared/hooks/useSplitPane';
-import { notePageChatCreated } from '@/modules/queue';
 
 /** Rendered by ProjectWorkspaceShell to bind this module's project state to WorkspaceMain. */
 function ProjectMainRegion({
@@ -46,7 +45,6 @@ function ProjectMainRegion({
   ) => {
     // quests: the new chat got its id; its "New chat" tab becomes this chat's tab, in place.
     replaceNewChatTab(targetSessionId);
-    notePageChatCreated(targetSessionId); // quests: a chat started for a ticket gets the name chosen for it
     registerOptimisticSession({ sessionId: targetSessionId, ...context });
   }, [registerOptimisticSession]);
 

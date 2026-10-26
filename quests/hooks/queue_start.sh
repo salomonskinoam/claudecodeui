@@ -66,10 +66,10 @@ print("Family rule: tell these chats when the kind of your closing line changes,
 PY
 if [ "$src" = startup ]; then
   cat <<EOF
-Name rule: right after the worktree question (or first, where there is none), ask Noam for this chat's name with AskUserQuestion: "Name this chat: <mon_dd> <world> <2 word objective>". Offer two options: your proposed name, and "Let Haiku choose". Other lets him type. Keep the format. Then run:
+Name rule: right after the worktree question (or first, where there is none), ask Noam for this chat's name with AskUserQuestion: "Name this chat: <mon_dd> <world> <2 word objective>". Offer two options: your proposed name, and "Let Haiku choose". Other lets him type. Keep the format. A chat that starts from a ticket (its first message is "we are starting this ticket <link>") adds " #<ticket number>" at the end. Then run:
   node ~/src/quests/claudecodeui/quests/tools/rename_chat.mjs $sid "<name>"
 or, for Haiku:
-  node ~/src/quests/claudecodeui/quests/tools/rename_chat.mjs $sid --haiku "<his first message>"
+  node ~/src/quests/claudecodeui/quests/tools/rename_chat.mjs $sid --haiku "<his first message>" [--ticket <number>]
 EOF
 fi
 exit 0

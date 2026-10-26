@@ -230,11 +230,12 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.keyboard.press('Alt+Enter');
     await page.waitForTimeout(2500);
     const e = q.entries.find((x) => x.key === expected);
-    console.log(JSON.stringify({
-      expected, url: await page.evaluate(() => location.pathname),
-      opened: e.sessionId ? await page.evaluate((id) => location.pathname === `/session/${id}`, e.sessionId)
-        : await page.locator(`text=Name the chat for ticket #${e.number}`).isVisible(),
-    }));
+    // A chat opens; an unclaimed ticket opens a new chat with the ticket text typed in (cleared again here).
+    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    const opened = e.sessionId ? await page.evaluate((id) => location.pathname === `/session/${id}`, e.sessionId)
+      : (await box.inputValue()) === `we are starting this ticket ${e.url}`;
+    console.log(JSON.stringify({ expected, url: await page.evaluate(() => location.pathname), opened }));
+    if (!e.sessionId) { await box.fill(''); await page.waitForTimeout(1500); }
   }
 
   if (check === 'latch') {
@@ -283,14 +284,11 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'ticketchat') {
-    // Click an unclaimed ticket, name the chat, start it: the new chat opens with the ticket text typed in, unsent.
+    // Click an unclaimed ticket: a new chat opens with the ticket text typed in, unsent (it names itself at its start).
     // The text is then cleared, so no draft is left behind. Nothing is sent.
     const q = await apiQueue();
     const t = q.entries.find((e) => e.state === 'unclaimed');
     await page.locator(`[data-quests-queue="list"] [data-queue-key="${t.key}"]`).click();
-    await page.locator('input[placeholder="world"]').fill('test');
-    await page.locator('input[placeholder="two words"]').fill('queue check');
-    await page.locator('button:has-text("Start")').click();
     await page.waitForTimeout(3000);
     const box = page.locator('[data-slot="prompt-input-textarea"]').first();
     const text = await box.inputValue();
