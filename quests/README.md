@@ -12,6 +12,10 @@ Everything of the quests setup lives in this repo (fork of siteboon/claudecodeui
 | `tests/headless.cjs` | Headless checks of the running page: live feed, pin, bottom, fast scroll | `node quests/tests/headless.cjs <check> <sessionId>` |
 | `tools/set_window_class.py` | Gives an open X11 window the `QuestsIDE` class | |
 | `tools/mockup.py` | The first throwaway mockup of the chat graph page | |
+| `hooks/queue_start.sh` | Priority queue: at every chat start, the closing-line rule, the chat's family, and (fresh start) the name rule | `~/.claude/settings.json`, SessionStart |
+| `hooks/queue_stop.sh` | Priority queue: sends a reply without its closing line back to the chat once | `~/.claude/settings.json`, Stop |
+| `tools/rename_chat.mjs` | Names a chat in the one format, or lets Claude Haiku choose (`--haiku <text>`) | `node quests/tools/rename_chat.mjs <session id> "<name>"` |
+| `priority-queue/` | The priority queue's requirements (Noam's words verbatim) and plan | |
 | `examples/` | Use-case examples for the chat management design (side quest) | |
 
 Setting up a new machine: clone, `npm install && npm run build`, `git remote add upstream https://github.com/siteboon/claudecodeui.git && git fetch upstream --tags`, then create the two links above, `systemctl --user daemon-reload`, `systemctl --user enable --now quests-ui.service`.

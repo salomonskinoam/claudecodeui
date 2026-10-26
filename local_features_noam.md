@@ -86,3 +86,13 @@ Discussed in depth; no part is built yet.
 | 35 | Manager chat | One always-open chat that ranks all work by an editable written policy, opens side quests and blockers as new chats, and brings the user only the top item that needs them, with full context. Chats keep explaining in full in their own window too. | asked |
 | 36 | Local store and history | 100% local, its own git history as the log; not on GitHub. | asked |
 | 37 | Graph view | A page showing the chats as a tree (side quests and blockers under their origin), each with live state, status and priority, and a way to open each chat. | asked |
+
+## Priority queue
+
+One ordered queue of chats and tickets that brings the user the next thing that needs them. Requirements and plan: `quests/priority-queue/`.
+
+| # | Feature | Behavior | Status |
+|---|---|---|---|
+| 47 | Closing line on every reply | Every reply of every chat on the machine ends with one more line after the output style's two closing lines: "waiting for <what>", "question <what>", "blocker <what>" (open blockers only) or "Done <what>". A reply without it is sent back to the chat once with the rule; the second try passes. The rule is given to every chat at its start. | built |
+| 48 | Family notices | At its start, a chat that has a ticket is told its family: the parent chat (from its ticket's "Parent chat" section), the chats on its sibling tickets and on its child tickets (open, claimed ones only). It tells them when the kind of its closing line changes, on every ticket update, and when the user says so: a message if the chat is live, else a comment on its ticket. | built |
+| 49 | Chat names by one format | Every chat is named "<mm_dd> <world> <2 word objective>", plus " #<ticket>" for a chat from a ticket. A new chat asks the user for its name right after the worktree question, with "Let Haiku choose" (Claude Haiku picks the world and the two words). Any name outside the format is refused. | built |
