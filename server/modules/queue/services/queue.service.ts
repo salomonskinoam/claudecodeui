@@ -26,6 +26,8 @@ export type QueueEntry = QueueOrderEntry & {
   closingLine: string | null;
   /** For tickets: the session id in the ticket's "## Parent chat" section. */
   parentChatSid: string | null;
+  /** For tickets: the numbers of its open blockers (for the close popup). */
+  openBlockers: number[];
 };
 
 const KINDS: QueueKind[] = ['quest', 'sidequest', 'blocker'];
@@ -88,7 +90,8 @@ export function buildEntries(): QueueEntry[] {
       key: `ticket:${t.number}`, kind, title: t.title, url: t.url, number: t.number,
       parentKey: t.parent && t.parent.state === 'OPEN' && open.has(t.parent.number) ? `ticket:${t.parent.number}` : null,
       blocks, state: st.state, since: st.since || time(t.createdAt), needsNoam: false, closingLine: st.line,
-      world: t.labels.find((l) => !NOT_WORLDS.has(l)) ?? null, parentChatSid: t.parentChatSid, ...chatFields(sid),
+      world: t.labels.find((l) => !NOT_WORLDS.has(l)) ?? null, parentChatSid: t.parentChatSid, openBlockers: openBlockersOf(t.number),
+      ...chatFields(sid),
     });
   }
   const chatSids = new Set([...live.keys(), ...[...lines.values()].filter((l) => l.line_kind && !l.finalized).map((l) => l.provider_session_id)]);
@@ -98,7 +101,8 @@ export function buildEntries(): QueueEntry[] {
     const name = sessions.get(sid)?.custom_name ?? live.get(sid)?.name ?? sid;
     entries.push({
       key: `chat:${sid}`, kind: 'chat', title: name, url: null, number: null, parentKey: null, blocks: [],
-      state: st.state, since: st.since, needsNoam: false, closingLine: st.line, world: null, parentChatSid: null, ...chatFields(sid),
+      state: st.state, since: st.since, needsNoam: false, closingLine: st.line, world: null, parentChatSid: null, openBlockers: [],
+      ...chatFields(sid),
     });
   }
   const byKey = new Map(entries.map((e) => [e.key, e as QueueOrderEntry]));
@@ -171,6 +175,14 @@ export function dragTo(key: string, beforeKey: string | null) {
   const entries = buildEntries();
   store(dragOrder(repair(queueDb.getState<string[]>('order') ?? [], entries), entries, key, beforeKey));
   return getQueue();
+}
+
+/** The view a drag would give, without storing it: the page's live preview while the mouse button is held. */
+export function previewDrag(key: string, beforeKey: string | null): string[] {
+  const entries = buildEntries();
+  const order = dragOrder(repair(queueDb.getState<string[]>('order') ?? [], entries), entries, key, beforeKey);
+  const latch = queueDb.getState<string | null>('latch') ?? null;
+  return viewOrder(order, latch && entries.some((e) => e.key === latch) ? latch : null, entries);
 }
 
 export function setLatch(key: string | null) {

@@ -2,7 +2,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 
 import {
-  closeTicket, dragTo, getQueue, renameChat, setLatch, setOrder, suggestName, type CloseChoice,
+  closeTicket, dragTo, getQueue, previewDrag, renameChat, setLatch, setOrder, suggestName, type CloseChoice,
 } from '@/modules/queue/services/queue.service.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -25,6 +25,12 @@ router.put('/drag', asyncHandler(async (req: Request, res: Response) => {
   const { key, beforeKey } = req.body ?? {};
   if (typeof key !== 'string' || !(beforeKey === null || typeof beforeKey === 'string')) throw bad('key and beforeKey are required.');
   res.json(createApiSuccessResponse(dragTo(key, beforeKey)));
+}));
+
+router.get('/preview', asyncHandler(async (req: Request, res: Response) => {
+  const { key, before } = req.query;
+  if (typeof key !== 'string') throw bad('key is required.');
+  res.json(createApiSuccessResponse({ view: previewDrag(key, typeof before === 'string' && before ? before : null) }));
 }));
 
 router.put('/latch', asyncHandler(async (req: Request, res: Response) => {

@@ -2,13 +2,14 @@ import { type ReactNode } from 'react';
 import { Activity, Archive, Folder, MessageSquare, RotateCcw, Search, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
-import { LLMProviderLogo, ScrollArea } from '@/shared/ui';
+import { ScrollArea } from '@/shared/ui';
 import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationSearchResults, Project, RecentConversationListItem, ReleaseInfo, SearchProgress, SidebarProjectListProps, SidebarSearchMode } from '@/shared/types';
 import { formatCompactAge, getAllSessions } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import SidebarFooter from '@/modules/sidebar/SidebarFooter';
 import SidebarHeader from '@/modules/sidebar/SidebarHeader';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import SidebarRecentConversations from '@/modules/sidebar/SidebarRecentConversations';
+import { QueueList } from '@/modules/queue';
 
 function HighlightedSnippet({ snippet, highlights }: { snippet: string; highlights: { start: number; end: number }[] }) {
   const parts: ReactNode[] = [];
@@ -261,9 +262,6 @@ export default function SidebarContent({
                           session.provider,
                         )}
                       >
-                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-muted/60">
-                          <LLMProviderLogo provider={session.provider} className="h-3.5 w-3.5" />
-                        </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13px] font-normal leading-4 text-foreground">
                             {session.sessionTitle}
@@ -565,9 +563,6 @@ export default function SidebarContent({
                               isProjectArchived: true,
                             })}
                           >
-                            <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-background/70">
-                              <LLMProviderLogo provider={session.__provider} className="h-3.5 w-3.5" />
-                            </span>
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-xs text-foreground">
                                 {(typeof session.summary === 'string' && session.summary.trim().length > 0
@@ -635,9 +630,6 @@ export default function SidebarContent({
                           className="flex min-w-0 flex-1 items-center gap-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           onClick={() => onArchivedSessionClick(session)}
                         >
-                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-background/70">
-                            <LLMProviderLogo provider={session.provider} className="h-3.5 w-3.5" />
-                          </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-xs text-foreground">
                               {session.sessionTitle}
@@ -681,7 +673,15 @@ export default function SidebarContent({
             </div>
           )
         ) : (
-          <SidebarProjectList {...projectListProps} />
+          // quests: the priority queue replaces the grouping by project.
+          <QueueList
+            shownSessionId={projectListProps.selectedSession?.id ?? null}
+            onNewSession={() => {
+              const project = projectListProps.selectedProject ?? projects[0];
+              if (project) projectListProps.onNewSession(project);
+            }}
+            onStartTicket={(entry) => { if (entry.url) window.open(entry.url, '_blank', 'noreferrer'); }}
+          />
         )}
       </ScrollArea>
 

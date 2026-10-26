@@ -12,6 +12,10 @@
 //   plan    <sessionId> is a plan name here (~/.claude/plans/<name>.md): opens a chat tab, then the plan tab placed
 //           right after it, and prints the left tab order, the URL and the start of the rendered plan
 //   mode    the permission mode button: start mode, after Shift+Tab, after plain Tab (must not change)
+//   queue   the session list: its lines must equal the queue's view from GET /api/quests/queue, one background
+//           color per family, no CloudCLI logo in the header
+//   drag    drags the first root line onto the last line (its family follows as the rules say), then drags another
+//           and releases it outside the list (the order must not change); puts the first root back at the end
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
 //           panes, prints the stored layout after each drag. Restores no layout: use a fresh browser profile.
 const os = require('node:os');
@@ -21,8 +25,8 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan'].includes(check) || !sessionId) {
-  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan <sessionId>');
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag'].includes(check) || !sessionId) {
+  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag <sessionId>');
   process.exit(2);
 }
 const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
@@ -149,6 +153,67 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     }));
     console.log(JSON.stringify(r));
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  }
+
+  const apiQueue = () => page.evaluate(async () => (await (await fetch('/api/quests/queue', {
+    headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}` },
+  })).json()).data);
+  const listRows = () => page.evaluate(() => Array.from(document.querySelectorAll('[data-quests-queue="list"] [data-queue-key]'))
+    .map((r) => ({ key: r.dataset.queueKey, color: r.style.backgroundColor, draggable: r.draggable })));
+
+  if (check === 'queue') {
+    const q = await apiQueue();
+    const rows = await listRows();
+    const roots = new Set(q.entries.map((e) => e.rootKey));
+    const colors = new Set(rows.map((r) => r.color));
+    console.log(JSON.stringify({
+      rowsMatchView: JSON.stringify(rows.map((r) => r.key)) === JSON.stringify(q.view),
+      rows: rows.length, families: roots.size, colors: colors.size,
+      headerLogo: await page.evaluate(() => /CloudCLI/.test(document.querySelector('.md\\:block')?.textContent ?? '')),
+    }));
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  }
+
+  if (check === 'drag') {
+    // A root with a side quest under it is dragged onto the line after that side quest: the side quest must come
+    // along below it. Then another root is dragged and released outside the list: the order must not change.
+    // The stored order is put back exactly at the end.
+    const before = await apiQueue();
+    const put = (route, body) => page.evaluate(async ([r, b]) => fetch(`/api/quests/queue${r}`, {
+      method: 'PUT', headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(b),
+    }), [route, body]);
+    await page.evaluate(() => {
+      window.__dragged = [];
+      document.addEventListener('dragstart', (e) => window.__dragged.push(e.target.dataset?.queueKey), true);
+    });
+    const mouseDrag = async (fromKey, toLocator, y) => {
+      const from = await page.locator(`[data-queue-key="${fromKey}"]`).boundingBox();
+      const to = await toLocator.boundingBox();
+      await page.mouse.move(from.x + 40, from.y + from.height / 2);
+      await page.mouse.down();
+      for (let i = 1; i <= 8; i++) await page.mouse.move(to.x + 40, from.y + (to.y + y - from.y) * (i / 8));
+      await page.mouse.up();
+      await page.waitForTimeout(2500);
+    };
+    const side = before.entries.find((e) => e.kind === 'sidequest' && e.parentKey && before.view.includes(e.parentKey));
+    const root = side.parentKey;
+    const next = before.view[before.view.indexOf(side.key) + 1];
+    // Aim at the top edge of the line after `next`: the root lands right after `next`, below its own side quest.
+    await mouseDrag(root, page.locator(`[data-queue-key="${before.view[before.view.indexOf(side.key) + 2]}"]`), 3);
+    const after = await apiQueue();
+    const at = (o, k) => o.indexOf(k);
+    console.log(JSON.stringify({
+      picked: await page.evaluate(() => window.__dragged), root, side: side.key, onto: next,
+      before: [at(before.view, root), at(before.view, side.key), at(before.view, next)],
+      after: [at(after.view, root), at(after.view, side.key), at(after.view, next)],
+    }));
+    const second = after.view.find((k) => k !== root && after.entries.find((e) => e.key === k).rootKey === k
+      && after.entries.find((e) => e.key === k).state !== 'permission');
+    await mouseDrag(second, page.locator('.chat-messages-pane'), 200);
+    console.log(JSON.stringify({ releasedOutside: second, unchanged: JSON.stringify((await apiQueue()).order) === JSON.stringify(after.order) }));
+    await put('/order', { order: before.order });
+    console.log(JSON.stringify({ restored: JSON.stringify((await apiQueue()).order) === JSON.stringify(before.order) }));
   }
 
   if (check === 'mode') {
