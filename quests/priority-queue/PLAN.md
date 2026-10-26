@@ -1,199 +1,125 @@
-# Priority queue for quests: plan
+# The priority queue for quests: the change
 
-Ticket: https://github.com/salomonskinoam/tickets/issues/32 (oct_09 priotity queue: tickets priority queue). Requirements, verbatim and as read: `quests/priority-queue/REQUIREMENTS.md` in salomonskinoam/claudecodeui, commit 97f1c33. This plan stands alone; everything it needs is written here.
+## 1. Why
 
-## 1. Philosophy
+Noam runs many Claude Code chats at once and loses his time finding which one needs him. This change adds one ordered queue of his chats and tickets to the quests page (the web page on http://localhost:3001, repo `~/src/quests/claudecodeui`). He answers the top entry, presses one key, and the next one comes. The order stays stable until something real changes it. Closed tickets and cleared blockers are never shown. Nothing opens a ticket or starts work by itself.
 
-Noam runs many Claude Code chats at once. A chat lasts one to two days. Most of his time goes into scrolling, switching between chats and remembering where each one stood. He wants to always talk to the one chat that needs him most, answer it, and get the next one.
+## 2. What the change must do
 
-The ticket system (salomonskinoam/tickets, built 2026-10-13 to 2026-10-16) already cuts growing work out of chats into tickets of three kinds: quest, side quest, blocker. A blocker ranks above what it blocks, a side quest below its parent. Noam decides when a ticket is opened, and Noam opens chats from tickets. Nothing opens a ticket or starts a chat by itself.
+A ticket is a GitHub issue in salomonskinoam/tickets, of kind `quest`, `sidequest` or `blocker` (label). A chat claims a ticket with a comment "Claimed by chat <name>, session <session id>, ...". A blocker's body has a section "## Blocks" with the session ids of the chats it blocks.
 
-The queue is the missing piece: one list that puts every open chat and ticket in the order Noam should handle them, keeps that order stable, and brings him the next one with one key.
+"New" means nothing of it is built. "Partly built" names the part that already works and is not touched.
 
-Two principles hold everywhere:
+| # | Requirement | Status |
+|---|---|---|
+| 1 | The queue holds every open ticket and every chat that has a ticket or a live process. A chat that claimed a ticket is that ticket's entry. A chat leaves when its ticket closes; with no ticket, when Noam runs /finalize-chat in it. Its state comes from its last closing line, so it keeps its place when its editor tab closes. | New |
+| 2 | Roots: a quest (always, also with a parent), a ticket whose parent is closed or missing, a chat with no ticket. A family is a root plus the blockers and side quests under it. | New. The kinds, the parent links and the claims already exist on the tickets; reading them into a queue is new. |
+| 3 | Inside a family a blocker ranks above every chat it blocks; a side quest ranks below its parent. Kinds order only inside a family. | New. The ticket system states this rule in words, with no code behind it. |
+| 4 | Roots get an arbitrary place when they appear, and it sticks. A new root goes last. When a root closes, its children become roots and keep its place. | New |
+| 5 | A chat waiting on a permission prompt ranks above everything. Equal rank: permission prompt, then question, then Done, oldest first. | New. The page already knows which chat waits on a permission prompt (the blue dot). |
+| 6 | Noam changes only the place of a root, by dragging. The root moves alone; a family member that would end on the wrong side joins the dragged block, which grows and moves on as one. Live while the mouse button is held; released inside keeps the order, released outside undoes it. | New. Dragging tabs is built; dragging list lines is not. |
+| 7 | The session list becomes one flat list in queue order, name only, live, replacing the grouping by project. One generated background color per family. Logos removed. | New. Lean one-line rows, the dots and the live refresh are built and stay. |
+| 8 | A forest widget above the list: roots side by side, children below, a small collapse button per node, click opens like the line, hover shows the ticket name and highlights node and line both ways. | New |
+| 9 | Ticket lines have a GitHub link and a "close" button. Chat lines have an "Open in Cursor" link (`cursor://anthropic.claude-code/open?session=<session id>`). | New. The Cursor link is built only in the approval popup for chats waiting in Cursor. |
+| 10 | An entry ranked above the shown chat blinks when it becomes ready for Noam. | New |
+| 11 | Sending does not take a chat out of the queue. A "Next" button and Alt+Enter open the highest entry that needs Noam; Alt+Enter first sends typed text. Plain Enter sends and stays. | Partly built: plain Enter already sends and stays. "Next" and Alt+Enter are new. |
+| 12 | Leaving a chat without sending, by picking another one by hand, puts it on top below permission prompts (the "on top latch"): one chat at a time, releasable, moving as a drag does. | New |
+| 13 | A chat open in another editor (Cursor, the Claude desktop app, a terminal) is read-only in the page, with its Cursor link. | New. The popup for a Cursor chat waiting on a permission prompt is built and stays; locking the input box is new. |
+| 14 | Closing a root with open blockers first raises a popup: "are you sure", the open blockers listed, options yes / convert the blockers to quests / convert them to side quests / close the blockers too / other kind. In the chats and in the page. | New. Closing tickets from a chat is built (the ticket-work skill); the popup and closing from the page are new. |
+| 15 | Clicking an unclaimed ticket opens a new chat in the page, in the folder of the chat that opened the ticket, with "we are starting this ticket <link>" typed in, not sent. | New. The page can already keep text in a new chat's input box; using that from a ticket is new. |
+| 16 | Every chat is named "<mm_dd> <world> <2 word objective>", plus " #<ticket number>" when it comes from a ticket. A popup asks Noam, offering "let Haiku choose"; the format is always kept. In the page for chats from tickets; right after the worktree question for other chats. | New. Renaming by hand in Cursor is built, and the page already shows that name first. |
+| 17 | Every reply ends with a third closing line, after "Running:" and "Required from you:": "waiting for <what>", "question <what>", "blocker <what>" (open blockers only) or "Done <what>". "question" and "Done" need Noam; "waiting for" and "blocker" do not. A hook sends a reply without the line back once; the second try passes. It goes live right after its check. It lives outside the noam_worlds repo and is not an output style. | New. The two lines "Running:" and "Required from you:" already exist in the noam_worlds output style and stay. |
+| 18 | Every chat tells its parent, sibling and child chats when the kind of its closing line changes, on every ticket update, and when Noam says so: a message when live, else a comment on their ticket. | Partly built: on a ticket update, the ticket-work skill already tells the parent chat and the child chats. Siblings, a change of the closing line's kind, and "when Noam says so" are new. |
+| 19 | The order is stored in the quests server's database and mirrored to GitHub within seconds as one file in salomonskinoam/tickets, restored from there after a disk loss. | New |
 
-| Principle | Meaning |
+## 3. The change, step by step
+
+### Step 1. Closing line, family rule, names (new files in `~/src/quests/claudecodeui/quests/`)
+
+| File | What it does |
 |---|---|
-| Closed things are never shown again | A closed ticket, a cleared blocker, a settled decision is never named again. Noam, 2026-10-20 20:50: "we shouldn't spam closed tickets, that's the whole point of all of this." (tickets repo `philosophy.md`, commit 439802f) |
-| The order is stable | An order, once given, sticks until something real changes it. Noam, 2026-10-20 18:49: "that ranking sticks until the following change." |
+| `hooks/queue_start.sh` | SessionStart hook. Prints three rules into the chat. The closing-line rule: "Every reply ends with one more line after Running: and Required from you:, exactly one of: waiting for <what> / question <what> (with its background and history) / blocker <what> (open blockers only) / Done <what>. A reply without it is sent back to you once." The family rule: the chat's own ticket (`gh issue list -R salomonskinoam/tickets --state open --search "<session id> in:comments"`), its parent, siblings and children with their claiming chats' names and session ids, and "Tell them when the kind of your closing line changes, on every ticket update, and when Noam says so: SendMessage if live (ListAgents), else a comment on their ticket." On a fresh start only, the name rule: "Right after the worktree question, ask Noam with AskUserQuestion for this chat's name <mm_dd> <world> <2 word objective>, options: your proposal and Let Haiku choose; then run rename_chat.mjs." |
+| `hooks/queue_stop.sh` | Stop hook. If `stop_hook_active` is true, exit 0. Else take the last assistant text of the transcript (`jq -rs '[.[] \| select(.type=="assistant")] \| last \| .message.content[]? \| select(.type=="text") \| .text'`), its last non-empty line; if it matches `^(waiting for\|question\|blocker\|done)\b[ :]*.+` (case ignored), exit 0; else exit 2 with the closing-line rule on stderr. |
+| `tools/rename_chat.mjs` | `node rename_chat.mjs <session id> <name>`: checks the format, then `renameSession(sessionId, name)` of `@anthropic-ai/claude-agent-sdk`. With `--haiku <text> [--ticket <n>]`: asks Claude Haiku (`query` with model `claude-haiku-5-5`, no tools, no settings, no saved session, in `~/.cache/quests-haiku`) for "<world>\|<word> <word>", builds the name from the local date, then deletes the title stub the call leaves in `~/.claude/projects`. |
+| `~/.claude/settings.json` | Two hook entries: SessionStart (`startup\|resume\|compact`) runs `queue_start.sh`; Stop runs `queue_stop.sh`. The Stop entry is added only after step 1's check passes. |
 
-## 2. What exists
+### Step 2. The close popup in the chats (`~/src/tickets/hooks/guard_root_close.sh`, new)
 
-| Piece | Where | What it does today |
-|---|---|---|
-| The quests page | `~/src/quests/claudecodeui` (fork of CloudCLI UI, public repo salomonskinoam/claudecodeui), service `quests-ui.service` on 127.0.0.1:3001 | Shows every Claude Code chat on the machine, tabs per pane, split screen, session list on the right, one status dot per chat. Features list: `local_features_noam.md`. |
-| Session list | `src/modules/sidebar/` (`SidebarProjectList.tsx`, `SidebarProjectSessions.tsx`, `SidebarSessionItem.tsx`; a flat list already exists in `SidebarRecentConversations.tsx`) | Grouped by project, newest first. Click opens a chat as a left-pane tab (`openLeftTab`, `src/shared/hooks/useSplitPane.ts:71`), Ctrl+click in the right pane (`openRightTab`). |
-| Status dots | `src/shared/hooks/useLiveChats.ts`, server `GET /api/quests/live` (`server/index.ts:231`) | Polls every 2 seconds. Reads Claude Code's registry `~/.claude/sessions/*.json` (one file per live process: `status` busy, waiting or idle; `waitingFor` "permission prompt" or "input needed"; `entrypoint`). Drops idle processes today. |
-| Drafts | `src/shared/chatDrafts.ts` (`writeDraftText`), key `project:<projectId>` for a new chat | Text typed into an input box survives a reload. Writing a draft before opening a new chat fills its input box. |
-| Input box keys | `src/modules/chat/hooks/useChatComposerState.ts:1163` (`handleKeyDown`, `handleSubmit` at :980) | Enter and Ctrl+Enter send, Shift+Enter makes a new line. Alt is unused. |
-| Approval popup for outside chats | `src/modules/chat/composer/OutsideApprovalBanner.tsx:63` | The one place that uses `cursor://anthropic.claude-code/open?session=<id>`. Nothing locks the input box for chats open in another editor. |
-| Tab drag | `src/modules/project-workspace/PaneTabs.tsx` | Native browser drag events, a blue landing line. |
-| Server modules | `server/modules/<x>/` (routes, services, repository in `server/modules/database/repositories/`) | Pattern to copy: `server/modules/scheduled-messages/` (an interval with an in-flight guard, started from the `listen` callback in `server/index.ts:428`). |
-| Database | better-sqlite3, `~/.cloudcli/auth.db`, tables in `server/modules/database/schema.ts`, added by `runMigrations` (`migrations.ts:493`) | Holds sessions (`session_id`, `provider_session_id`, `project_path`, `jsonl_path`, `custom_name`). Not backed up. |
-| Live push | Websocket `/ws`, clients in `connectedClients`, send loop `sendToConnectedClients` (`session-upsert-broadcast.service.ts:66`, not exported) | Sends `session_upserted` frames. A file watcher on `~/.claude/projects` (`sessions-watcher.service.ts:197`) fires within 0.5 to 2 seconds of a transcript change. |
-| Page chats | `claude-runtime.provider.js` (`queryClaudeSDK`), `settingSources = ['project','user','local']` | Chats run from the page load the user's hooks, so session start hooks run for them too. |
-| Headless checks | `quests/tests/headless.cjs` | Signs a token from `~/.cloudcli/auth.db`, opens the page in Chrome, runs one named check (`live`, `pin`, `bottom`, `scroll`, `tabs`, `mode`, `plan`). |
-| Tickets | GitHub issues in private repo salomonskinoam/tickets, clone `~/src/tickets` (rules `REQUIREMENTS.md`, commit 8442f98) | Kind by label (`quest`, `sidequest`, `blocker`). Parent by GitHub sub-issue. A blocker's "## Blocks" section names chats by session id. A claim is a comment "Claimed by chat <name>, session <id>, ...". |
-| Ticket tree | `~/src/tickets/forest.py` | Draws the tree. Logic is all inside `main()`; one GitHub call per issue for the parent, about 30 seconds a run. Its regexes (`CLAIM`, `SID`) and the Blocks and own-ticket rules are what the server ports. |
-| Ticket hooks | `~/src/tickets/hooks/`, wired in `~/.claude/settings.json` | `session_start.sh` prints the session id, "Your ticket: #N", children, open blockers naming the chat. `validate_ticket.sh` shows the popup pattern (`permissionDecision: "ask"`) and the block pattern (reason on stderr, exit 2). |
-| Close steps | `~/src/tickets/skills/ticket-work/SKILL.md` close step, line 44 (`gh issue close`); `finalize-chat` delegates to it | The only place a chat closes a ticket. |
-| Stop hook pattern | `~/src/noam_worlds/sdk/plugins/hor/hooks/stop_check.sh` | Reads the last assistant text with one `jq` line from `transcript_path`; blocks with exit 2 and text on stderr; lets the second try pass (`stop_hook_active`). |
-| Cursor's open tabs | `~/.config/Cursor/User/workspaceStorage/<id>/state.vscdb`, table ItemTable, key `Anthropic.claude-code`, field `panelTabSessions` | One entry per open Claude tab (sessionId, title). On 2026-10-21 it matched the live claude-vscode processes exactly (7 and 7). |
+A PreToolUse hook on Bash for `gh issue close <n>` on salomonskinoam/tickets. It passes when the command starts with `TICKET_CLOSE_OK=1`. Otherwise it reads the ticket: root means kind quest or no open parent; open blockers are its open sub-issues labeled `blocker` plus open blockers whose "## Blocks" names a chat that claimed it. A root with open blockers: exit 2 with the list and "Ask Noam with AskUserQuestion: Yes, close it / Convert the blockers to quests / Convert the blockers to side quests / Close the blockers too (Other: a kind). Do his choice, then close again with TICKET_CLOSE_OK=1." One entry in `~/.claude/settings.json` (PreToolUse, matcher Bash).
 
-## 3. What is required
-
-The full list, as ruled by Noam between 2026-10-09 and 2026-10-21. Numbers are the rule numbers of the requirements file.
-
-| # | Requirement |
-|---|---|
-| 1 | The queue holds chats that wait for Noam and open tickets no chat has claimed. |
-| 2 | The interface is the quests page. |
-| 3 | The order is one list over all entries, shaped by a forest. A root is a ticket of kind quest, a ticket with no open parent, or a chat with no ticket. A quest is always a root, also with a parent (it stays linked, outside the parent's family). Roots get an arbitrary place when they appear, and that place sticks. |
-| 4 | A family is a root and the blockers and side quests under it. Inside a family: a blocker above the chats it blocks; a side quest below its parent. Never changed by hand; changing a ticket's kind moves it. |
-| 5 | Kinds order only inside a family. Between families only the roots' places count. |
-| 6 | When a root closes before its children, the children become roots and keep its place. |
-| 6.1 | Closing a root that still has open blockers raises a popup first: "are you sure", the open blockers listed, options: yes; convert the blockers to quests; convert them to side quests; close the blockers too; other (a kind Noam types). In the chats and in the page. |
-| 7 | A permission prompt ranks above everything. |
-| 8 | Equal priority: permission prompt, then question, then Done; oldest first. |
-| 9 | Noam changes only the place of a root by hand. |
-| 10 | Dragging a root moves it alone; other families may end up between its members. A family member that would end on the wrong side joins the dragged block; the block grows and moves on as one. |
-| 11 | The drag is live while the mouse button is held. Released inside: the new order stands. Released outside: undo. |
-| 12 | A new entry is placed by rules 4 to 8; a new root goes last (also a new quest with a parent). |
-| 12.1 | The list holds every open ticket and every chat with a ticket or a live process. "Next" skips entries that do not need Noam. A chat leaves when its ticket closes, or, with no ticket, when Noam finalizes it (always his call: the chat runs /finalize-chat). A chat's state comes from its last closing line, so a closed editor tab keeps its place. |
-| 13 | The order lives in the quests server's local database, mirrored to GitHub within seconds as one file in salomonskinoam/tickets, restored from there after a disk loss. |
-| 14 | The session list is one flat list in queue order, name only, top first, live. It replaces the projects grouping. |
-| 15 | Each family has its own generated color, used as the background of its lines. |
-| 16 | A separate widget shows the forest, horizontal, roots on the top level, a small collapse button per node. Clicking a node opens it like its line. Hovering a node shows the ticket name and highlights its line, and the other way around. |
-| 16.1 | Every ticket entry has a clickable link to the ticket. |
-| 16.2 | Every ticket line has a "close" button, which raises the popup of rule 6.1. |
-| 17 | Every chat line has an "Open in Cursor" link. |
-| 18 | Sending a message does not take a chat out of the queue; the page stays on the chat. |
-| 18.1 | Clicking an unclaimed ticket opens a new chat in the page with "we are starting this ticket <link>" typed in, not sent, in the folder of the chat that opened the ticket. |
-| 18.1.1 | Every chat is named "<mm_dd> <world> <2 word objective>", plus " #<ticket number>" when it comes from a ticket ("10_22 quests priority queue #32"). The format is always kept. A popup asks Noam for the name and offers "let Haiku choose". A chat from a ticket is asked in the page when it is created; a "New Session" chat asks right after the worktree question at its start. |
-| 18.2 | A chat open in another editor (Cursor, the Claude desktop app, a terminal) is read-only in the page, with its "Open in Cursor" link. |
-| 18.3 | Leaving a chat without Enter, by picking another chat by hand, puts it on top (below permission prompts): the "on top latch", one chat at a time, releasable. |
-| 18.4 | The latched chat moves as in rule 10. |
-| 18.5 | When a chat ranked higher than the current one becomes ready for Noam, its line blinks. |
-| 19 | A button and Alt+Enter "bring me the next one in line". Alt+Enter first sends typed text. Plain Enter sends and stays. |
-| 20 | Every reply ends with a third closing line owned by the queue: "waiting for <what>", "question <what>", "blocker <what>" or "Done <what>". |
-| 20.0 | "question" and "Done" give a queue place; "waiting for" none until the awaited thing returns; "blocker" none. |
-| 20.1 | "blocker" names only open blockers. |
-| 21 | A hook lets no reply pass without the line and sends it back with instructions. |
-| 22 | That hook and its instructions belong to the queue's harness, apart from the noam_worlds harness, and not as an output style. |
-| 23 | Nothing opens a ticket by itself. |
-| 24 | Every chat tells its parent, sibling and child chats about its events (a change of the kind of its closing line, every ticket update, and whenever Noam says to notify the family): a message when live, else a comment on their ticket. Home: the queue's instruction text. |
-
-## 4. The model
-
-### Entries
-
-| Entry | Key | Comes from |
-|---|---|---|
-| An open ticket | `ticket:<number>` | GitHub. If a chat claimed it, the entry shows that chat (the newest claim) and opens it. |
-| A chat with no ticket | `chat:<session id>` | The registry (live process) or its stored closing line (not "Done"). |
-
-A chat with a ticket is not a second entry; it is its ticket's entry.
-
-### State of an entry
-
-| State | Read from | Needs Noam |
-|---|---|---|
-| permission prompt | registry `status` waiting, `waitingFor` "permission prompt" | yes |
-| question | closing line "question", or registry `waitingFor` "input needed" | yes |
-| Done | closing line "Done" | yes |
-| unclaimed ticket | GitHub, no claim | yes |
-| running | registry `status` busy | no |
-| waiting for | closing line "waiting for" | no |
-| blocker | closing line "blocker" | no |
-| none yet | no closing line (chats from before the hook) | no |
-
-A chat with no ticket leaves when it runs /finalize-chat (seen in its transcript); finalizing is always Noam's call.
-
-### The constraints
-
-A pair "a above b" for: every blocker and each entry it blocks (the claimed tickets of the chats in its "Blocks" section); every side quest's parent and the side quest. Quests have no constraint with their parent (rule 3).
-
-### The stored order
-
-One list of keys, top first, plus at most one latched key. Everything else is computed.
-
-| Operation | Rule |
-|---|---|
-| Repair (after each refresh) | A stable topological sort: among the entries whose "above" partners are already placed, take the one that stands highest in the stored list. Consistent stretches keep their order; each violation is fixed by the smallest move. |
-| New entries | A new root goes last. A new blocker goes right above the highest entry it blocks. A new side quest goes right below the lowest member of its parent's family. Several new at once go in rule 8 order. |
-| Siblings | Entries of one family with no constraint between them keep the slots they hold; inside those slots they sort by rule 8 (permission prompt, question, Done, then the rest; oldest first). |
-| Drag of a root to a place | The root takes the place. Every entry that must be above it and now stands below is lifted to just above it, keeping its order; every entry that must be below it and now stands above is dropped to just below it. Then repair. This is the growing block of rule 10. |
-| View | Permission prompts first, in stored order. Then the latched chat, placed by the drag rule at the top. Then the rest. The latch is a view only; releasing it shows the stored order again. |
-
-The algorithm is one pure TypeScript module, used by the page for the live drag and by the server for the stored order, with one test file of plain asserts.
-
-## 5. Implementation
-
-### 5.1 The queue harness (step 1)
-
-Lives in the quests repo, `quests/hooks/`, wired through `~/.claude/settings.json` like the ticket hooks. Nothing in noam_worlds.
-
-| File | Event | What it does |
-|---|---|---|
-| `quests/hooks/queue_start.sh` | SessionStart (startup, resume, compact) | Prints the closing-line rule (four endings, the third line after the output style's two, "blocker" names only open blockers), the family rule (parent, siblings and children with their session ids, read from GitHub; notify on a change of the line's kind, on a ticket update, and when Noam says so), and the naming rule: on startup, right after the worktree question, ask Noam for "<mm_dd> <world> <2 word objective>" with a popup offering "let Haiku choose", then run `quests/tools/rename_chat.mjs`. |
-| `quests/tools/rename_chat.mjs` | run by a chat or by the server | `rename_chat.mjs <session id> <name>` sets the name with the Agent SDK's `renameSession`. With `--haiku <text>` it first asks Claude Haiku (through the Agent SDK on the subscription) for the world and the two words, and keeps the format. |
-| `quests/hooks/queue_stop.sh` | Stop | Last assistant text by the `jq` line of `stop_check.sh`; its last non-empty line must match `^(waiting for|question|blocker|Done) .+`. Missing: exit 2 with what is missing and the instruction text. |
-
-### 5.2 The close popup in the chats (step 2)
-
-`~/src/tickets/hooks/guard_root_close.sh`, PreToolUse on Bash, matching `gh issue close` on salomonskinoam/tickets. If the ticket is a root with open blockers, it blocks (exit 2) with the list of open blockers and the instruction: ask Noam with the five options of rule 6.1, carry out his choice, then close again with `TICKET_CLOSE_OK=1`. The only change in the tickets repo.
-
-### 5.3 The server (step 3)
-
-New module `server/modules/queue/`.
+### Step 3. The server (new module `server/modules/queue/`)
 
 | Part | What |
 |---|---|
-| Table `queue_state` | Key and value: `order` (list of keys as JSON), `latch` (one key or empty). Plus `queue_chats`: session id, closing-line kind and text, time. |
-| Tickets | Every 15 seconds one GraphQL call through `gh api graphql`: open issues with number, title, labels, body, last comments, parent number. Claims and "Blocks" parsed with the regexes of `forest.py`. |
-| Chats | Every 2 seconds: the registry (live processes, idle ones included, with `entrypoint`) and Cursor's `panelTabSessions`. On every transcript change (the existing watcher): the chat's last closing line, stored in `queue_chats`. At start: the closing lines of chats changed in the last 14 days. |
-| Routes | `GET /api/quests/queue` (entries with state, kind, family, constraints, the stored order, the latch). `PUT /api/quests/queue/order`, `PUT /api/quests/queue/latch`. |
-| Push | A `queue_updated` frame on the websocket whenever an input changes (`sendToConnectedClients` exported). |
-| Mirror | 10 seconds after a change to order or latch, one file `queue/order.json` written through the GitHub contents API to branch `queue-state` of salomonskinoam/tickets (off main, so the local clone is not disturbed). At start, an empty table is restored from it. |
+| Tables in `~/.cloudcli/auth.db` (added in `server/modules/database/schema.ts` and `migrations.ts`) | `queue_state(key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)` holding `order` (JSON list of keys `ticket:<n>` / `chat:<session id>`) and `latch` (one key or null). `queue_chats(session_id TEXT PRIMARY KEY, line_kind TEXT, line_text TEXT, line_at TEXT, finalized INTEGER)`. |
+| `queue-sources.service.ts` | Tickets every 15 seconds: one `gh api graphql` call for the open issues with `number title url body createdAt labels parent{number state} comments(last:50){body createdAt}`, paged by 100. Claims by `Claimed by chat (.+?), session ([0-9a-f-]{36})`, blocks by the session ids inside `## Blocks(.*?)(\n## \|\Z)`. Every 2 seconds: the live processes in `~/.claude/sessions/*.json` (state busy over waiting over idle when one chat has two processes, which also fixes the page's dots) and Cursor's open tabs (`panelTabSessions` of key `Anthropic.claude-code` in `~/.config/Cursor/User/workspaceStorage/*/state.vscdb`, read-only). On each transcript change (hooked into the existing watcher's flush in `server/modules/providers/services/sessions-watcher.service.ts`) and at start for chats changed in the last 14 days: the closing line from the last 256 KB of the transcript, and `finalized` when a user line holds `<command-name>/finalize-chat</command-name>`. |
+| `queue-order.ts` | The order, pure functions shared with the page (below). |
+| `queue.service.ts` | Builds the entries, their state (first match: permission prompt, running, question, Done, waiting for, blocker, unclaimed ticket, none yet; needs Noam for permission prompt, question, Done, unclaimed ticket), "held outside" (a live process with entrypoint `claude-vscode`, `claude-desktop` or `cli`, or an open Cursor tab), stores the repaired order, mirrors it, runs close and rename. |
+| `queue.routes.ts` at `/api/quests/queue` | `GET` (entries, order, latch, view). `PUT order`, `PUT latch`. `POST close {number, choice}` (runs `gh issue edit` / `gh issue close` and a comment "Closed from the quests page by Noam, <time>"). `POST rename {sessionId, name}` and `POST suggest-name {number}` (both through `rename_chat.mjs`). |
+| Mirror | 10 seconds after a change, `{order, latch, updatedAt}` is written as `queue/order.json` on branch `queue-state` of salomonskinoam/tickets through `gh api -X PUT .../contents/queue/order.json`. An empty table at start is restored from it. |
 
-### 5.4 The page
+### Step 4. The order (`server/modules/queue/queue-order.ts`, test `quests/priority-queue/order.test.mjs`)
 
-| Step | Part | What |
-|---|---|---|
-| 4 | Order module | `src/modules/queue/queueOrder.ts` (section 4) and `quests/priority-queue/order.test.mjs`. |
-| 5 | The list | `src/modules/queue/useQueue.ts` (fetch plus websocket) and `QueueList.tsx`, which replaces the project list in `SidebarContent.tsx`. One line per entry: dot, name, family color as background (color from the root key, fixed lightness for the dark theme), "Open in Cursor" link on chats, ticket link on tickets. Roots draggable with native drag events as in `PaneTabs.tsx`; the order recomputed live while the button is held; release inside sends `PUT order`, release outside restores. The latched line has a release button. A line ranked above the shown chat blinks when it becomes ready for Noam (rule 18.5). The forest widget sits above the list; sidebar logos are removed. |
-| 6 | Using it | Each ticket line gets a "close" button (rule 16.2), which checks for open blockers and raises the popup of rule 6.1. In `handleKeyDown`: Alt+Enter submits typed text, then opens the next entry that needs Noam (not the current chat). A "Next" button beside the input box does the same without sending. Latch: when Noam picks another chat by hand (list, tab, forest node) and the chat he leaves got no message since it was shown, `PUT latch`. Read-only: a chat with a live process outside the page, or in Cursor's tab list, gets a banner with "Open in Cursor" instead of the input box. |
-| 7 | New chat from a ticket | Find the parent chat's folder (session id from the ticket's "Parent chat" section, its `project_path`; a worktree path maps to its repo's main folder), `writeDraftText('project:<id>', 'we are starting this ticket <link>')`, open a new chat in that project. Before it opens, a popup asks Noam for the two words (the world filled from the ticket's world label, or its other label), with "let Haiku choose" (Haiku reads the ticket title). When the chat gets its session id, the server names it through `rename_chat.mjs`, the same rename that Cursor and the page show first (row 33 of `local_features_noam.md`). |
-| 8 | The forest widget | `src/modules/queue/QueueForest.tsx`, plain nested boxes, no library: roots across the top, children growing below each, a small button per node to collapse or open. Shared hover state with the list. |
+Constraints "a above b": every open blocker above each entry of a chat it blocks; every open parent above its side quest.
 
-### 5.5 Records
+```
+repair(stored, entries):
+  list = stored keys that are still entries
+  new entries, in tie order: a root goes last; a blocker right above the highest entry it blocks;
+     a side quest right below the lowest member of its parent's family
+  side quests of one parent keep their positions and sort inside them by tie order, then age
+  stable topological sort: repeatedly place, among entries whose "above" partners are placed,
+     the one highest in list
+drag(list, key, target):
+  move key to target; lift every must-be-above entry now below it to just above it;
+  drop every must-be-below entry now above it to just below it; repair
+view: permission prompts first (stored order), then drag(rest, latch, 0) if a latch is set
+next: first entry of the view that needs Noam and is not the shown chat
+```
 
-Every step adds or updates its rows in `local_features_noam.md` (new section "Priority queue") and `quests/README.md` in the same commit, is pushed to salomonskinoam/claudecodeui (the tickets hook to salomonskinoam/tickets), and posts an update comment on ticket 32.
+### Step 5. The list (page)
 
-## 6. Verification
+| File | Change |
+|---|---|
+| `src/modules/queue/useQueue.ts` (new) | Polls `GET /api/quests/queue` every 2 seconds; holds the shared hover key. |
+| `src/modules/queue/QueueList.tsx` (new) | The flat list: dot, name, family color `hsl(hash(root key) % 360, 35%, 22%)`, GitHub link and close button on tickets, Cursor link on chats, release button on the latched line, blink, drag of root lines (native drag events; preview `drag(...)` while held; drop sends `PUT order`; release outside restores). |
+| `src/modules/queue/CloseTicketDialog.tsx` (new) | The page's close popup; calls `POST close`. |
+| `src/modules/sidebar/SidebarContent.tsx` | `QueueList` replaces `SidebarProjectList`. |
+| `SidebarHeader.tsx`, `SidebarSessionItem.tsx`, `SidebarRecentConversations.tsx`, `SidebarContent.tsx` | Remove the app logo block and the provider logos. |
+
+### Step 6. Next, latch, read-only (page)
+
+| File | Change |
+|---|---|
+| `src/modules/chat/hooks/useChatComposerState.ts` | Alt+Enter: send if there is text, then open next. Mark the chat "sent since shown" on every send. |
+| `src/modules/chat/composer/ChatComposer.tsx` | A "Next" button. |
+| `src/modules/project-workspace/ProjectWorkspaceShell.tsx` | "open next"; on a manual switch (line, tab, node) away from a chat not "sent since shown", `PUT latch`. |
+| `src/modules/chat/composer/OutsideChatBanner.tsx` (new), `ChatInterface.tsx` | For a chat held outside, the banner "Open in Cursor to answer" replaces the input box. |
+
+### Step 7. New chat from a ticket (page)
+
+| File | Change |
+|---|---|
+| `src/modules/queue/NameChatDialog.tsx` (new) | Name popup: date fixed, world from the ticket's label, two words, "Let Haiku choose" (`POST suggest-name`), "Start". |
+| `src/modules/queue/startTicketChat.ts` (new) | The folder: the session id in the ticket's "## Parent chat" section, that chat's `project_path`, a worktree path cut back to its repo. Then `writeDraftText('project:<id>', 'we are starting this ticket <link>')` and the page's new-session action in that project. When the chat gets its session id (`replaceNewChatTab`), `POST rename`. |
+
+### Step 8. The forest widget (page)
+
+`src/modules/queue/QueueForest.tsx` (new), above `QueueList` in `SidebarContent.tsx`, at most a third of the sidebar's height, own scroll: roots side by side, families below, a collapse button per node, hover shared with the list, click opens.
+
+### Records
+
+Each step adds its rows to a new section "Priority queue" in `local_features_noam.md`, its new files to `quests/README.md`, is committed and pushed, and gets one comment on ticket 32.
+
+## 4. Checks
 
 | Step | Check |
 |---|---|
-| 1 | `queue_stop.sh` fed a fake hook input: a transcript ending without the line exits 2 with the instructions; with "Done <what>" exits 0. One real chat ends a turn, gets sent back once, then ends with the line. |
-| 2 | `guard_root_close.sh` fed `gh issue close` on a root with an open blocker: blocked with the list; with `TICKET_CLOSE_OK=1`: passes; on a ticket with no open blocker: passes. |
-| 3 | `GET /api/quests/queue` lists ticket 32 and this chat; a changed closing line shows within 3 seconds; `queue/order.json` appears on branch `queue-state` within 10 seconds of a `PUT order`. |
-| 4 | `node quests/priority-queue/order.test.mjs`: repair keeps consistent orders, fixes violations; a blocker stays above, a side quest below; a drag past a side quest carries it; a drag above a blocker carries it; new roots go last; permission prompts and the latch on top in the view. |
-| 7 | A new chat from ticket 32 opens with "we are starting this ticket https://github.com/salomonskinoam/tickets/issues/32" in its box, unsent; after its first message its name in the page and in Cursor is "<today> quests <2 words> #32". |
-| 5 to 8 | New checks in `quests/tests/headless.cjs`: `queue` (list order and colors), `drag` (block grows, release outside undoes), `next` (Alt+Enter opens the next entry), `latch`, `readonly`, `forest` (hover highlights both ways, collapse). |
-
-Every build follows the memory rule: `free -m` first with several GB free, one heavy step at a time, `NODE_OPTIONS=--max-old-space-size=1536` under `nice`, `npm run build:client` when only the page changed; after a server change `systemctl --user restart quests-ui.service`.
-
-## 7. Decisions
-
-All ruled by Noam, verbatim in `quests/priority-queue/REQUIREMENTS.md`.
-
-| # | Decision | Ruling |
-|---|---|---|
-| 1 | Where the forest widget sits | Above the list of chats in the right sidebar; logos there removed (2026-10-23 14:30). |
-| 2 | Retry of the closing-line hook | One retry, then the reply passes (2026-10-23 14:30, "ok"). |
-| 3 | Close in the page | A "close" button on ticket lines (2026-10-26 10:03, "yes"). |
-| 4 | When a chat with no ticket leaves | When Noam finalizes it; finalizing is always his call (2026-10-26 10:03). |
-| 5 | When the family is told | On a change of the kind of the closing line, and when Noam says so (2026-10-26 10:03). |
-| 6 | When the closing-line hook goes live | Right after its check in step 1 (2026-10-26 10:03, "ok"). |
-| 7 | The two-word objective | A popup asks Noam, with "let Haiku choose"; the format is always kept (2026-10-26 10:03). |
-| 8 | "New Session" chats | Named by the same format, asked right after the worktree question (2026-10-26 10:03). |
+| 1 | `queue_stop.sh` on made-up inputs: no line, exit 2; "Done step one", exit 0; `stop_hook_active` true, exit 0. `queue_start.sh` for this chat prints the three rules and ticket 32's family. `rename_chat.mjs` renames a throwaway chat and the page shows it. Then the Stop entry goes in; one live chat is sent back once and then ends with the line. |
+| 2 | `guard_root_close.sh` on a close of ticket 7 (open blockers 3, 5, 6): exit 2 listing them; with `TICKET_CLOSE_OK=1`: exit 0; a ticket without open blockers: exit 0. Nothing is closed. |
+| 3 | `GET /api/quests/queue` lists ticket 32 with this chat, the same open tickets as `python3 ~/src/tickets/forest.py`, and every live chat; a new closing line shows within 3 seconds; `queue/order.json` appears on branch `queue-state` within 10 seconds of a `PUT order`; an emptied table is restored on restart. Also read the `entrypoint` of a page-run chat, so it is not counted as held outside. |
+| 4 | `node quests/priority-queue/order.test.mjs`: consistent orders stay; a violation is fixed by one move; blockers stay above, side quests below; a drag carries the family member it would pass, both ways; new roots go last; new blockers go right above; permission prompts and the latch on top in the view; next skips the shown chat and entries that do not need Noam. |
+| 5 | New headless checks in `quests/tests/headless.cjs`: `queue` (lines equal the API's view, one color per family, no logos) and `drag` (the block grows; release outside undoes). |
+| 6 | `next` (Alt+Enter sends and opens the next), `latch` (a manual switch without sending puts the chat on top; release puts it back), `readonly` (a Cursor chat shows the banner). Time how fast Cursor's tab list changes after a tab opens. |
+| 7 | An unclaimed test ticket opens a new chat in the noam_worlds folder with "we are starting this ticket <link>" unsent; after the first message its name is "<today> <world> <two words> #<n>" in the page; check whether Cursor shows it too. |
+| 8 | `forest`: roots side by side, collapse hides children, hover highlights both ways, click opens. |
