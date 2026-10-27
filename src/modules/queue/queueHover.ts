@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { currentQueue } from '@/modules/queue/queueStore';
+import { entryOfChat } from '@/modules/queue/types';
 
 /**
  * quests priority queue: the entry under the mouse, one key shared by the list, the forest and the tab rows, so
@@ -18,7 +19,7 @@ export function setQueueHover(key: string | null): void {
 
 /** The same, from a chat's page session id (a tab). */
 export function hoverQueueSession(sessionId: string | null): void {
-  setQueueHover(sessionId ? currentQueue().entries.find((e) => e.sessionId === sessionId)?.key ?? null : null);
+  setQueueHover(sessionId ? entryOfChat(currentQueue().entries, sessionId)?.key ?? null : null);
 }
 
 function subscribe(listener: () => void): () => void {

@@ -1,6 +1,6 @@
 import { setLeftTabs } from '@/shared/hooks/useSplitPane';
 import { currentQueue, setQueueLatch, syncQueueFromCursor } from '@/modules/queue/queueStore';
-import type { QueueEntry } from '@/modules/queue/types';
+import { entryOfChat, type QueueEntry } from '@/modules/queue/types';
 
 /**
  * quests priority queue: moving between chats.
@@ -35,13 +35,13 @@ export function noteShownChat(sessionId: string | null): void {
   sentSinceShown = false;
   keepsPlace = false;
   if (!left || !leftQuietly) return;
-  const entry = currentQueue().entries.find((e) => e.sessionId === left);
+  const entry = entryOfChat(currentQueue().entries, left);
   if (entry && !entry.heldOutside) void setQueueLatch(entry.key).catch((error: unknown) => console.error(error));
 }
 
 export async function syncTabsFromCursor(): Promise<void> {
   const ids = await syncQueueFromCursor();
-  const first = currentQueue().entries.find((e) => e.sessionId === ids[0]);
+  const first = entryOfChat(currentQueue().entries, ids[0] ?? null);
   if (!first || !opener) return;
   if (first.sessionId !== shown) noteSwitchKeepsPlace();
   opener(first);
@@ -51,7 +51,7 @@ export async function syncTabsFromCursor(): Promise<void> {
 export function openNextInQueue(): boolean {
   const { entries, view } = currentQueue();
   const byKey = new Map(entries.map((e) => [e.key, e]));
-  const current = entries.find((e) => e.sessionId === shown)?.key ?? null;
+  const current = entryOfChat(entries, shown)?.key ?? null;
   const key = view.find((k) => k !== current && byKey.get(k)?.needsNoam);
   if (!key || !opener) return false;
   noteSwitchKeepsPlace();

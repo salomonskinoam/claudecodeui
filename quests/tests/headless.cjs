@@ -427,7 +427,9 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const before = { lines: await lines(), ...(await state()) };
     await page.locator('[data-quests-queue="sync-cursor"]').click();
     await page.waitForTimeout(3000);
-    const textX = await page.locator('[data-quests-queue="list"] [data-queue-key] span.truncate').evaluateAll((ns) => [...new Set(ns.map((n) => Math.round(n.getBoundingClientRect().left)))]);
+    // The text of every line (a ticket's "#n", a chat's name) starts at the same x: no false indent.
+    const textX = await page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => [...new Set(ns.map((n) =>
+      Math.round((n.querySelector('a[title^="Ticket #"]') ?? n.querySelector('span.truncate')).getBoundingClientRect().left)))]);
     console.log(JSON.stringify({ before, after: { lines: await lines(), ...(await state()) }, textX, latch: (await apiQueue()).latch }, null, 1));
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   }

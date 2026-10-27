@@ -2,7 +2,7 @@ import { useFamilyColors } from '@/modules/queue/familyColors';
 import { HOVER_CLASS } from '@/modules/queue/looks';
 import { hoverQueueSession, useQueueHover } from '@/modules/queue/queueHover';
 import { useQueue } from '@/modules/queue/queueStore';
-import type { QueueKind } from '@/modules/queue/types';
+import { entryOfChat, type QueueKind } from '@/modules/queue/types';
 
 export type QueueLook = {
   /** The family's color, for the background. */
@@ -23,7 +23,7 @@ export function useQueueLook(): (sessionId: string) => QueueLook | null {
   const colors = useFamilyColors();
   const hover = useQueueHover();
   return (sessionId) => {
-    const entry = queue.entries.find((e) => e.sessionId === sessionId);
+    const entry = entryOfChat(queue.entries, sessionId);
     if (!entry) return null;
     return {
       color: colors.get(entry.rootKey) ?? 'transparent',

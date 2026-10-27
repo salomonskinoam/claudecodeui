@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { Queue } from '@/modules/queue/types';
+import { isChat, type Queue } from '@/modules/queue/types';
 
 /**
  * quests priority queue: the lines that blink. An entry ranked above the shown chat blinks from the moment it turns
@@ -11,7 +11,7 @@ export function useBlink(queue: Queue, shownSessionId: string | null): Set<strin
   const [blinking, setBlinking] = useState<Set<string>>(new Set());
   useEffect(() => {
     const byKey = new Map(queue.entries.map((e) => [e.key, e]));
-    const shownIndex = queue.view.findIndex((k) => byKey.get(k)?.sessionId === shownSessionId);
+    const shownIndex = queue.view.findIndex((k) => isChat(byKey.get(k)!, shownSessionId));
     const next = new Set<string>();
     queue.view.forEach((k, i) => {
       const e = byKey.get(k);

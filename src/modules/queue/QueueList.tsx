@@ -6,7 +6,7 @@ import QueueLine from '@/modules/queue/QueueLine';
 import QueueToolbar from '@/modules/queue/QueueToolbar';
 import { setQueueOpener } from '@/modules/queue/queueNavigation';
 import { useQueue } from '@/modules/queue/queueStore';
-import type { QueueEntry } from '@/modules/queue/types';
+import { isChat, type QueueEntry } from '@/modules/queue/types';
 import { useBlink } from '@/modules/queue/useBlink';
 import { useLineDrag } from '@/modules/queue/useLineDrag';
 import { useOpenEntry } from '@/modules/queue/useOpenEntry';
@@ -44,7 +44,7 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
             key={e.key}
             entry={e}
             color={colors.get(e.rootKey)}
-            shown={e.sessionId !== null && e.sessionId === shownSessionId}
+            shown={isChat(e, shownSessionId)}
             blinking={blinking.has(e.key)}
             latched={queue.latch === e.key}
             separator={i > 0 && lines[i - 1].group !== e.group}

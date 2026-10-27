@@ -9,7 +9,7 @@ import { HOVER_CLASS, SHOWN_CLASS } from '@/modules/queue/looks';
 import { setQueueHover, useQueueHover } from '@/modules/queue/queueHover';
 import { openQueueEntry } from '@/modules/queue/queueNavigation';
 import { useQueue } from '@/modules/queue/queueStore';
-import type { QueueEntry } from '@/modules/queue/types';
+import { isChat, type QueueEntry } from '@/modules/queue/types';
 
 /**
  * quests priority queue: the forest. Roots side by side in queue order, each family below its root, children
@@ -43,7 +43,7 @@ export default function QueueForest({ shownSessionId }: { shownSessionId: string
           onMouseLeave={() => setQueueHover(null)}
           onClick={() => openQueueEntry(e)}
           className={cn('mt-0.5 flex h-[20px] max-w-[150px] cursor-pointer items-center gap-1 rounded-sm px-1 text-[12px] text-[#cccccc]',
-            e.sessionId !== null && e.sessionId === shownSessionId && SHOWN_CLASS,
+            isChat(e, shownSessionId) && SHOWN_CLASS,
             hover === e.key && HOVER_CLASS)}
           style={{ backgroundColor: colors.get(e.rootKey) }}
         >
@@ -58,7 +58,7 @@ export default function QueueForest({ shownSessionId }: { shownSessionId: string
           ) : <span className="w-3 flex-shrink-0" />}
           <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ backgroundColor: dot ? CHAT_DOT_STYLE[dot].color : 'transparent' }} />
           <KindSign kind={e.kind} />
-          <span className="truncate">{e.number !== null ? `#${e.number}` : e.title}</span>
+          <span className="truncate">{e.number !== null ? `#${e.number} ${e.title}` : e.title}</span>
         </div>
         {!isFolded && kids.map((k) => node(k, depth + 1))}
       </div>

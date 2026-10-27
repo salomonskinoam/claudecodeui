@@ -1,5 +1,6 @@
 import { openNextInQueue } from '@/modules/queue/queueNavigation';
 import { useQueue } from '@/modules/queue/queueStore';
+import { entryOfChat } from '@/modules/queue/types';
 
 const btn = 'rounded-sm border border-[#454647] px-3 py-1 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e]';
 
@@ -9,7 +10,7 @@ const btn = 'rounded-sm border border-[#454647] px-3 py-1 text-[13px] text-[#ccc
  */
 export default function OutsideChatBanner({ sessionId, children }: { sessionId: string | null; children: React.ReactNode }) {
   const queue = useQueue();
-  const entry = sessionId ? queue.entries.find((e) => e.sessionId === sessionId) : undefined;
+  const entry = sessionId ? entryOfChat(queue.entries, sessionId) : undefined;
   if (!entry?.heldOutside) return <>{children}</>;
   return (
     <div className="mx-8 mb-4 flex items-center justify-between gap-3 rounded border border-[#575757] bg-[#3c3c3c] px-4 py-2 text-[13px] text-[#cccccc]"

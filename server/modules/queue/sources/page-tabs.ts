@@ -9,13 +9,15 @@ import { getTitles, noteTranscript } from '@/modules/queue/sources/transcripts.j
 const STALE_MS = 30_000;
 const windows = new Map<string, { sids: string[]; at: number }>();
 
-/** A window reports its open tabs (page session ids); each one's transcript is read once for its name and state. */
+/**
+ * A window reports its open tabs (the page's session ids); each one's transcript is read once for its name and
+ * state. A tab id the page has no row for is Claude Code's id itself (a tab opened from a Cursor link).
+ */
 export function setPageTabs(windowId: string, pageSessionIds: string[]): void {
   const byPageId = new Map(queueDb.listClaudeSessions().map((s) => [s.session_id, s]));
-  const rows = pageSessionIds.map((id) => byPageId.get(id)).filter((s): s is NonNullable<typeof s> => Boolean(s));
-  windows.set(windowId, { sids: rows.map((s) => s.provider_session_id), at: Date.now() });
-  for (const s of rows) {
-    if (s.jsonl_path && !getTitles().has(s.provider_session_id)) void noteTranscript(s.jsonl_path).catch(() => undefined);
+  windows.set(windowId, { sids: pageSessionIds.map((id) => byPageId.get(id)?.provider_session_id ?? id), at: Date.now() });
+  for (const s of pageSessionIds.map((id) => byPageId.get(id))) {
+    if (s?.jsonl_path && !getTitles().has(s.provider_session_id)) void noteTranscript(s.jsonl_path).catch(() => undefined);
   }
 }
 

@@ -59,6 +59,13 @@ export default function QueueLine({ entry: e, color, shown, blinking, latched, s
         style={{ backgroundColor: dot ? CHAT_DOT_STYLE[dot].color : 'transparent' }}
       />
       <KindSign kind={e.kind} />
+      {/* A ticket reads "#n title" (the number is its GitHub link); a chat reads its name. */}
+      {e.url && (
+        <a href={e.url} target="_blank" rel="noreferrer" title={`Ticket #${e.number} on GitHub`}
+          className="flex-shrink-0 text-[13px] text-[#9d9d9d] hover:text-[#3794ff]" onClick={(event) => event.stopPropagation()}>
+          #{e.number}
+        </a>
+      )}
       <span className="min-w-0 flex-1 truncate">{e.title}</span>
       {latched && (
         <button type="button" title="Release from the top" className="opacity-70 hover:opacity-100"
@@ -70,12 +77,6 @@ export default function QueueLine({ entry: e, color, shown, blinking, latched, s
         <a href={`cursor://anthropic.claude-code/open?session=${e.providerSessionId}`} title="Open in Cursor"
           className="opacity-0 group-hover:opacity-70" onClick={(event) => event.stopPropagation()}>
           <SquareArrowOutUpRight className="h-3 w-3" />
-        </a>
-      )}
-      {e.url && (
-        <a href={e.url} target="_blank" rel="noreferrer" title={`Ticket #${e.number} on GitHub`}
-          className="text-[12px] text-[#828283] hover:text-[#3794ff]" onClick={(event) => event.stopPropagation()}>
-          #{e.number}
         </a>
       )}
       {e.number !== null && (
