@@ -4,7 +4,8 @@ import { CircleCheck, SquareArrowOutUpRight, X } from 'lucide-react';
 import { cn } from '@/shared/utils';
 import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
 import KindSign from '@/modules/queue/KindSign';
-import { HOVER_CLASS, setQueueHover, useQueueHover } from '@/modules/queue/queueHover';
+import { HOVER_CLASS, SHOWN_CLASS } from '@/modules/queue/looks';
+import { setQueueHover, useQueueHover } from '@/modules/queue/queueHover';
 import { setQueueLatch } from '@/modules/queue/queueStore';
 import type { QueueEntry } from '@/modules/queue/types';
 import type { LineMarker } from '@/modules/queue/useLineDrag';
@@ -43,7 +44,7 @@ export default function QueueLine({ entry: e, color, shown, blinking, latched, s
       title={e.chatName ?? e.title}
       className={cn(
         'group relative mx-1 flex h-[26px] cursor-pointer items-center gap-2 rounded-sm px-2 text-[15px] text-[#cccccc]',
-        shown && 'outline outline-1 outline-[#3794ff]',
+        shown && SHOWN_CLASS,
         hovered && HOVER_CLASS,
         blinking && 'animate-pulse',
         separator && 'mt-[7px] before:absolute before:-top-[5px] before:left-0 before:right-0 before:h-[2px] before:bg-[#8a8a8a]',

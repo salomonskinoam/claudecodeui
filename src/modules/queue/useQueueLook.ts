@@ -1,5 +1,6 @@
 import { useFamilyColors } from '@/modules/queue/familyColors';
-import { HOVER_CLASS, hoverQueueSession, useQueueHover } from '@/modules/queue/queueHover';
+import { HOVER_CLASS } from '@/modules/queue/looks';
+import { hoverQueueSession, useQueueHover } from '@/modules/queue/queueHover';
 import { useQueue } from '@/modules/queue/queueStore';
 import type { QueueKind } from '@/modules/queue/types';
 

@@ -122,7 +122,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       const p = await page.evaluate(() => JSON.parse(localStorage.getItem('quests-panes')));
       console.log(label.padEnd(34), 'left', JSON.stringify(short(p.left)), 'right', JSON.stringify(short(p.right)), 'rightActive', (p.rightActive || '').slice(0, 4), 'url', page.url().split('/').pop().slice(0, 4));
     };
-    const rows = page.locator('div.h-9:has(> [draggable="true"])');
+    const rows = page.locator('[data-quests-tabs="row"]');
     await layout('start');
     await rows.nth(0).locator('[draggable="true"]').nth(1).dragTo(rows.nth(1).locator('[draggable="true"]').nth(0), { targetPosition: { x: 150, y: 10 } });
     await page.waitForTimeout(1500); await layout('left #2 -> right, after its tab');
@@ -147,7 +147,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.goto(`http://127.0.0.1:3001/plan/${plan}`);
     await page.waitForTimeout(5000);
     const r = await page.evaluate(() => ({
-      tabs: Array.from(document.querySelectorAll('div.h-9 > [draggable="true"]')).map((t) => t.textContent.replace('×', '').trim().slice(0, 30)),
+      tabs: Array.from(document.querySelectorAll('[data-quests-tabs="row"] > [draggable="true"]')).map((t) => t.textContent.replace('×', '').trim().slice(0, 30)),
       url: location.pathname,
       rendered: document.querySelector('.prose h1, .prose h2')?.textContent?.slice(0, 80) ?? null,
     }));
@@ -304,7 +304,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // Hovering the chat's tab lights up its line in the list and its node in the forest. The tab wears the same
     // family color as its line, and the same kind sign.
     const key = (await apiQueue()).entries.find((e) => e.sessionId === sessionId).key;
-    const tab = page.locator('div.h-9 > [draggable="true"]').first();
+    const tab = page.locator('[data-quests-tabs="row"] > [draggable="true"]').first();
     const line = page.locator(`[data-quests-queue="list"] [data-queue-key="${key}"]`);
     const node = page.locator(`[data-forest-key="${key}"]`);
     const lit = async () => ({
@@ -390,7 +390,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(4000);
     const panes = () => page.evaluate(() => JSON.parse(localStorage.getItem('quests-panes') || '{}'));
     const dragTabTo = async (id, xShare) => {
-      const tabs = await page.locator('div.h-9 > [draggable="true"]').evaluateAll((ns) => ns.map((n) => n.getBoundingClientRect().toJSON()));
+      const tabs = await page.locator('[data-quests-tabs="row"] > [draggable="true"]').evaluateAll((ns) => ns.map((n) => n.getBoundingClientRect().toJSON()));
       const p = await panes();
       const all = [...p.left, ...p.right];
       const box = tabs[all.indexOf(id)];

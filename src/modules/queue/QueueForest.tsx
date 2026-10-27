@@ -5,7 +5,8 @@ import { cn } from '@/shared/utils';
 import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
 import { useFamilyColors } from '@/modules/queue/familyColors';
 import KindSign from '@/modules/queue/KindSign';
-import { HOVER_CLASS, setQueueHover, useQueueHover } from '@/modules/queue/queueHover';
+import { HOVER_CLASS, SHOWN_CLASS } from '@/modules/queue/looks';
+import { setQueueHover, useQueueHover } from '@/modules/queue/queueHover';
 import { openQueueEntry } from '@/modules/queue/queueNavigation';
 import { useQueue } from '@/modules/queue/queueStore';
 import type { QueueEntry } from '@/modules/queue/types';
@@ -15,7 +16,7 @@ import type { QueueEntry } from '@/modules/queue/types';
  * indented under their parent. A small button per node folds its children; hovering a node highlights its line
  * in the list and its tab (and the other way around); clicking opens it as its line does.
  */
-export default function QueueForest() {
+export default function QueueForest({ shownSessionId }: { shownSessionId: string | null }) {
   const queue = useQueue();
   const hover = useQueueHover();
   const dots = useChatDots();
@@ -42,6 +43,7 @@ export default function QueueForest() {
           onMouseLeave={() => setQueueHover(null)}
           onClick={() => openQueueEntry(e)}
           className={cn('mt-0.5 flex h-[20px] max-w-[150px] cursor-pointer items-center gap-1 rounded-sm px-1 text-[12px] text-[#cccccc]',
+            e.sessionId !== null && e.sessionId === shownSessionId && SHOWN_CLASS,
             hover === e.key && HOVER_CLASS)}
           style={{ backgroundColor: colors.get(e.rootKey) }}
         >

@@ -61,8 +61,9 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
 
   return (
     <div
+      data-quests-tabs="row"
       className={cn(
-        'flex h-9 flex-shrink-0 items-stretch overflow-x-auto border-b border-border bg-muted/30',
+        'flex h-10 flex-shrink-0 items-stretch overflow-x-auto border-b border-border bg-muted/30',
         dropBefore === null && 'shadow-[inset_-2px_0_0_0_#3794ff]',
       )}
       onDragOver={(event) => allowDrop(event, null)}
@@ -90,11 +91,12 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
             onDragOver={(event) => allowDrop(event, targetOf(event, id))}
             onDrop={(event) => drop(event, targetOf(event, id))}
             className={cn(
-              'group flex min-w-0 max-w-[220px] cursor-pointer items-center gap-1 border-r border-border/60 pl-3 pr-1 text-sm',
-              // Cursor's tab colors (workbench.colorCustomizations: tab.activeBackground, tab.activeBorder).
+              'group flex min-w-0 max-w-[220px] cursor-pointer items-center gap-1 pl-3 pr-1 text-sm',
+              // The active tab bulges above the others (full height, the rest start lower) and wears a blue frame
+              // with Cursor's red bottom edge (workbench.colorCustomizations: tab.activeBackground, tab.activeBorder).
               id === activeId
-                ? cn('border-b-2 border-b-[#ff0000] text-white', !look && 'bg-[#3d5984]')
-                : cn('text-[#dddddd]', look ? 'hover:brightness-125' : 'hover:bg-muted/50'),
+                ? cn('z-10 rounded-t-md border-2 border-[#3794ff] border-b-[#ff0000] font-bold text-white', !look && 'bg-[#3d5984]')
+                : cn('mt-2 border-r border-border/60 text-[#dddddd]', look ? 'hover:brightness-125' : 'hover:bg-muted/50'),
               look?.hoverClass,
               // The landing spot of a dragged tab: a blue line on this tab's left edge.
               dropBefore === id && 'shadow-[inset_2px_0_0_0_#3794ff]',

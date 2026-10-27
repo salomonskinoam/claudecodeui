@@ -7,9 +7,6 @@ import { currentQueue } from '@/modules/queue/queueStore';
  * the three light up together and look the same. Any of them sets it; all of them read it.
  */
 
-/** The look of the hovered entry, the same in all three places. */
-export const HOVER_CLASS = 'brightness-150 ring-1 ring-inset ring-white/80';
-
 let hover: string | null = null;
 const listeners = new Set<() => void>();
 
