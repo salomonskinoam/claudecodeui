@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { drag, next, repair, view, type QueueOrderEntry } from '../queue-order.js';
+import { drag, lift, next, repair, view, type QueueOrderEntry } from '../queue-order.js';
 
 const e = (key: string, kind: QueueOrderEntry['kind'], extra: Partial<QueueOrderEntry> = {}): QueueOrderEntry =>
   ({ key, kind, parentKey: null, blocks: [], state: 'none', since: 0, ...extra });
@@ -71,14 +71,10 @@ test('entries with a chat rank above tickets no chat has claimed, whatever their
   assert.deepEqual(view(['U', 'B', 'R', 'S', 'P'], 'S', c), ['P', 'R', 'S', 'B', 'U']);
 });
 
-test('open chats go right under the permission prompts and the latch, in stored order', () => {
-  const t = [e('A', 'quest', { state: 'running' }), e('B', 'chat'), e('C', 'chat'), e('U', 'quest', { state: 'unclaimed' }),
-    e('P', 'chat', { state: 'permission' })];
-  assert.deepEqual(view(['A', 'B', 'C', 'U', 'P'], null, t, ['C', 'U']), ['P', 'C', 'U', 'A', 'B']);
-  assert.deepEqual(view(['A', 'B', 'C', 'U', 'P'], null, t, ['C', 'A']), ['P', 'A', 'C', 'B', 'U']);
-  assert.deepEqual(view(['A', 'B', 'C', 'U', 'P'], 'B', t, ['C']), ['P', 'B', 'C', 'A', 'U']);
-  // A latched ticket no chat has claimed sits with the tickets; the open tabs still lead.
-  assert.deepEqual(view(['A', 'B', 'C', 'U', 'P'], 'U', t, ['C']), ['P', 'C', 'A', 'B', 'U']);
+test('sync from Cursor lifts the given keys to the top in their order, each with its family block', () => {
+  assert.deepEqual(lift(['A', 'B', 'C', 'U'], [e('A', 'chat'), e('B', 'chat'), e('C', 'chat'), e('U', 'chat')], ['C', 'A']),
+    ['C', 'A', 'B', 'U']);
+  assert.deepEqual(lift(['X', 'B', 'R', 'S', 'Y'], fam, ['R', 'gone']), ['B', 'R', 'X', 'S', 'Y']);
 });
 
 test('next skips the shown entry and entries that do not need Noam', () => {

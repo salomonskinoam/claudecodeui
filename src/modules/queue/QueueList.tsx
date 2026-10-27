@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CircleCheck, Plus, SquareArrowOutUpRight, X } from 'lucide-react';
+import { CircleCheck, Plus, RefreshCw, SquareArrowOutUpRight, X } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
@@ -8,7 +8,9 @@ import { openRightTab } from '@/shared/hooks/useSplitPane';
 
 import CloseTicketDialog from '@/modules/queue/CloseTicketDialog';
 import KindSign from '@/modules/queue/KindSign';
-import { dragQueue, familyColors, previewQueue, setQueueHover, setQueueLatch, useQueue, useQueueHover } from '@/modules/queue/useQueue';
+import {
+  dragQueue, familyColors, previewQueue, setQueueHover, setQueueLatch, syncQueueFromCursor, useQueue, useQueueHover,
+} from '@/modules/queue/useQueue';
 import type { QueueEntry } from '@/modules/queue/useQueue';
 import { setQueueOpener } from '@/modules/queue/queueNavigation';
 
@@ -98,14 +100,26 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
 
   return (
     <div className="flex flex-col" data-quests-queue="list">
-      <button
-        type="button"
-        className="mx-2 mb-1 flex h-[26px] items-center gap-2 rounded-sm px-2 text-[13px] text-[#7f8081] hover:bg-[#2a2d2e]"
-        onClick={onNewSession}
-      >
-        <Plus className="h-3 w-3" />
-        New Session
-      </button>
+      <div className="mx-2 mb-1 flex">
+        <button
+          type="button"
+          className="flex h-[26px] flex-1 items-center gap-2 rounded-sm px-2 text-[13px] text-[#7f8081] hover:bg-[#2a2d2e]"
+          onClick={onNewSession}
+        >
+          <Plus className="h-3 w-3" />
+          New Session
+        </button>
+        <button
+          type="button"
+          data-quests-queue="sync-cursor"
+          title="Put the chats open in Cursor on top, in Cursor's tab order"
+          className="flex h-[26px] items-center gap-2 rounded-sm px-2 text-[13px] text-[#7f8081] hover:bg-[#2a2d2e]"
+          onClick={() => void syncQueueFromCursor()}
+        >
+          <RefreshCw className="h-3 w-3" />
+          Sync from Cursor
+        </button>
+      </div>
       <div
         onDragOver={(event) => { if (dragged.current) event.preventDefault(); }}
         onDrop={(event) => {

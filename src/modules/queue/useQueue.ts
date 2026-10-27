@@ -69,9 +69,10 @@ export async function previewQueue(key: string, beforeKey: string | null): Promi
 export const dragQueue = (key: string, beforeKey: string | null) => call('PUT', '/drag', { key, beforeKey });
 export const setQueueLatch = (key: string | null) => call('PUT', '/latch', { key });
 export const closeQueueTicket = (number: number, choice: string) => call('POST', '/close', { number, choice });
+export const syncQueueFromCursor = () => call('POST', '/sync-cursor', {});
 
 /**
- * The chats open as tabs (page session ids, in tab order) rank at the top of the queue. Every poll reports them,
+ * The chats open as tabs (page session ids, in tab order) join the queue. Every poll reports them,
  * so a restarted server knows them again within two seconds.
  */
 export function reportQueueTabs(sessionIds: string[]): void {

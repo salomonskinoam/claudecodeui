@@ -1,5 +1,5 @@
 import { queueDb } from '@/modules/database/index.js';
-import { drag as dragOrder, repair, rootOf, view as viewOrder, needsNoam, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
+import { drag as dragOrder, lift as liftOrder, repair, rootOf, view as viewOrder, needsNoam, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import {
   TICKETS_REPO, getCursorTabs, getLive, getTickets, getTitles, noteRecentTranscripts, noteTranscript, refreshCursorTabs, refreshLive, refreshTickets, run,
   type Ticket,
@@ -52,11 +52,6 @@ export function setOpenTabs(pageSessionIds: string[]): void {
   }
 }
 
-/** The keys of the open chats: a live Claude Code process (a Cursor tab, a terminal). A page tab alone is not open. */
-const openKeys = (entries: QueueEntry[]): string[] => {
-  const live = getLive();
-  return entries.filter((e) => e.providerSessionId && live.has(e.providerSessionId)).map((e) => e.key);
-};
 
 export function buildEntries(): QueueEntry[] {
   const tickets = getTickets();
@@ -120,11 +115,12 @@ export function buildEntries(): QueueEntry[] {
     });
   }
   // Chats in the queue: live ones, ones whose last reply left a closing line and were not finalized, and the ones
-  // open as tabs in the page (the user chose to open them).
+  // open as tabs in the page or in Cursor (the user chose to open them).
   const chatSids = new Set([
     ...live.keys(),
     ...[...lines.values()].filter((l) => l.line_kind && !l.finalized).map((l) => l.provider_session_id),
     ...openTabs,
+    ...[...tabs].filter((sid) => !closed(sid)),
   ]);
   for (const sid of chatSids) {
     if (ticketOf.has(sid) && claimant.get(ticketOf.get(sid)!) === sid) continue;
@@ -192,7 +188,17 @@ export function getQueue() {
   store(order);
   const stored = queueDb.getState<string | null>('latch') ?? null;
   const latch = stored && entries.some((e) => e.key === stored) ? stored : null;
-  return { entries, order, latch, view: viewOrder(order, latch, entries, openKeys(entries)) };
+  return { entries, order, latch, view: viewOrder(order, latch, entries) };
+}
+
+/** "Sync from Cursor": the chats open in Cursor (its Claude tabs in tab order, then live Cursor chats) jump to the top. */
+export function syncFromCursor() {
+  const entries = buildEntries();
+  const cursor = [...getLive()].filter(([, p]) => p.entrypoint === 'claude-vscode').map(([sid]) => sid);
+  const keys = [...getCursorTabs(), ...cursor].map((sid) => entries.find((e) => e.providerSessionId === sid)?.key)
+    .filter((k): k is string => Boolean(k));
+  store(liftOrder(repair(queueDb.getState<string[]>('order') ?? [], entries), entries, [...new Set(keys)]));
+  return getQueue();
 }
 
 export function setOrder(order: string[]) {
@@ -212,7 +218,7 @@ export function previewDrag(key: string, beforeKey: string | null): string[] {
   const entries = buildEntries();
   const order = dragOrder(repair(queueDb.getState<string[]>('order') ?? [], entries), entries, key, beforeKey);
   const latch = queueDb.getState<string | null>('latch') ?? null;
-  return viewOrder(order, latch && entries.some((e) => e.key === latch) ? latch : null, entries, openKeys(entries));
+  return viewOrder(order, latch && entries.some((e) => e.key === latch) ? latch : null, entries);
 }
 
 export function setLatch(key: string | null) {

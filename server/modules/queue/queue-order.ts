@@ -134,24 +134,23 @@ export function drag(list: string[], entries: QueueOrderEntry[], key: string, be
   return settle([...rest.slice(0, p), ...lift, key, ...drop, ...rest.slice(p + 1)], entries);
 }
 
+/** Move `keys` to the top, in their given order, each as a drag does: its family block comes along. */
+export function lift(list: string[], entries: QueueOrderEntry[], keys: string[]): string[] {
+  return [...keys].reverse().reduce((l, k) => (l.includes(k) ? drag(l, entries, k, l.find((x) => x !== k) ?? null) : l), list);
+}
+
 /**
- * Permission prompts first, in stored order; then the latched chat on top of the rest; then the open chats
- * (`open`, in stored order: the user chose to open them). Then every entry with a chat (a claimed
- * ticket, or a chat with no ticket) above every ticket no chat has claimed, whatever its kind: the family rules
- * order entries only inside each of these levels.
+ * Permission prompts first, in stored order; then the latched chat on top of the rest. Then every entry with a
+ * chat (a claimed ticket, or a chat with no ticket) above every ticket no chat has claimed, whatever its kind:
+ * the family rules order entries only inside each of these levels.
  */
-export function view(stored: string[], latch: string | null, entries: QueueOrderEntry[], open: string[] = []): string[] {
+export function view(stored: string[], latch: string | null, entries: QueueOrderEntry[]): string[] {
   const byKey = index(entries);
   const perm = stored.filter((k) => byKey.get(k)?.state === 'permission');
   let rest = stored.filter((k) => byKey.has(k) && !perm.includes(k));
   if (latch && rest.includes(latch)) rest = drag(rest, entries, latch, rest.find((k) => k !== latch) ?? null);
   const unclaimed = (k: string) => byKey.get(k)!.state === 'unclaimed';
-  const ordered = [...rest.filter((k) => !unclaimed(k)), ...rest.filter(unclaimed)];
-  const tops = ordered.filter((k) => open.includes(k) && k !== latch);
-  const others = ordered.filter((k) => !tops.includes(k));
-  // Right under the latched chat when it leads; else (no latch, or a latched ticket that dropped below) at the top.
-  const at = latch && others[0] === latch ? 1 : 0;
-  return [...perm, ...others.slice(0, at), ...tops, ...others.slice(at)];
+  return [...perm, ...rest.filter((k) => !unclaimed(k)), ...rest.filter(unclaimed)];
 }
 
 /** The first entry of the view that needs Noam and is not the shown one. */

@@ -25,8 +25,8 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab'].includes(check) || !sessionId) {
-  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab <sessionId>');
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor'].includes(check) || !sessionId) {
+  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor <sessionId>');
   process.exit(2);
 }
 const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
@@ -314,6 +314,15 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       sign: { tab: await tab.locator('[title="Quest"], [title="Side quest"], [title="Blocker"]').count(), line: await line.locator('[title="Quest"], [title="Side quest"], [title="Blocker"]').count() },
     }));
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  }
+
+  if (check === 'synccursor') {
+    // "Sync from Cursor" puts the chats open in Cursor on top of the list (it changes the real order, as asked).
+    const lines = async () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.slice(0, 9).map((n) => n.title));
+    const before = await lines();
+    await page.locator('[data-quests-queue="sync-cursor"]').click();
+    await page.waitForTimeout(1500);
+    console.log(JSON.stringify({ before, after: await lines() }, null, 1));
   }
 
   if (check === 'newtab') {
