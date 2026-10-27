@@ -3,6 +3,19 @@
 Everything of the quests setup lives in this repo (fork of siteboon/claudecodeui). Feature list, by behavior:
 `../local_features_noam.md`.
 
+## The model
+
+Three things exist, each with one home, and the views read them.
+
+| Thing | What it is | Home | Who reads it |
+|---|---|---|---|
+| Chats | One record per chat this machine knows: its name, its running process (if any), where it is open right now (Cursor, the Claude desktop app, a terminal, this page), its last closing line, whether /finalize-chat ran. A chat is open when a process runs it or a tab holds it somewhere. | `server/modules/queue/chats.ts`, joined on every read from the readers in `sources/` | The queue (its entries, the open group, read-only in the page) and the status dots (`/api/quests/live`) |
+| Tickets | The open GitHub issues of salomonskinoam/tickets, with their kind, parent, blocks and claims | `server/modules/queue/sources/tickets.ts` | The queue |
+| The queue | The entries (a ticket with its claiming chat, or a chat without a ticket), the stored order with the "on top" mark, and the rules (`queue-order.ts`) that give the view | `server/modules/queue/queue.service.ts` | The list and the forest in the sidebar; the tab rows, for a tab's color, sign and hover |
+
+The page's tabs are the page's own place: the page owns them (`src/shared/hooks/useSplitPane.ts`) and reports them to the chats
+model. "Sync from Cursor" copies Cursor's place into the page's.
+
 | Path | What | Installed as |
 |---|---|---|
 | `system/quests-ui.service` | The page's server as a user service, on 127.0.0.1:3001, started at login | Link: `~/.config/systemd/user/quests-ui.service`, enabled (`default.target.wants`) |
