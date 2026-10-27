@@ -25,8 +25,8 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover'].includes(check) || !sessionId) {
-  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover <sessionId>');
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab'].includes(check) || !sessionId) {
+  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab <sessionId>');
   process.exit(2);
 }
 const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
@@ -308,6 +308,24 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       line: await page.locator(`[data-quests-queue="list"] [data-queue-key="${key}"]`).evaluate((n) => n.className.includes('brightness-150')),
       node: await page.locator(`[data-forest-key="${key}"]`).evaluate((n) => n.className.includes('outline-1')),
     }));
+  }
+
+  if (check === 'newtab') {
+    // The "+" tab opens a new empty chat; back on the chat, a double-click on the empty part of the tab row does too.
+    const state = async () => page.evaluate(() => ({
+      url: location.pathname,
+      tabs: JSON.parse(localStorage.getItem('quests-panes') || '{}').left,
+      input: Boolean(document.querySelector('[data-slot="prompt-input-textarea"]')),
+    }));
+    await page.locator('[data-quests-tab="new"]').first().click();
+    await page.waitForTimeout(2000);
+    const plus = await state();
+    await page.goto(`http://127.0.0.1:3001/session/${sessionId}`);
+    await page.waitForTimeout(4000);
+    const row = await page.locator('[data-quests-tab="new"]').first().evaluate((b) => b.parentElement.getBoundingClientRect().toJSON());
+    await page.mouse.dblclick(row.right - 30, row.top + row.height / 2);
+    await page.waitForTimeout(2000);
+    console.log(JSON.stringify({ plus, doubleClick: await state() }));
   }
 
   if (check === 'mode') {

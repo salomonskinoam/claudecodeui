@@ -139,7 +139,7 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
               className={cn(
                 'group relative mx-1 flex h-[26px] cursor-pointer items-center gap-2 rounded-sm px-2 text-[15px] text-[#cccccc]',
                 isShown && 'outline outline-1 outline-[#3794ff]',
-                hover === key && 'brightness-150',
+                hover === key && 'ring-1 ring-inset ring-white/80 brightness-150',
                 blinking.has(key) && 'animate-pulse',
               )}
               style={{ backgroundColor: colors.get(e.rootKey) }}

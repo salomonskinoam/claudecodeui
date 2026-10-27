@@ -19,13 +19,15 @@ type PaneTabsProps = {
   dotOf: (id: string) => ChatDot | null;
   /** A tab (from this row or the other pane's) was dropped here, before `beforeId` (null: at the end). */
   onDropTab: (id: string, beforeId: string | null) => void;
+  /** Opens a new empty chat: the "+" tab, or a double-click on the empty part of the row. */
+  onNewChat: () => void;
 };
 
 /**
  * quests: one row of chat tabs above a pane, like an editor's tab bar. Tabs drag: onto a tab (left half:
  * before it, right half: after it) or onto the empty end of a row, in this pane or the other one.
  */
-function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf, onDropTab }: PaneTabsProps) {
+function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf, onDropTab, onNewChat }: PaneTabsProps) {
   // Where a dragged tab would land: before this id, or null for the end of the row; undefined while no drag.
   const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined);
 
@@ -70,6 +72,8 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
         }
       }}
       onDrop={(event) => drop(event, null)}
+      // Double-click on the empty part of the row (not on a tab): a new empty chat.
+      onDoubleClick={(event) => { if (event.target === event.currentTarget) onNewChat(); }}
     >
       {ids.map((id) => {
         const dot = dotOf(id);
@@ -124,6 +128,15 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
           </div>
         );
       })}
+      <button
+        type="button"
+        title="New chat"
+        data-quests-tab="new"
+        className="flex w-9 flex-shrink-0 items-center justify-center text-[16px] text-[#dddddd] hover:bg-muted/50"
+        onClick={onNewChat}
+      >
+        +
+      </button>
       {onClosePane && (
         <button
           type="button"

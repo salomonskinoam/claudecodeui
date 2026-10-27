@@ -120,6 +120,14 @@ function ProjectWorkspaceShell({
     handleNewSession(owner ?? projects[0]);
   }, [showTabs, sessionId, planName, selectedProject, projects, panes.left, handleNewSession]);
 
+  // The "+" tab and a double-click on a tab row: a new empty chat, in the left pane (new chats live there), in the
+  // shown project, else the project of the last chat tab.
+  const newChat = useCallback(() => {
+    const lastChat = panes.left.filter((id) => id !== NEW_CHAT_TAB).at(-1);
+    const owner = selectedProject ?? projects.find((project) => project.sessions?.some((s) => s.id === lastChat));
+    handleNewSession(owner ?? projects[0]);
+  }, [panes.left, selectedProject, projects, handleNewSession]);
+
   const leftActive = urlTab;
   const showLeftTab = useCallback((id: string) => {
     const plan = planNameOf(id);
@@ -175,6 +183,7 @@ function ProjectWorkspaceShell({
               onClose={closeLeft}
               dotOf={dotOf}
               onDropTab={dropTabLeft}
+              onNewChat={newChat}
             />
           )}
           {/* The chat view fills the height left under the tab row, so its bottom stays on screen. */}
@@ -220,6 +229,7 @@ function ProjectWorkspaceShell({
               onClosePane={closeRightPane}
               dotOf={dotOf}
               onDropTab={dropTabRight}
+              onNewChat={newChat}
             />
             {planNameOf(panes.rightActive) ? (
               <PlanView planName={planNameOf(panes.rightActive) as string} />
