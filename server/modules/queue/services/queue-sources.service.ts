@@ -51,10 +51,13 @@ export type LiveProcess = {
 let tickets: Ticket[] = [];
 let live = new Map<string, LiveProcess>();
 let cursorTabs = new Set<string>();
+/** Each chat's name from its transcript: the rename (custom-title) if any, else Claude's generated title. */
+const titles = new Map<string, string>();
 
 export const getTickets = () => tickets;
 export const getLive = () => live;
 export const getCursorTabs = () => cursorTabs;
+export const getTitles = () => titles;
 
 const section = (body: string, name: string): string =>
   body.match(new RegExp(`## ${name}([\\s\\S]*?)(\\n## |$)`))?.[1] ?? '';
@@ -199,6 +202,20 @@ export async function noteTranscript(file: string): Promise<void> {
     at = row.timestamp ?? null;
     break;
   }
+  const title = (type: string, field: string): string | null => {
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      if (!lines[i].includes(`"type":"${type}"`)) continue;
+      try {
+        const value = JSON.parse(lines[i])[field];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+      } catch {
+        // a line being written right now
+      }
+    }
+    return null;
+  };
+  const name = title('custom-title', 'customTitle') ?? title('ai-title', 'aiTitle');
+  if (name) titles.set(sid, name);
   queueDb.setChat({
     provider_session_id: sid,
     line_kind: kind,

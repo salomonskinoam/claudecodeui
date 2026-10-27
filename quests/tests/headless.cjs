@@ -332,6 +332,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.mouse.dblclick(row.right - 30, row.top + row.height / 2);
     await page.waitForTimeout(2000);
     console.log(JSON.stringify({ plus, doubleClick: await state() }));
+    await putLatch(null); // leaving the chat by hand for the new chat set the latch
   }
 
   if (check === 'mode') {

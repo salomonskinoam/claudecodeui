@@ -136,7 +136,7 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
               onMouseEnter={() => setQueueHover(key)}
               onMouseLeave={() => setQueueHover(null)}
               onClick={(event) => open(e, event)}
-              title={e.closingLine ?? e.title}
+              title={e.chatName ?? e.title}
               className={cn(
                 'group relative mx-1 flex h-[26px] cursor-pointer items-center gap-2 rounded-sm px-2 text-[15px] text-[#cccccc]',
                 isShown && 'outline outline-1 outline-[#3794ff]',

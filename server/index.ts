@@ -206,6 +206,43 @@ app.use('/api/agent', agentRoutes);
 
 app.use('/api/voice', authenticateToken, voiceRoutes);
 
+// quests: the account and plan-limit widget at the top of the sidebar. The limits come from the address Claude
+// Code's /usage screen reads (unofficial), with the subscription token Claude Code keeps in
+// ~/.claude/.credentials.json (read only, never refreshed); the email from ~/.claude.json. Cached 30 seconds.
+let usageCache: { at: number; data: unknown } | null = null;
+const USAGE_LABELS: Record<string, string> = { session: 'Session (5hr)', weekly_all: 'Weekly (7 day)' };
+app.get('/api/quests/usage', authenticateToken, async (_req: Request, res: Response) => {
+    if (usageCache && Date.now() - usageCache.at < 30_000) {
+        res.json(usageCache.data);
+        return;
+    }
+    const home = os.homedir();
+    const oauth = JSON.parse(await fsPromises.readFile(path.join(home, '.claude', '.credentials.json'), 'utf8')).claudeAiOauth;
+    const email = JSON.parse(await fsPromises.readFile(path.join(home, '.claude.json'), 'utf8')).oauthAccount?.emailAddress ?? null;
+    let response: globalThis.Response;
+    try {
+        response = await fetch('https://api.anthropic.com/api/oauth/usage', {
+            headers: { Authorization: `Bearer ${oauth.accessToken}`, 'anthropic-beta': 'oauth-2025-04-20' },
+            signal: AbortSignal.timeout(10_000),
+        });
+    } catch (error) {
+        res.status(502).json({ error: `usage address unreachable: ${String(error)}` }); // offline, or slower than 10 s
+        return;
+    }
+    if (!response.ok) {
+        res.status(502).json({ error: `usage address answered ${response.status}${oauth.expiresAt < Date.now() ? ' (token expired: run claude once)' : ''}` });
+        return;
+    }
+    const raw = await response.json() as { limits?: Array<{ kind: string; percent: number; resets_at?: string; scope?: { model?: { display_name?: string } } }> };
+    const limits = (raw.limits ?? []).map((l) => ({
+        label: l.scope?.model?.display_name ? `${l.scope.model.display_name} limit` : USAGE_LABELS[l.kind] ?? l.kind,
+        percent: l.percent,
+        resetsAt: l.resets_at ?? null,
+    }));
+    usageCache = { at: Date.now(), data: { email, limits } };
+    res.json(usageCache.data);
+});
+
 // quests: one plan file, for the plan tab. Plans are written by Claude Code to ~/.claude/plans/<name>.md (the
 // ExitPlanMode tool call carries planFilePath). Only names of that form are served, from that folder only.
 app.get('/api/quests/plan/:name', authenticateToken, async (req: Request, res: Response) => {

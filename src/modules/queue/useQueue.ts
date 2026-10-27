@@ -20,6 +20,7 @@ export type QueueEntry = {
   number: number | null;
   sessionId: string | null;
   providerSessionId: string | null;
+  chatName: string | null;
   projectPath: string | null;
   world: string | null;
   rootKey: string;
@@ -55,7 +56,8 @@ async function call(method: string, route: string, body?: unknown): Promise<void
   }
 }
 
-export const refreshQueue = () => call('GET', '');
+let openTabs: string[] | null = null;
+export const refreshQueue = () => (openTabs ? call('PUT', '/tabs', { sessionIds: openTabs }) : call('GET', ''));
 
 /** The view a drag of `key` to stand before `beforeKey` would give (nothing is stored). */
 export async function previewQueue(key: string, beforeKey: string | null): Promise<string[]> {
@@ -67,6 +69,16 @@ export async function previewQueue(key: string, beforeKey: string | null): Promi
 export const dragQueue = (key: string, beforeKey: string | null) => call('PUT', '/drag', { key, beforeKey });
 export const setQueueLatch = (key: string | null) => call('PUT', '/latch', { key });
 export const closeQueueTicket = (number: number, choice: string) => call('POST', '/close', { number, choice });
+
+/**
+ * The chats open as tabs (page session ids, in tab order) rank at the top of the queue. Every poll reports them,
+ * so a restarted server knows them again within two seconds.
+ */
+export function reportQueueTabs(sessionIds: string[]): void {
+  if (openTabs?.join() === sessionIds.join()) return;
+  openTabs = sessionIds;
+  void refreshQueue().catch((error: unknown) => console.error(error));
+}
 
 export async function postQueue<T>(route: string, body: unknown): Promise<T> {
   const response = await authenticatedFetch(`/api/quests/queue${route}`, {

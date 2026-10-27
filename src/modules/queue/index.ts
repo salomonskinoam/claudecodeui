@@ -2,7 +2,7 @@
 export { default as QueueList } from '@/modules/queue/QueueList';
 export { default as QueueForest } from '@/modules/queue/QueueForest';
 export { default as KindSign } from '@/modules/queue/KindSign';
-export { currentQueue, familyColors, hoverQueueSession, useQueue, setQueueLatch } from '@/modules/queue/useQueue';
+export { currentQueue, familyColors, hoverQueueSession, reportQueueTabs, useQueue, setQueueLatch } from '@/modules/queue/useQueue';
 export type { Queue, QueueEntry } from '@/modules/queue/useQueue';
 export { noteSentInChat, noteShownChat, openNextInQueue } from '@/modules/queue/queueNavigation';
 export { default as OutsideChatBanner } from '@/modules/queue/OutsideChatBanner';

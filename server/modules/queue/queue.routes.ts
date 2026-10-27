@@ -2,7 +2,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 
 import {
-  closeTicket, dragTo, getQueue, previewDrag, setLatch, setOrder, type CloseChoice,
+  closeTicket, dragTo, getQueue, previewDrag, setLatch, setOpenTabs, setOrder, type CloseChoice,
 } from '@/modules/queue/services/queue.service.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -10,6 +10,14 @@ const bad = (message: string) => new AppError(message, { code: 'INVALID_REQUEST_
 const CHOICES = new Set(['close', 'blockers-to-quest', 'blockers-to-sidequest', 'close-blockers']);
 
 const router = express.Router();
+
+// The page reports the chats open as its tabs (its own session ids, in tab order): they rank at the top.
+router.put('/tabs', asyncHandler(async (req: Request, res: Response) => {
+  const { sessionIds } = req.body ?? {};
+  if (!Array.isArray(sessionIds) || !sessionIds.every((k) => typeof k === 'string')) throw bad('sessionIds must be a list.');
+  setOpenTabs(sessionIds);
+  res.json(createApiSuccessResponse(getQueue()));
+}));
 
 router.get('/', asyncHandler(async (_req: Request, res: Response) => {
   res.json(createApiSuccessResponse(getQueue()));

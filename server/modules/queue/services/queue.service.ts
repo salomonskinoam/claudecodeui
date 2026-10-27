@@ -1,7 +1,7 @@
 import { queueDb } from '@/modules/database/index.js';
 import { drag as dragOrder, repair, rootOf, view as viewOrder, needsNoam, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import {
-  TICKETS_REPO, getCursorTabs, getLive, getTickets, noteRecentTranscripts, refreshCursorTabs, refreshLive, refreshTickets, run,
+  TICKETS_REPO, getCursorTabs, getLive, getTickets, getTitles, noteRecentTranscripts, noteTranscript, refreshCursorTabs, refreshLive, refreshTickets, run,
   type Ticket,
 } from '@/modules/queue/services/queue-sources.service.js';
 
@@ -14,6 +14,8 @@ export type QueueEntry = QueueOrderEntry & {
   /** The chat attached to the entry: the page's session id (for opening) and Claude Code's. */
   sessionId: string | null;
   providerSessionId: string | null;
+  /** The attached chat's name (rename, else Claude's title), shown on hover. */
+  chatName: string | null;
   projectPath: string | null;
   world: string | null;
   rootKey: string;
@@ -36,6 +38,23 @@ const LINE_STATE: Record<string, QueueState> = { question: 'question', done: 'do
 
 const kindOf = (t: Ticket): QueueKind => KINDS.find((k) => t.labels.includes(k)) ?? 'quest';
 const time = (s: string | null | undefined): number => (s ? Date.parse(s) : 0);
+
+/** Claude Code session ids of the chats open as tabs in the page, in tab order (left pane, then right). */
+let openTabs: string[] = [];
+
+/** The page reports its open tabs (its own session ids); each one's transcript is read for its name and state. */
+export function setOpenTabs(pageSessionIds: string[]): void {
+  const byPageId = new Map(queueDb.listClaudeSessions().map((s) => [s.session_id, s]));
+  const rows = pageSessionIds.map((id) => byPageId.get(id)).filter((s): s is NonNullable<typeof s> => Boolean(s));
+  openTabs = rows.map((s) => s.provider_session_id);
+  for (const s of rows) {
+    if (s.jsonl_path && !getTitles().has(s.provider_session_id)) void noteTranscript(s.jsonl_path).catch(() => undefined);
+  }
+}
+
+/** The open tabs' entry keys, in tab order. */
+const openKeys = (entries: QueueEntry[]): string[] =>
+  openTabs.map((sid) => entries.find((e) => e.providerSessionId === sid)?.key).filter((k): k is string => Boolean(k));
 
 export function buildEntries(): QueueEntry[] {
   const tickets = getTickets();
@@ -68,11 +87,14 @@ export function buildEntries(): QueueEntry[] {
     if (l?.line_kind) return { state: LINE_STATE[l.line_kind], since: time(l.line_at), line };
     return { state: 'none', since: p?.statusUpdatedAt ?? 0, line };
   };
+  const titles = getTitles();
+  const chatName = (sid: string) => titles.get(sid) ?? sessions.get(sid)?.custom_name ?? live.get(sid)?.name ?? sid;
   const chatFields = (sid: string | null) => {
     const s = sid ? sessions.get(sid) : undefined;
     return {
       sessionId: s?.session_id ?? sid,
       providerSessionId: sid,
+      chatName: sid ? chatName(sid) : null,
       projectPath: s?.project_path ?? null,
       heldOutside: sid ? OUTSIDE.has(live.get(sid)?.entrypoint ?? '') || tabs.has(sid) : false,
     };
@@ -95,13 +117,18 @@ export function buildEntries(): QueueEntry[] {
       ...chatFields(sid),
     });
   }
-  const chatSids = new Set([...live.keys(), ...[...lines.values()].filter((l) => l.line_kind && !l.finalized).map((l) => l.provider_session_id)]);
+  // Chats in the queue: live ones, ones whose last reply left a closing line and were not finalized, and the ones
+  // open as tabs in the page (the user chose to open them).
+  const chatSids = new Set([
+    ...live.keys(),
+    ...[...lines.values()].filter((l) => l.line_kind && !l.finalized).map((l) => l.provider_session_id),
+    ...openTabs,
+  ]);
   for (const sid of chatSids) {
-    if (ticketOf.has(sid)) continue;
+    if (ticketOf.has(sid) && claimant.get(ticketOf.get(sid)!) === sid) continue;
     const st = chatState(sid);
-    const name = sessions.get(sid)?.custom_name ?? live.get(sid)?.name ?? sid;
     entries.push({
-      key: `chat:${sid}`, kind: 'chat', title: name, url: null, number: null, parentKey: null, blocks: [],
+      key: `chat:${sid}`, kind: 'chat', title: chatName(sid), url: null, number: null, parentKey: null, blocks: [],
       state: st.state, since: st.since, needsNoam: false, closingLine: st.line, world: null, parentChatSid: null, openBlockers: [],
       startFolder: null, ...chatFields(sid),
     });
@@ -163,7 +190,7 @@ export function getQueue() {
   store(order);
   const stored = queueDb.getState<string | null>('latch') ?? null;
   const latch = stored && entries.some((e) => e.key === stored) ? stored : null;
-  return { entries, order, latch, view: viewOrder(order, latch, entries) };
+  return { entries, order, latch, view: viewOrder(order, latch, entries, openKeys(entries)) };
 }
 
 export function setOrder(order: string[]) {
@@ -183,7 +210,7 @@ export function previewDrag(key: string, beforeKey: string | null): string[] {
   const entries = buildEntries();
   const order = dragOrder(repair(queueDb.getState<string[]>('order') ?? [], entries), entries, key, beforeKey);
   const latch = queueDb.getState<string | null>('latch') ?? null;
-  return viewOrder(order, latch && entries.some((e) => e.key === latch) ? latch : null, entries);
+  return viewOrder(order, latch && entries.some((e) => e.key === latch) ? latch : null, entries, openKeys(entries));
 }
 
 export function setLatch(key: string | null) {

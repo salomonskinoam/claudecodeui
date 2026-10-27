@@ -71,6 +71,15 @@ test('entries with a chat rank above tickets no chat has claimed, whatever their
   assert.deepEqual(view(['U', 'B', 'R', 'S', 'P'], 'S', c), ['P', 'R', 'S', 'B', 'U']);
 });
 
+test('chats open as tabs go right under the permission prompts and the latch, in tab order', () => {
+  const t = [e('A', 'quest', { state: 'running' }), e('B', 'chat'), e('C', 'chat'), e('U', 'quest', { state: 'unclaimed' }),
+    e('P', 'chat', { state: 'permission' })];
+  assert.deepEqual(view(['A', 'B', 'C', 'U', 'P'], null, t, ['C', 'U']), ['P', 'C', 'U', 'A', 'B']);
+  assert.deepEqual(view(['A', 'B', 'C', 'U', 'P'], 'B', t, ['C']), ['P', 'B', 'C', 'A', 'U']);
+  // A latched ticket no chat has claimed sits with the tickets; the open tabs still lead.
+  assert.deepEqual(view(['A', 'B', 'C', 'U', 'P'], 'U', t, ['C']), ['P', 'C', 'A', 'B', 'U']);
+});
+
 test('next skips the shown entry and entries that do not need Noam', () => {
   const n = [e('A', 'quest', { state: 'running' }), e('B2', 'quest', { state: 'question' }), e('C', 'chat', { state: 'done' })];
   assert.equal(next(['A', 'B2', 'C'], n, null), 'B2');

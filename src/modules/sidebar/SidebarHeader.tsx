@@ -6,6 +6,7 @@ import { CLOUDCLI_WORDMARK_FONT_FAMILY } from '@/shared/constants';
 import { IS_PLATFORM } from '@/shared/utils';
 import type { SidebarSearchMode } from '@/shared/types';
 import SidebarModeTabs from '@/modules/sidebar/SidebarModeTabs';
+import UsageWidget from '@/modules/sidebar/UsageWidget';
 
 const MOD_KEY =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
@@ -85,8 +86,9 @@ export default function SidebarHeader({
         className="hidden px-3 pb-2 pt-3 md:block"
         style={{}}
       >
-        {/* quests: no logo and no GitHub badge here, to leave the room to the queue. */}
-        <div className="flex items-center justify-end gap-2">
+        {/* quests: no logo and no GitHub badge; the account and plan limits sit where the logo was. */}
+        <div className="flex items-start gap-2">
+          <UsageWidget />
           <div className="flex flex-shrink-0 items-center gap-0.5">
             <Button
               variant="ghost"

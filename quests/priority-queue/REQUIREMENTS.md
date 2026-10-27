@@ -143,6 +143,12 @@ Earlier rulings that still stand, verbatim:
 
 > so it should be demoted back to a ticket level and the priority rule should demote closed chats back to ticket level if they were not closed
 
+2026-10-26 22:02, verbatim (answer to 67: should chats open as tabs in the page join the queue):
+
+> 67. makes no sense. open chats are by definition top of the queue, it was a rule wasn't it? they jump on top because the user chose to open them.
+>
+> also, hover on the list items or tree should show the chat NAME not whatever it is that is shown right now
+
 ## The requirements, as read
 
 ### Sources
@@ -162,6 +168,7 @@ Earlier rulings that still stand, verbatim:
 | 6 | When a root is done (its ticket closed) before its children, the children become roots. They keep the done root's place, in their order by rule 4. | 19:18 |
 | 6.1 | Closing a root that still has open blockers raises a popup first: "are you sure", with an explanation of what is flagged as its blockers. The options: "yes"; convert the blockers to quests; convert them to side quests; close the blockers too; other (a kind Noam types). The popup comes up both in the chats (the ticket-work close step and the finalize-chat skill, in salomonskinoam/tickets) and in the quests page. | 20:35, 21:05 |
 | 7 | A permission prompt ranks above everything: a chat waiting on a permission prompt in the lowest family ranks above every entry of the highest family. | 28, 20:11 |
+| 7.0 | A chat open as a tab in the page is in the queue and ranks at the top, right under the permission prompts (and the latched chat when it leads), in tab order: the user chose to open it. | 26 Oct 22:02 |
 | 7.1 | Below the permission prompts (and the latched chat), every entry with a chat (a claimed ticket, or a chat with no ticket) ranks above every ticket no chat has claimed, whatever the kinds: a claimed side quest ranks above an unclaimed blocker or quest. The family rules order entries only inside each of these two levels. | 26 Oct 21:41 |
 | 7.2 | A claim by a closed chat (one that ran /finalize-chat) does not count. A ticket still open whose chat was closed drops back to the ticket level of rule 7.1, as a ticket no chat has claimed; clicking it starts a new chat for it. | 26 Oct 21:56 |
 | 8 | Entries with the same priority are ordered by kind of wait: permission prompt, then question, then Done; oldest first inside each. | 23, 28, 34 |
@@ -182,6 +189,7 @@ Earlier rulings that still stand, verbatim:
 | 16.0 | The forest widget sits above the list of chats, in the right sidebar. Logos are removed there to save room. | 23 Oct 14:30 |
 | 16.1 | Every entry for a ticket shows a clickable link to the ticket's GitHub page. | 21 Oct 17:46 |
 | 16.2 | Every ticket line has a "close" button. It raises the popup of rule 6.1 when the ticket is a root with open blockers. | 26 Oct 10:03 |
+| 16.3 | Hovering a line or a forest node shows the chat's name (rename, else Claude's title); a ticket no chat has claimed shows the ticket title. | 26 Oct 22:02 |
 | 17 | Every chat in the list has a link that opens it in Cursor: `cursor://anthropic.claude-code/open?session=<session id>`. Not tested yet; no test now. | 24 | Every chat tells its immediate family, if it has one, about the events that happen to it. Immediate family: its parent chat (the chat that opened its ticket), its sibling chats (the chats on the other sub-tickets of the same parent ticket), and its immediate children (the chats on its ticket's own sub-tickets, the linked root quests of rule 3 included). Events: a change of the kind of the closing line of rule 20 (waiting for, question, blocker, Done), every ticket update (a commit, a push, an eval, a decision), and every time Noam says to notify the family. A live chat gets a message; a chat that is not live gets a comment on its ticket. The home is the queue's instruction text of rule 22. | 22:26, 22:47, 26 Oct 10:03 |
 
 ### Using it
