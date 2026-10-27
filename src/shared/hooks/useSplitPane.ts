@@ -78,6 +78,21 @@ export const replaceNewChatTab = (id: string) =>
 /** The left pane's tabs become `ids` (a chat already in the right pane stays there). */
 export const setLeftTabs = (ids: string[]) => write((p) => ({ ...p, left: ids.filter((id) => !p.right.includes(id)) }));
 
+/**
+ * A tab dropped on the left half of the shown chat `shownId`: the tab takes the left pane and the shown chat moves
+ * to the right pane (a new chat, which cannot go right, just closes). The caller then shows `id` on the left.
+ */
+export const swapIntoLeft = (id: string, shownId: string) =>
+  write((p) => {
+    const toRight = shownId !== NEW_CHAT_TAB && shownId !== id;
+    const right = toRight ? [...without(p.right, shownId), shownId] : without(p.right, id);
+    return {
+      left: [...without(without(p.left, shownId), id), id].filter((x) => !right.includes(x)),
+      right,
+      rightActive: toRight ? shownId : right.length > 0 ? (p.rightActive === id ? neighbor(p.right, id) : p.rightActive) : null,
+    };
+  });
+
 export const closeLeftTab = (id: string) => write((p) => ({ ...p, left: without(p.left, id) }));
 
 export const openRightTab = (id: string) =>

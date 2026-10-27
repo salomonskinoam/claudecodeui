@@ -3,22 +3,24 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
-import { openQueueEntry } from '@/modules/queue/queueNavigation';
+import { useFamilyColors } from '@/modules/queue/familyColors';
 import KindSign from '@/modules/queue/KindSign';
-import { familyColors, setQueueHover, useQueue, useQueueHover } from '@/modules/queue/useQueue';
-import type { QueueEntry } from '@/modules/queue/useQueue';
+import { HOVER_CLASS, setQueueHover, useQueueHover } from '@/modules/queue/queueHover';
+import { openQueueEntry } from '@/modules/queue/queueNavigation';
+import { useQueue } from '@/modules/queue/queueStore';
+import type { QueueEntry } from '@/modules/queue/types';
 
 /**
  * quests priority queue: the forest. Roots side by side in queue order, each family below its root, children
  * indented under their parent. A small button per node folds its children; hovering a node highlights its line
- * in the list (and the other way around); clicking opens it as its line does.
+ * in the list and its tab (and the other way around); clicking opens it as its line does.
  */
 export default function QueueForest() {
   const queue = useQueue();
   const hover = useQueueHover();
   const dots = useChatDots();
+  const colors = useFamilyColors();
   const [folded, setFolded] = useState<Set<string>>(new Set());
-  const colors = familyColors(queue);
   const rank = new Map(queue.view.map((k, i) => [k, i]));
   const byRank = (a: QueueEntry, b: QueueEntry) => (rank.get(a.key) ?? 0) - (rank.get(b.key) ?? 0);
   const children = new Map<string, QueueEntry[]>();
@@ -40,7 +42,7 @@ export default function QueueForest() {
           onMouseLeave={() => setQueueHover(null)}
           onClick={() => openQueueEntry(e)}
           className={cn('mt-0.5 flex h-[20px] max-w-[150px] cursor-pointer items-center gap-1 rounded-sm px-1 text-[12px] text-[#cccccc]',
-            hover === e.key && 'brightness-150 outline outline-1 outline-[#3794ff]')}
+            hover === e.key && HOVER_CLASS)}
           style={{ backgroundColor: colors.get(e.rootKey) }}
         >
           {kids.length > 0 ? (

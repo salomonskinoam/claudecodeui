@@ -5,10 +5,12 @@ import { useParams } from 'react-router-dom';
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import { useProjectCommandState, useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
-import PaneTabs, { TAB_DRAG_TYPE } from '@/modules/project-workspace/PaneTabs';
+import PaneTabs from '@/modules/project-workspace/PaneTabs';
+import SplitDropZone, { type SplitSide } from '@/modules/project-workspace/SplitDropZone';
+import { useTabDragging } from '@/modules/project-workspace/tabDrag';
 import { PlanView } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
-import { noteShownChat, noteSwitchToSplit, reportQueueTabs } from '@/modules/queue';
+import { noteShownChat, noteSwitchKeepsPlace, reportQueueTabs } from '@/modules/queue';
 import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -26,6 +28,7 @@ import {
   planNameOf,
   planTabId,
   selectRightTab,
+  swapIntoLeft,
   usePanes,
 } from '@/shared/hooks/useSplitPane';
 
@@ -186,41 +189,20 @@ function ProjectWorkspaceShell({
     moveTab(id, 'right', beforeId);
   }, [leftActive, panes.left, showLeftTab]);
 
-  // Dragging a tab over the shown chat splits the screen. Dropped on its right half, the tab opens in the right
-  // pane; on its left half, the tab is shown on the left and the chat that was there moves to the right pane.
-  const [tabDragging, setTabDragging] = useState(false);
-  const [splitSide, setSplitSide] = useState<'left' | 'right' | null>(null);
-  useEffect(() => {
-    const start = (event: DragEvent) => setTabDragging(Boolean(event.dataTransfer?.types.includes(TAB_DRAG_TYPE)));
-    const end = () => {
-      setTabDragging(false);
-      setSplitSide(null);
-    };
-    window.addEventListener('dragstart', start);
-    window.addEventListener('dragend', end);
-    window.addEventListener('drop', end);
-    return () => {
-      window.removeEventListener('dragstart', start);
-      window.removeEventListener('dragend', end);
-      window.removeEventListener('drop', end);
-    };
-  }, []);
-  const dropSplit = useCallback((id: string, side: 'left' | 'right') => {
+  // A tab dropped on the shown chat (SplitDropZone) splits the screen. Right half: the tab opens in the right
+  // pane. Left half: the tab takes the left pane and the shown chat moves to the right pane. Neither is a switch
+  // made by hand, so the chat that leaves the left pane does not take the queue's "on top latch".
+  const tabDragging = useTabDragging();
+  const dropSplit = useCallback((id: string, side: SplitSide) => {
+    if (id === leftActive && side === 'left') {
+      return;
+    }
+    noteSwitchKeepsPlace();
     if (side === 'right') {
-      if (id === leftActive) {
-        noteSwitchToSplit();
-      }
       dropTabRight(id, null);
       return;
     }
-    if (id === leftActive) {
-      return;
-    }
-    noteSwitchToSplit();
-    if (leftActive !== NEW_CHAT_TAB) {
-      moveTab(leftActive, 'right', null);
-    }
-    moveTab(id, 'left', null);
+    swapIntoLeft(id, leftActive);
     showLeftTab(id);
   }, [leftActive, dropTabRight, showLeftTab]);
 
@@ -260,32 +242,7 @@ function ProjectWorkspaceShell({
                 navigate={navigate}
               />
             )}
-            {tabDragging && showTabs && (
-              <div
-                data-quests-split="drop"
-                className="absolute inset-0 z-20 flex"
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  const box = event.currentTarget.getBoundingClientRect();
-                  setSplitSide(event.clientX < box.left + box.width / 2 ? 'left' : 'right');
-                }}
-                onDragLeave={() => setSplitSide(null)}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  const id = event.dataTransfer.getData(TAB_DRAG_TYPE);
-                  if (id && splitSide) {
-                    dropSplit(id, splitSide);
-                  }
-                }}
-              >
-                {(['left', 'right'] as const).map((side) => (
-                  <div
-                    key={side}
-                    className={`pointer-events-none flex-1 ${splitSide === side ? 'bg-primary/20 outline outline-2 -outline-offset-2 outline-primary' : ''}`}
-                  />
-                ))}
-              </div>
-            )}
+            {showTabs && <SplitDropZone onDrop={dropSplit} />}
           </div>
         </div>
   

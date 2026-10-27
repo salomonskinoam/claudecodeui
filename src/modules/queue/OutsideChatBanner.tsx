@@ -1,5 +1,5 @@
 import { openNextInQueue } from '@/modules/queue/queueNavigation';
-import { useQueue } from '@/modules/queue/useQueue';
+import { useQueue } from '@/modules/queue/queueStore';
 
 const btn = 'rounded-sm border border-[#454647] px-3 py-1 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e]';
 

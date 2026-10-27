@@ -28,6 +28,13 @@ const TIE: Partial<Record<QueueState, number>> = { permission: 0, question: 1, d
 
 export const needsNoam = (e: QueueOrderEntry): boolean => NEEDS_NOAM.has(e.state);
 
+/**
+ * The three groups of the list, top to bottom: 0 the chats open right now, 1 the chats that were closed without
+ * /finalize-chat (and the tickets they claimed), 2 the tickets no chat has claimed. A separator sits between them.
+ */
+export type QueueGroup = 0 | 1 | 2;
+export const groupOf = (e: QueueOrderEntry): QueueGroup => (e.open ? 0 : e.state === 'unclaimed' ? 2 : 1);
+
 const tieCmp = (a: QueueOrderEntry, b: QueueOrderEntry): number =>
   (TIE[a.state] ?? 3) - (TIE[b.state] ?? 3) || a.since - b.since;
 
@@ -142,17 +149,15 @@ export function lift(list: string[], entries: QueueOrderEntry[], keys: string[])
 }
 
 /**
- * Permission prompts first, in stored order. Then three levels: the chats open right now, the other entries with
- * a chat (a claimed ticket, or a chat with no ticket), the tickets no chat has claimed. The latched entry leads its
- * level. The family rules order entries only inside each level.
+ * Permission prompts first, in stored order; then the three groups of `groupOf`, the latched entry leading its
+ * group. The family rules order entries only inside each group.
  */
 export function view(stored: string[], latch: string | null, entries: QueueOrderEntry[]): string[] {
   const byKey = index(entries);
   const perm = stored.filter((k) => byKey.get(k)?.state === 'permission');
   let rest = stored.filter((k) => byKey.has(k) && !perm.includes(k));
   if (latch && rest.includes(latch)) rest = drag(rest, entries, latch, rest.find((k) => k !== latch) ?? null);
-  const level = (k: string) => (byKey.get(k)!.open ? 0 : byKey.get(k)!.state === 'unclaimed' ? 2 : 1);
-  return [...perm, ...[0, 1, 2].flatMap((n) => rest.filter((k) => level(k) === n))];
+  return [...perm, ...[0, 1, 2].flatMap((g) => rest.filter((k) => groupOf(byKey.get(k)!) === g))];
 }
 
 /** The first entry of the view that needs Noam and is not the shown one. */

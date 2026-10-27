@@ -1,9 +1,8 @@
 import { useState } from 'react';
 
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui';
-
-import { closeQueueTicket } from '@/modules/queue/useQueue';
-import type { QueueEntry } from '@/modules/queue/useQueue';
+import { closeQueueTicket } from '@/modules/queue/queueStore';
+import type { QueueEntry } from '@/modules/queue/types';
 
 type CloseTicketDialogProps = { entry: QueueEntry; entries: QueueEntry[]; onDone: () => void };
 

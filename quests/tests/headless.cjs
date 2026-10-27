@@ -25,8 +25,8 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors'].includes(check) || !sessionId) {
-  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors <sessionId>');
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups'].includes(check) || !sessionId) {
+  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
 const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
@@ -247,9 +247,11 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(2500);
     const after = await apiQueue();
     const permissions = after.view.filter((k) => after.entries.find((e) => e.key === k).state === 'permission').length;
-    // On top: below the permission prompts, with nothing above it but members of its own family (its blockers).
+    // On top of its group: below the permission prompts and the higher groups (rule 7.0.1), with nothing above it
+    // but members of its own family (its blockers).
+    const entry = (k) => after.entries.find((e) => e.key === k);
     const onTop = after.view.slice(permissions, after.view.indexOf(mine.key))
-      .every((k) => after.entries.find((e) => e.key === k).rootKey === mine.rootKey);
+      .every((k) => entry(k).group < entry(mine.key).group || entry(k).rootKey === mine.rootKey);
     console.log(JSON.stringify({ left: mine.key, clicked: other, latch: after.latch, onTop, position: after.view.indexOf(mine.key) }));
     await putLatch(null);
     console.log(JSON.stringify({ released: (await apiQueue()).latch === null }));
@@ -270,7 +272,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.locator(`[data-forest-key="${root.key}"]`).hover();
     const lineLit = await page.locator(`[data-quests-queue="list"] [data-queue-key="${root.key}"]`).evaluate((n) => n.className.includes('brightness-150'));
     await page.locator(`[data-quests-queue="list"] [data-queue-key="${kids[0]}"]`).hover();
-    const nodeLit = await page.locator(`[data-forest-key="${kids[0]}"]`).evaluate((n) => n.className.includes('outline-1'));
+    const nodeLit = await page.locator(`[data-forest-key="${kids[0]}"]`).evaluate((n) => n.className.includes('brightness-150'));
     await page.locator(`[data-forest-key="${root.key}"] button`).click();
     const folded = await page.locator(`[data-forest-key="${kids[0]}"]`).count() === 0;
     const target = q.entries.find((e) => e.sessionId && e.sessionId !== sessionId);
@@ -304,16 +306,44 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const key = (await apiQueue()).entries.find((e) => e.sessionId === sessionId).key;
     const tab = page.locator('div.h-9 > [draggable="true"]').first();
     const line = page.locator(`[data-quests-queue="list"] [data-queue-key="${key}"]`);
+    const node = page.locator(`[data-forest-key="${key}"]`);
+    const lit = async () => ({
+      tab: await tab.evaluate((n) => n.className.includes('brightness-150')),
+      line: await line.evaluate((n) => n.className.includes('brightness-150')),
+      node: await node.evaluate((n) => n.className.includes('brightness-150')),
+    });
     await tab.hover();
     await page.waitForTimeout(300);
+    const fromTab = await lit();
+    await page.mouse.move(0, 0);
+    await line.hover();
+    await page.waitForTimeout(300);
+    const fromLine = await lit();
+    await page.mouse.move(0, 0);
+    await node.hover();
+    await page.waitForTimeout(300);
+    const fromNode = await lit();
     console.log(JSON.stringify({
       key,
-      line: await line.evaluate((n) => n.className.includes('brightness-150')),
-      node: await page.locator(`[data-forest-key="${key}"]`).evaluate((n) => n.className.includes('outline-1')),
+      fromTab, fromLine, fromNode,
       sameColor: (await tab.evaluate((n) => n.style.backgroundColor)) === (await line.evaluate((n) => n.style.backgroundColor)),
       sign: { tab: await tab.locator('[title="Quest"], [title="Side quest"], [title="Blocker"]').count(), line: await line.locator('[title="Quest"], [title="Side quest"], [title="Blocker"]').count() },
     }));
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  }
+
+  if (check === 'groups') {
+    // The list has three groups with a separator between them: open chats, chats closed without /finalize-chat,
+    // unclaimed tickets. The groups come from the server; a separator sits exactly where the group changes.
+    const q = await apiQueue();
+    const group = new Map(q.entries.map((e) => [e.key, e.group]));
+    const rows = await page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => [n.dataset.queueKey, n.className.includes('before:h-[2px]')]));
+    const expected = rows.map(([k], i) => i > 0 && group.get(rows[i - 1][0]) !== group.get(k));
+    console.log(JSON.stringify({
+      separators: rows.filter(([, s]) => s).map(([k]) => k),
+      asExpected: rows.every(([, s], i) => s === expected[i]),
+      groups: [0, 1, 2].map((g) => rows.filter(([k]) => group.get(k) === g).length),
+    }));
   }
 
   if (check === 'dropline') {

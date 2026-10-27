@@ -3,10 +3,8 @@ import type { DragEvent } from 'react';
 
 import { type ChatDot, CHAT_DOT_STYLE } from '@/shared/hooks/useLiveChats';
 import { cn } from '@/shared/utils';
-import { familyColors, hoverQueueSession, KindSign, useQueue } from '@/modules/queue';
-
-/** The drag payload type: a tab id, so drops from outside the tab rows are ignored. */
-export const TAB_DRAG_TYPE = 'application/x-quests-tab';
+import { KindSign, useQueueLook } from '@/modules/queue';
+import { TAB_DRAG_TYPE } from '@/modules/project-workspace/tabDrag';
 
 type PaneTabsProps = {
   ids: string[];
@@ -25,13 +23,13 @@ type PaneTabsProps = {
 
 /**
  * quests: one row of chat tabs above a pane, like an editor's tab bar. Tabs drag: onto a tab (left half:
- * before it, right half: after it) or onto the empty end of a row, in this pane or the other one.
+ * before it, right half: after it) or onto the empty end of a row, in this pane or the other one. A tab whose
+ * chat is in the priority queue wears its family's color, its kind's sign and the shared hover.
  */
 function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf, onDropTab, onNewChat }: PaneTabsProps) {
   // Where a dragged tab would land: before this id, or null for the end of the row; undefined while no drag.
   const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined);
-  const queue = useQueue();
-  const colors = familyColors(queue);
+  const lookOf = useQueueLook();
 
   const targetOf = (event: DragEvent<HTMLElement>, id: string): string | null => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -79,8 +77,7 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
     >
       {ids.map((id) => {
         const dot = dotOf(id);
-        // quests priority queue: a tab whose chat is in the queue wears its family's color and its kind's sign.
-        const entry = queue.entries.find((e) => e.sessionId === id);
+        const look = lookOf(id);
         return (
           <div
             key={id}
@@ -96,15 +93,16 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
               'group flex min-w-0 max-w-[220px] cursor-pointer items-center gap-1 border-r border-border/60 pl-3 pr-1 text-sm',
               // Cursor's tab colors (workbench.colorCustomizations: tab.activeBackground, tab.activeBorder).
               id === activeId
-                ? cn('border-b-2 border-b-[#ff0000] text-white', !entry && 'bg-[#3d5984]')
-                : cn('text-[#dddddd]', entry ? 'hover:brightness-125' : 'hover:bg-muted/50'),
+                ? cn('border-b-2 border-b-[#ff0000] text-white', !look && 'bg-[#3d5984]')
+                : cn('text-[#dddddd]', look ? 'hover:brightness-125' : 'hover:bg-muted/50'),
+              look?.hoverClass,
               // The landing spot of a dragged tab: a blue line on this tab's left edge.
               dropBefore === id && 'shadow-[inset_2px_0_0_0_#3794ff]',
             )}
             title={nameOf(id)}
-            style={entry ? { backgroundColor: colors.get(entry.rootKey) } : undefined}
-            onMouseEnter={() => hoverQueueSession(id)}
-            onMouseLeave={() => hoverQueueSession(null)}
+            style={look ? { backgroundColor: look.color } : undefined}
+            onMouseEnter={look?.onMouseEnter}
+            onMouseLeave={look?.onMouseLeave}
             onClick={() => onSelect(id)}
             onAuxClick={(event) => event.button === 1 && onClose(id)}
           >
@@ -115,7 +113,7 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
                 style={{ backgroundColor: CHAT_DOT_STYLE[dot].color }}
               />
             )}
-            {entry && <KindSign kind={entry.kind} />}
+            {look && look.kind !== 'chat' && <KindSign kind={look.kind} />}
             <span className="truncate">{nameOf(id)}</span>
             <button
               type="button"
