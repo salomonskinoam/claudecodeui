@@ -133,6 +133,12 @@ Earlier rulings that still stand, verbatim:
 > 7. popup to ask the user, and an ability for the user to say "let haiku choose". but the format should always be kept.
 > 8. they should also get a name by the format, and just let the user name them at the start right after asking about the worktree
 
+2026-10-26 21:41, verbatim:
+
+> claimed tickets (with chats) should always take precedence in the queue over not claimed ones, even if they are side quests over blockers or quests.
+> meaning live chats that are not closed take precedence over tickets.
+> which is why i expected to see 5 chats on the top of the queue
+
 ## The requirements, as read
 
 ### Sources
@@ -152,6 +158,7 @@ Earlier rulings that still stand, verbatim:
 | 6 | When a root is done (its ticket closed) before its children, the children become roots. They keep the done root's place, in their order by rule 4. | 19:18 |
 | 6.1 | Closing a root that still has open blockers raises a popup first: "are you sure", with an explanation of what is flagged as its blockers. The options: "yes"; convert the blockers to quests; convert them to side quests; close the blockers too; other (a kind Noam types). The popup comes up both in the chats (the ticket-work close step and the finalize-chat skill, in salomonskinoam/tickets) and in the quests page. | 20:35, 21:05 |
 | 7 | A permission prompt ranks above everything: a chat waiting on a permission prompt in the lowest family ranks above every entry of the highest family. | 28, 20:11 |
+| 7.1 | Below the permission prompts (and the latched chat), every entry with a chat (a claimed ticket, or a chat with no ticket) ranks above every ticket no chat has claimed, whatever the kinds: a claimed side quest ranks above an unclaimed blocker or quest. The family rules order entries only inside each of these two levels. | 26 Oct 21:41 |
 | 8 | Entries with the same priority are ordered by kind of wait: permission prompt, then question, then Done; oldest first inside each. | 23, 28, 34 |
 | 9 | Noam changes one thing by hand: the place of a root. Never the order inside a family, and never across the levels of rules 7 and 8. | 28 |
 | 10 | Dragging a root moves the root alone. Entries of other families may end up between members of its family, above them or below them. When the root would pass a member of its own family that must stay on the other side, that member joins the dragged block; the block grows each time and moves on as one block. | 23, 20:11 |

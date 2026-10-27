@@ -57,6 +57,20 @@ test('the view puts permission prompts first, then the latched chat', () => {
   assert.deepEqual(view(['X', 'Y', 'B', 'R', 'S'], 'R', fam), ['B', 'R', 'X', 'Y', 'S']);
 });
 
+test('entries with a chat rank above tickets no chat has claimed, whatever their kind', () => {
+  // R is a claimed quest, B its unclaimed blocker, S its claimed side quest, U an unclaimed root.
+  const c = [
+    e('R', 'quest', { state: 'running' }),
+    e('B', 'blocker', { parentKey: 'R', blocks: ['R'], state: 'unclaimed' }),
+    e('S', 'sidequest', { parentKey: 'R', state: 'done' }),
+    e('U', 'quest', { state: 'unclaimed' }),
+    e('P', 'chat', { state: 'permission' }),
+  ];
+  assert.deepEqual(view(['U', 'B', 'R', 'S', 'P'], null, c), ['P', 'R', 'S', 'U', 'B']);
+  // Latched side quest: its parent stays above it; the blocker came along, so it leads the unclaimed tickets.
+  assert.deepEqual(view(['U', 'B', 'R', 'S', 'P'], 'S', c), ['P', 'R', 'S', 'B', 'U']);
+});
+
 test('next skips the shown entry and entries that do not need Noam', () => {
   const n = [e('A', 'quest', { state: 'running' }), e('B2', 'quest', { state: 'question' }), e('C', 'chat', { state: 'done' })];
   assert.equal(next(['A', 'B2', 'C'], n, null), 'B2');

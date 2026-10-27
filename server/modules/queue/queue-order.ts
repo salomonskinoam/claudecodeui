@@ -134,13 +134,18 @@ export function drag(list: string[], entries: QueueOrderEntry[], key: string, be
   return settle([...rest.slice(0, p), ...lift, key, ...drop, ...rest.slice(p + 1)], entries);
 }
 
-/** Permission prompts first, in stored order; then the latched chat on top of the rest. */
+/**
+ * Permission prompts first, in stored order; then the latched chat on top of the rest. Then every entry with a
+ * chat (a claimed ticket, or a chat with no ticket) above every ticket no chat has claimed, whatever its kind:
+ * the family rules order entries only inside each of these levels.
+ */
 export function view(stored: string[], latch: string | null, entries: QueueOrderEntry[]): string[] {
   const byKey = index(entries);
   const perm = stored.filter((k) => byKey.get(k)?.state === 'permission');
   let rest = stored.filter((k) => byKey.has(k) && !perm.includes(k));
   if (latch && rest.includes(latch)) rest = drag(rest, entries, latch, rest.find((k) => k !== latch) ?? null);
-  return [...perm, ...rest];
+  const unclaimed = (k: string) => byKey.get(k)!.state === 'unclaimed';
+  return [...perm, ...rest.filter((k) => !unclaimed(k)), ...rest.filter(unclaimed)];
 }
 
 /** The first entry of the view that needs Noam and is not the shown one. */
