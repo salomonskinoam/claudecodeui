@@ -52,9 +52,11 @@ export function setOpenTabs(pageSessionIds: string[]): void {
   }
 }
 
-/** The open tabs' entry keys, in tab order. */
-const openKeys = (entries: QueueEntry[]): string[] =>
-  openTabs.map((sid) => entries.find((e) => e.providerSessionId === sid)?.key).filter((k): k is string => Boolean(k));
+/** The keys of the open chats: a live Claude Code process (a Cursor tab, a terminal). A page tab alone is not open. */
+const openKeys = (entries: QueueEntry[]): string[] => {
+  const live = getLive();
+  return entries.filter((e) => e.providerSessionId && live.has(e.providerSessionId)).map((e) => e.key);
+};
 
 export function buildEntries(): QueueEntry[] {
   const tickets = getTickets();

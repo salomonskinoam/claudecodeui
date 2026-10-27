@@ -135,8 +135,8 @@ export function drag(list: string[], entries: QueueOrderEntry[], key: string, be
 }
 
 /**
- * Permission prompts first, in stored order; then the latched chat on top of the rest; then the chats open as
- * tabs in the page (`open`, in tab order: the user chose to open them). Then every entry with a chat (a claimed
+ * Permission prompts first, in stored order; then the latched chat on top of the rest; then the open chats
+ * (`open`, in stored order: the user chose to open them). Then every entry with a chat (a claimed
  * ticket, or a chat with no ticket) above every ticket no chat has claimed, whatever its kind: the family rules
  * order entries only inside each of these levels.
  */
@@ -147,7 +147,7 @@ export function view(stored: string[], latch: string | null, entries: QueueOrder
   if (latch && rest.includes(latch)) rest = drag(rest, entries, latch, rest.find((k) => k !== latch) ?? null);
   const unclaimed = (k: string) => byKey.get(k)!.state === 'unclaimed';
   const ordered = [...rest.filter((k) => !unclaimed(k)), ...rest.filter(unclaimed)];
-  const tops = open.filter((k, i) => ordered.includes(k) && k !== latch && open.indexOf(k) === i);
+  const tops = ordered.filter((k) => open.includes(k) && k !== latch);
   const others = ordered.filter((k) => !tops.includes(k));
   // Right under the latched chat when it leads; else (no latch, or a latched ticket that dropped below) at the top.
   const at = latch && others[0] === latch ? 1 : 0;
