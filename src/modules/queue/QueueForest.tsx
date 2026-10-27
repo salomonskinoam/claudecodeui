@@ -18,7 +18,7 @@ export default function QueueForest() {
   const hover = useQueueHover();
   const dots = useChatDots();
   const [folded, setFolded] = useState<Set<string>>(new Set());
-  const colors = familyColors(queue.entries.map((e) => e.rootKey));
+  const colors = familyColors(queue);
   const rank = new Map(queue.view.map((k, i) => [k, i]));
   const byRank = (a: QueueEntry, b: QueueEntry) => (rank.get(a.key) ?? 0) - (rank.get(b.key) ?? 0);
   const children = new Map<string, QueueEntry[]>();

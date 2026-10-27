@@ -5,10 +5,10 @@ import { useParams } from 'react-router-dom';
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import { useProjectCommandState, useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
-import PaneTabs from '@/modules/project-workspace/PaneTabs';
+import PaneTabs, { TAB_DRAG_TYPE } from '@/modules/project-workspace/PaneTabs';
 import { PlanView } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
-import { noteShownChat, reportQueueTabs } from '@/modules/queue';
+import { noteShownChat, noteSwitchToSplit, reportQueueTabs } from '@/modules/queue';
 import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -186,6 +186,44 @@ function ProjectWorkspaceShell({
     moveTab(id, 'right', beforeId);
   }, [leftActive, panes.left, showLeftTab]);
 
+  // Dragging a tab over the shown chat splits the screen. Dropped on its right half, the tab opens in the right
+  // pane; on its left half, the tab is shown on the left and the chat that was there moves to the right pane.
+  const [tabDragging, setTabDragging] = useState(false);
+  const [splitSide, setSplitSide] = useState<'left' | 'right' | null>(null);
+  useEffect(() => {
+    const start = (event: DragEvent) => setTabDragging(Boolean(event.dataTransfer?.types.includes(TAB_DRAG_TYPE)));
+    const end = () => {
+      setTabDragging(false);
+      setSplitSide(null);
+    };
+    window.addEventListener('dragstart', start);
+    window.addEventListener('dragend', end);
+    window.addEventListener('drop', end);
+    return () => {
+      window.removeEventListener('dragstart', start);
+      window.removeEventListener('dragend', end);
+      window.removeEventListener('drop', end);
+    };
+  }, []);
+  const dropSplit = useCallback((id: string, side: 'left' | 'right') => {
+    if (side === 'right') {
+      if (id === leftActive) {
+        noteSwitchToSplit();
+      }
+      dropTabRight(id, null);
+      return;
+    }
+    if (id === leftActive) {
+      return;
+    }
+    noteSwitchToSplit();
+    if (leftActive !== NEW_CHAT_TAB) {
+      moveTab(leftActive, 'right', null);
+    }
+    moveTab(id, 'left', null);
+    showLeftTab(id);
+  }, [leftActive, dropTabRight, showLeftTab]);
+
   return (
     <div
       className="fixed inset-0 flex bg-background"
@@ -211,7 +249,7 @@ function ProjectWorkspaceShell({
             />
           )}
           {/* The chat view fills the height left under the tab row, so its bottom stays on screen. */}
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col">
             {planName ? (
               <PlanView planName={planName} />
             ) : (
@@ -221,6 +259,32 @@ function ProjectWorkspaceShell({
                 sendMessage={sendMessage}
                 navigate={navigate}
               />
+            )}
+            {tabDragging && showTabs && (
+              <div
+                data-quests-split="drop"
+                className="absolute inset-0 z-20 flex"
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  const box = event.currentTarget.getBoundingClientRect();
+                  setSplitSide(event.clientX < box.left + box.width / 2 ? 'left' : 'right');
+                }}
+                onDragLeave={() => setSplitSide(null)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const id = event.dataTransfer.getData(TAB_DRAG_TYPE);
+                  if (id && splitSide) {
+                    dropSplit(id, splitSide);
+                  }
+                }}
+              >
+                {(['left', 'right'] as const).map((side) => (
+                  <div
+                    key={side}
+                    className={`pointer-events-none flex-1 ${splitSide === side ? 'bg-primary/20 outline outline-2 -outline-offset-2 outline-primary' : ''}`}
+                  />
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -269,7 +333,7 @@ function ProjectWorkspaceShell({
                 title="Right pane"
                 src={`/session/${panes.rightActive}`}
                 className="w-full flex-1 border-0"
-                style={isDraggingSplit ? { pointerEvents: 'none' } : undefined}
+                style={isDraggingSplit || tabDragging ? { pointerEvents: 'none' } : undefined}
               />
             )}
           </div>

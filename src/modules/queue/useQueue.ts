@@ -44,7 +44,13 @@ let timer: number | null = null;
 
 const publish = () => listeners.forEach((l) => l());
 
+// Requests can answer out of order (a slow poll after a drop): only an answer to a request sent after the one
+// shown may replace the queue, so an older state never flashes back.
+let sent = 0;
+let shownSeq = 0;
+
 async function call(method: string, route: string, body?: unknown): Promise<unknown> {
+  const seq = ++sent;
   const response = await authenticatedFetch(`/api/quests/queue${route}`, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
@@ -52,7 +58,8 @@ async function call(method: string, route: string, body?: unknown): Promise<unkn
   });
   if (!response.ok) throw new Error(`queue ${method} ${route}: ${response.status} ${await response.text()}`);
   const json = await response.json();
-  if (json.data?.entries) {
+  if (json.data?.entries && seq > shownSeq) {
+    shownSeq = seq;
     queue = json.data;
     publish();
   }
@@ -60,15 +67,10 @@ async function call(method: string, route: string, body?: unknown): Promise<unkn
 }
 
 let openTabs: string[] | null = null;
-export const refreshQueue = () => (openTabs ? call('PUT', '/tabs', { sessionIds: openTabs }) : call('GET', ''));
+/** This window's id: two page windows each keep their own tabs in the queue. */
+const windowId = crypto.randomUUID();
+export const refreshQueue = () => (openTabs ? call('PUT', '/tabs', { windowId, sessionIds: openTabs }) : call('GET', ''));
 
-/** The view a drag of `key` to stand before `beforeKey` would give (nothing is stored). */
-export async function previewQueue(key: string, beforeKey: string | null): Promise<string[]> {
-  const q = new URLSearchParams({ key, before: beforeKey ?? '' });
-  const response = await authenticatedFetch(`/api/quests/queue/preview?${q}`);
-  if (!response.ok) throw new Error(`queue preview: ${response.status}`);
-  return (await response.json()).data.view;
-}
 export const dragQueue = (key: string, beforeKey: string | null) => call('PUT', '/drag', { key, beforeKey });
 export const setQueueLatch = (key: string | null) => call('PUT', '/latch', { key });
 export const closeQueueTicket = (number: number, choice: string) => call('POST', '/close', { number, choice });
@@ -129,27 +131,18 @@ function subscribe(listener: () => void): () => void {
 export const useQueue = (): Queue => useSyncExternalStore(subscribe, () => queue);
 export const useQueueHover = (): string | null => useSyncExternalStore(subscribe, () => hover);
 
-const fnv = (s: string): number => {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i += 1) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
-  return h;
-};
+/** Ten dark colors far apart, ordered so each one differs strongly from the next. */
+const PALETTE = ['#1f4e79', '#7a4a10', '#2d5a27', '#6b1f52', '#16585e', '#6b2020', '#5e5e14', '#2a3a8a', '#4b5260', '#4b2a6b'];
 
 /**
- * One generated color per family. Each root gets a hue from a hash of its key; a hue closer than 14 degrees to
- * one already taken moves on by the golden angle until it is free. Roots are taken in key order, so the same set
- * of families always gets the same colors. Fixed saturation and lightness, for the dark theme.
+ * One color per family, given in queue order: the first family down the list gets the first color, and so on. So
+ * families next to each other never share a color; a color comes back only ten families further down.
  */
-export function familyColors(rootKeys: string[]): Map<string, string> {
-  const taken: number[] = [];
+export function familyColors(queue: Queue): Map<string, string> {
+  const rootOf = new Map(queue.entries.map((e) => [e.key, e.rootKey]));
   const out = new Map<string, string>();
-  for (const key of [...new Set(rootKeys)].sort()) {
-    let hue = fnv(key) % 360;
-    for (let tries = 0; tries < 25 && taken.some((t) => Math.min(Math.abs(t - hue), 360 - Math.abs(t - hue)) < 14); tries += 1) {
-      hue = (hue + 137.5) % 360;
-    }
-    taken.push(hue);
-    out.set(key, `hsl(${Math.round(hue)}, 35%, 22%)`);
+  for (const root of [...queue.view.map((k) => rootOf.get(k)), ...rootOf.values()]) {
+    if (root && !out.has(root)) out.set(root, PALETTE[out.size % PALETTE.length]);
   }
   return out;
 }

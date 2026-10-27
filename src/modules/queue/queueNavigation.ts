@@ -20,6 +20,9 @@ export const setQueueOpener = (open: (entry: QueueEntry) => void) => { opener = 
 
 export const noteSentInChat = () => { sentSinceShown = true; };
 
+/** The next switch keeps the chat left on screen (a split moves it to the right pane): it does not latch. */
+export const noteSwitchToSplit = () => { viaNext = true; };
+
 /** Open an entry by hand (a node of the forest): the same as clicking its line. */
 export const openQueueEntry = (entry: QueueEntry) => opener?.(entry);
 

@@ -25,8 +25,8 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor'].includes(check) || !sessionId) {
-  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor <sessionId>');
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors'].includes(check) || !sessionId) {
+  console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors <sessionId>');
   process.exit(2);
 }
 const secret = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
@@ -314,6 +314,79 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       sign: { tab: await tab.locator('[title="Quest"], [title="Side quest"], [title="Blocker"]').count(), line: await line.locator('[title="Quest"], [title="Side quest"], [title="Blocker"]').count() },
     }));
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  }
+
+  if (check === 'dropline') {
+    // Dragging a line keeps the list still and shows one blue landing line; released outside the list, nothing moves.
+    const before = await apiQueue();
+    const keysNow = () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+    const shown = await keysNow();
+    const root = shown.find((k) => before.entries.find((e) => e.key === k).rootKey === k && before.entries.find((e) => e.key === k).state !== 'permission');
+    const from = await page.locator(`[data-queue-key="${root}"]`).boundingBox();
+    const to = await page.locator(`[data-queue-key="${shown[shown.indexOf(root) + 3]}"]`).boundingBox();
+    await page.mouse.move(from.x + 40, from.y + from.height / 2);
+    await page.mouse.down();
+    const samples = [];
+    for (let i = 1; i <= 10; i++) {
+      await page.mouse.move(to.x + 40, from.y + (to.y + to.height * 0.75 - from.y) * (i / 10));
+      await page.waitForTimeout(150);
+      samples.push({ same: JSON.stringify(await keysNow()) === JSON.stringify(shown), markers: await page.locator('[data-quests-queue="list"] .bg-\\[\\#3794ff\\]').count() });
+    }
+    await page.mouse.move(to.x + 40, to.y + 2000);
+    await page.mouse.up();
+    await page.waitForTimeout(1500);
+    console.log(JSON.stringify({ root, samples, orderUnchanged: JSON.stringify((await apiQueue()).order) === JSON.stringify(before.order) }));
+    // A real drop on the lower half of that line: the root lands right below it. Then the order is put back.
+    const onto = shown[shown.indexOf(root) + 3];
+    await page.mouse.move(from.x + 40, from.y + from.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(to.x + 40, from.y + (to.y + to.height * 0.75 - from.y) * (i / 10));
+    await page.mouse.up();
+    await page.waitForTimeout(2000);
+    const landed = await keysNow();
+    await page.evaluate(async (order) => fetch('/api/quests/queue/order', {
+      method: 'PUT', headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    }), before.order);
+    console.log(JSON.stringify({ onto, landedRightBelow: landed.indexOf(root) === landed.indexOf(onto) + 1,
+      restored: JSON.stringify((await apiQueue()).order) === JSON.stringify(before.order) }));
+  }
+
+  if (check === 'split') {
+    // A tab dropped on the right half of the chat opens in the right pane; dropped on the left half, it is shown on
+    // the left and the chat that was there moves to the right pane. Uses this headless browser's own tabs only.
+    const other = (await apiQueue()).entries.find((e) => e.sessionId && e.sessionId !== sessionId).sessionId;
+    await page.goto(`http://127.0.0.1:3001/session/${other}`);
+    await page.waitForTimeout(4000);
+    const panes = () => page.evaluate(() => JSON.parse(localStorage.getItem('quests-panes') || '{}'));
+    const dragTabTo = async (id, xShare) => {
+      const tabs = await page.locator('div.h-9 > [draggable="true"]').evaluateAll((ns) => ns.map((n) => n.getBoundingClientRect().toJSON()));
+      const p = await panes();
+      const all = [...p.left, ...p.right];
+      const box = tabs[all.indexOf(id)];
+      const area = await page.locator('.chat-messages-pane').first().boundingBox();
+      await page.mouse.move(box.x + 20, box.y + box.height / 2);
+      await page.mouse.down();
+      for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + 20 + (area.x + area.width * xShare - box.x - 20) * (i / 10), box.y + (area.y + area.height / 2 - box.y) * (i / 10));
+      await page.mouse.up();
+      await page.waitForTimeout(2500);
+    };
+    const start = await panes();
+    await dragTabTo(sessionId, 0.8);
+    const right = { panes: await panes(), url: await page.evaluate(() => location.pathname) };
+    await dragTabTo(sessionId, 0.2);
+    const left = { panes: await panes(), url: await page.evaluate(() => location.pathname) };
+    console.log(JSON.stringify({ sessionId, other, start, right, left, latch: (await apiQueue()).latch }, null, 1));
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  }
+
+  if (check === 'colors') {
+    // Families next to each other in the list never share a color.
+    const rows = await page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => [n.dataset.queueKey, n.style.backgroundColor]));
+    const q = await apiQueue();
+    const root = new Map(q.entries.map((e) => [e.key, e.rootKey]));
+    const clashes = rows.filter((r, i) => i > 0 && root.get(rows[i - 1][0]) !== root.get(r[0]) && rows[i - 1][1] === r[1]).map((r) => r[0]);
+    console.log(JSON.stringify({ lines: rows.length, colors: new Set(rows.map((r) => r[1])).size, clashes }));
   }
 
   if (check === 'synccursor') {

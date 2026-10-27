@@ -9,7 +9,7 @@ import { openRightTab } from '@/shared/hooks/useSplitPane';
 import CloseTicketDialog from '@/modules/queue/CloseTicketDialog';
 import KindSign from '@/modules/queue/KindSign';
 import {
-  dragQueue, familyColors, previewQueue, setQueueHover, setQueueLatch, useQueue, useQueueHover,
+  dragQueue, familyColors, setQueueHover, setQueueLatch, useQueue, useQueueHover,
 } from '@/modules/queue/useQueue';
 import type { QueueEntry } from '@/modules/queue/useQueue';
 import { setQueueOpener, syncTabsFromCursor } from '@/modules/queue/queueNavigation';
@@ -48,14 +48,16 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
   const dots = useChatDots();
   const open = useOpenEntry(onStartTicket);
   useEffect(() => setQueueOpener(open));
-  const [preview, setPreview] = useState<string[] | null>(null);
+  // While a line is dragged, the list stays still; a blue line shows where it will land (`marker`: above or below
+  // the line under the mouse).
+  const [marker, setMarker] = useState<{ key: string; below: boolean } | null>(null);
   const [closing, setClosing] = useState<QueueEntry | null>(null);
   const dragged = useRef<string | null>(null);
   const target = useRef<string | null>(null);
 
   const byKey = new Map(queue.entries.map((e) => [e.key, e]));
-  const colors = familyColors(queue.entries.map((e) => e.rootKey));
-  const keys = (preview ?? queue.view).filter((k) => byKey.has(k));
+  const colors = familyColors(queue);
+  const keys = queue.view.filter((k) => byKey.has(k));
   const shownIndex = keys.findIndex((k) => byKey.get(k)!.sessionId === shownSessionId);
 
   // Blink: an entry above the shown chat that turned ready for the user, until it is opened or no longer ready.
@@ -74,28 +76,22 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue, shownSessionId]);
 
-  const beforeKeyAt = (event: DragEvent<HTMLDivElement>, key: string): string | null => {
-    const box = event.currentTarget.getBoundingClientRect();
-    if (event.clientY < box.top + box.height / 2) return key;
-    const i = queue.order.indexOf(key);
-    return queue.order.slice(i + 1).find((k) => k !== dragged.current) ?? null;
-  };
-
   const onDragOver = (event: DragEvent<HTMLDivElement>, key: string) => {
     if (!dragged.current || !event.dataTransfer.types.includes(DRAG_TYPE)) return;
     event.preventDefault();
-    const before = beforeKeyAt(event, key);
-    if (before === target.current) return;
-    target.current = before;
-    const moving = dragged.current;
-    // The server computes the order (one copy of the rules); a stale answer for an older target is dropped.
-    void previewQueue(moving, before).then((v) => { if (dragged.current === moving && target.current === before) setPreview(v); });
+    const box = event.currentTarget.getBoundingClientRect();
+    const below = event.clientY >= box.top + box.height / 2;
+    if (marker?.key === key && marker.below === below) return;
+    setMarker({ key, below });
+    // The drop sends "stand before this key" in the stored order; the server applies the family rules.
+    const i = queue.order.indexOf(key);
+    target.current = below ? (queue.order.slice(i + 1).find((k) => k !== dragged.current) ?? null) : key;
   };
 
   const endDrag = () => {
     dragged.current = null;
     target.current = null;
-    setPreview(null);
+    setMarker(null);
   };
 
   return (
@@ -162,6 +158,10 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
               )}
               style={{ backgroundColor: colors.get(e.rootKey) }}
             >
+              {marker?.key === key && (
+                <span className={cn('pointer-events-none absolute left-0 right-0 z-10 h-[3px] rounded-full bg-[#3794ff]',
+                  marker.below ? '-bottom-[2px]' : '-top-[2px]')} />
+              )}
               <span
                 className={cn('h-2 w-2 flex-shrink-0 rounded-full', dot === 'running' && 'animate-pulse')}
                 style={{ backgroundColor: dot ? CHAT_DOT_STYLE[dot].color : 'transparent' }}

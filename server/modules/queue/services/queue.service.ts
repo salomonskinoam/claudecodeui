@@ -39,14 +39,21 @@ const LINE_STATE: Record<string, QueueState> = { question: 'question', done: 'do
 const kindOf = (t: Ticket): QueueKind => KINDS.find((k) => t.labels.includes(k)) ?? 'quest';
 const time = (s: string | null | undefined): number => (s ? Date.parse(s) : 0);
 
-/** Claude Code session ids of the chats open as tabs in the page, in tab order (left pane, then right). */
-let openTabs: string[] = [];
+/**
+ * Claude Code session ids of the chats open as tabs in the page, per browser window: two windows open at once
+ * each keep their own tabs in the queue. A window that stopped reporting for 30 seconds is gone.
+ */
+const windowTabs = new Map<string, { sids: string[]; at: number }>();
+const openTabSids = (): string[] => {
+  for (const [id, w] of windowTabs) if (Date.now() - w.at > 30_000) windowTabs.delete(id);
+  return [...windowTabs.values()].flatMap((w) => w.sids);
+};
 
-/** The page reports its open tabs (its own session ids); each one's transcript is read for its name and state. */
-export function setOpenTabs(pageSessionIds: string[]): void {
+/** A window reports its open tabs (page session ids); each one's transcript is read for its name and state. */
+export function setOpenTabs(windowId: string, pageSessionIds: string[]): void {
   const byPageId = new Map(queueDb.listClaudeSessions().map((s) => [s.session_id, s]));
   const rows = pageSessionIds.map((id) => byPageId.get(id)).filter((s): s is NonNullable<typeof s> => Boolean(s));
-  openTabs = rows.map((s) => s.provider_session_id);
+  windowTabs.set(windowId, { sids: rows.map((s) => s.provider_session_id), at: Date.now() });
   for (const s of rows) {
     if (s.jsonl_path && !getTitles().has(s.provider_session_id)) void noteTranscript(s.jsonl_path).catch(() => undefined);
   }
@@ -120,7 +127,7 @@ export function buildEntries(): QueueEntry[] {
   const chatSids = new Set([
     ...live.keys(),
     ...[...lines.values()].filter((l) => l.line_kind && !l.finalized).map((l) => l.provider_session_id),
-    ...openTabs,
+    ...openTabSids(),
     ...[...tabs].filter((sid) => !closed(sid)),
   ]);
   for (const sid of chatSids) {
@@ -155,11 +162,16 @@ async function writeMirror(): Promise<void> {
     '-f', `content=${Buffer.from(body).toString('base64')}`, '-f', `branch=${MIRROR_BRANCH}`, ...(sha ? ['-f', `sha=${sha}`] : [])]);
 }
 
+// One mirror write at a time: two at once would PUT with the same file sha and the second would be refused. A
+// write queued behind another reads the state when it starts, so the last one always carries the newest order.
+let mirrorChain: Promise<void> = Promise.resolve();
+
 function scheduleMirror(): void {
   if (mirrorTimer) clearTimeout(mirrorTimer);
   mirrorTimer = setTimeout(() => {
     mirrorTimer = null;
-    writeMirror().catch((error: unknown) => console.error('[Queue] mirror failed', { error: String(error) }));
+    mirrorChain = mirrorChain.then(writeMirror)
+      .catch((error: unknown) => console.error('[Queue] mirror failed', { error: String(error) }));
   }, 10_000);
   mirrorTimer.unref?.();
 }
@@ -219,14 +231,6 @@ export function dragTo(key: string, beforeKey: string | null) {
   const entries = buildEntries();
   store(dragOrder(repair(queueDb.getState<string[]>('order') ?? [], entries), entries, key, beforeKey));
   return getQueue();
-}
-
-/** The view a drag would give, without storing it: the page's live preview while the mouse button is held. */
-export function previewDrag(key: string, beforeKey: string | null): string[] {
-  const entries = buildEntries();
-  const order = dragOrder(repair(queueDb.getState<string[]>('order') ?? [], entries), entries, key, beforeKey);
-  const latch = queueDb.getState<string | null>('latch') ?? null;
-  return viewOrder(order, latch && entries.some((e) => e.key === latch) ? latch : null, entries);
 }
 
 export function setLatch(key: string | null) {

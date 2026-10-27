@@ -6,7 +6,7 @@ import { cn } from '@/shared/utils';
 import { familyColors, hoverQueueSession, KindSign, useQueue } from '@/modules/queue';
 
 /** The drag payload type: a tab id, so drops from outside the tab rows are ignored. */
-const TAB_DRAG_TYPE = 'application/x-quests-tab';
+export const TAB_DRAG_TYPE = 'application/x-quests-tab';
 
 type PaneTabsProps = {
   ids: string[];
@@ -31,7 +31,7 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
   // Where a dragged tab would land: before this id, or null for the end of the row; undefined while no drag.
   const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined);
   const queue = useQueue();
-  const colors = familyColors(queue.entries.map((e) => e.rootKey));
+  const colors = familyColors(queue);
 
   const targetOf = (event: DragEvent<HTMLElement>, id: string): string | null => {
     const rect = event.currentTarget.getBoundingClientRect();
