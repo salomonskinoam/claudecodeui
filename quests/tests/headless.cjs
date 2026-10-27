@@ -411,12 +411,28 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'colors') {
-    // Families next to each other in the list never share a color.
-    const rows = await page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => [n.dataset.queueKey, n.style.backgroundColor]));
+    // Static: every family keeps its color after the first line moves to the bottom and after a reload (the order
+    // is put back). Distinct: families wear different colors while there are at most ten.
+    const colorsNow = async () => Object.fromEntries((await listRows()).map((r) => [r.key, r.color]));
+    const putOrder = (order) => page.evaluate(async (order) => fetch('/api/quests/queue/order', {
+      method: 'PUT', headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    }), order);
+    const before = await colorsNow();
     const q = await apiQueue();
     const root = new Map(q.entries.map((e) => [e.key, e.rootKey]));
-    const clashes = rows.filter((r, i) => i > 0 && root.get(rows[i - 1][0]) !== root.get(r[0]) && rows[i - 1][1] === r[1]).map((r) => r[0]);
-    console.log(JSON.stringify({ lines: rows.length, colors: new Set(rows.map((r) => r[1])).size, clashes }));
+    const families = new Map(Object.entries(before).map(([k, c]) => [root.get(k), c]));
+    const openFamilies = new Map(q.entries.filter((e) => e.group === 0).map((e) => [e.rootKey, families.get(e.rootKey)]));
+    await putOrder([...q.order.filter((k) => k !== q.view[0]), q.view[0]]);
+    await page.waitForTimeout(2500);
+    const afterDrag = await colorsNow();
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(2500);
+    const afterReload = await colorsNow();
+    await putOrder(q.order);
+    const changed = (a) => Object.keys(before).filter((k) => a[k] !== before[k]);
+    console.log(JSON.stringify({ lines: Object.keys(before).length, families: families.size, colors: new Set(families.values()).size,
+      openFamilies: openFamilies.size, openColors: new Set(openFamilies.values()).size, changedByMove: changed(afterDrag), changedByReload: changed(afterReload) }));
   }
 
   if (check === 'synccursor') {
