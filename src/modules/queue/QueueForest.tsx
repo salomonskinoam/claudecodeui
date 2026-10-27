@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/shared/utils';
 import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
 import { openQueueEntry } from '@/modules/queue/queueNavigation';
+import KindSign from '@/modules/queue/KindSign';
 import { familyColors, setQueueHover, useQueue, useQueueHover } from '@/modules/queue/useQueue';
 import type { QueueEntry } from '@/modules/queue/useQueue';
 
@@ -52,6 +53,7 @@ export default function QueueForest() {
             </button>
           ) : <span className="w-3 flex-shrink-0" />}
           <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ backgroundColor: dot ? CHAT_DOT_STYLE[dot].color : 'transparent' }} />
+          <KindSign kind={e.kind} />
           <span className="truncate">{e.number !== null ? `#${e.number}` : e.title}</span>
         </div>
         {!isFolded && kids.map((k) => node(k, depth + 1))}

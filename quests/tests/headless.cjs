@@ -299,15 +299,21 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'tabhover') {
-    // Hovering the chat's tab lights up its line in the list and its node in the forest.
+    // Hovering the chat's tab lights up its line in the list and its node in the forest. The tab wears the same
+    // family color as its line, and the same kind sign.
     const key = (await apiQueue()).entries.find((e) => e.sessionId === sessionId).key;
-    await page.locator('div.h-9 > [draggable="true"]').first().hover();
+    const tab = page.locator('div.h-9 > [draggable="true"]').first();
+    const line = page.locator(`[data-quests-queue="list"] [data-queue-key="${key}"]`);
+    await tab.hover();
     await page.waitForTimeout(300);
     console.log(JSON.stringify({
       key,
-      line: await page.locator(`[data-quests-queue="list"] [data-queue-key="${key}"]`).evaluate((n) => n.className.includes('brightness-150')),
+      line: await line.evaluate((n) => n.className.includes('brightness-150')),
       node: await page.locator(`[data-forest-key="${key}"]`).evaluate((n) => n.className.includes('outline-1')),
+      sameColor: (await tab.evaluate((n) => n.style.backgroundColor)) === (await line.evaluate((n) => n.style.backgroundColor)),
+      sign: { tab: await tab.locator('[title="Quest"], [title="Side quest"], [title="Blocker"]').count(), line: await line.locator('[title="Quest"], [title="Side quest"], [title="Blocker"]').count() },
     }));
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   }
 
   if (check === 'newtab') {

@@ -7,6 +7,7 @@ import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
 import { openRightTab } from '@/shared/hooks/useSplitPane';
 
 import CloseTicketDialog from '@/modules/queue/CloseTicketDialog';
+import KindSign from '@/modules/queue/KindSign';
 import { dragQueue, familyColors, previewQueue, setQueueHover, setQueueLatch, useQueue, useQueueHover } from '@/modules/queue/useQueue';
 import type { QueueEntry } from '@/modules/queue/useQueue';
 import { setQueueOpener } from '@/modules/queue/queueNavigation';
@@ -148,6 +149,7 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
                 className={cn('h-2 w-2 flex-shrink-0 rounded-full', dot === 'running' && 'animate-pulse')}
                 style={{ backgroundColor: dot ? CHAT_DOT_STYLE[dot].color : 'transparent' }}
               />
+              <KindSign kind={e.kind} />
               <span className="min-w-0 flex-1 truncate">{e.title}</span>
               {queue.latch === key && (
                 <button type="button" title="Release from the top" className="opacity-70 hover:opacity-100"

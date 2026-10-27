@@ -9,6 +9,7 @@ import PaneTabs from '@/modules/project-workspace/PaneTabs';
 import { PlanView } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
 import { noteShownChat } from '@/modules/queue';
+import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
 import ProjectQuickSettingsRegion from '@/modules/project-workspace/ProjectQuickSettingsRegion';
@@ -52,6 +53,31 @@ function ProjectWorkspaceShell({
     }
   }, [showTabs, urlTab]);
 
+  const loadedName = useCallback((id: string): string | null => {
+    for (const project of projects) {
+      const session = project.sessions?.find((s) => s.id === id);
+      if (session) {
+        return String(session.summary || session.name || 'New chat');
+      }
+    }
+    return null;
+  }, [projects]);
+
+  // A tab whose chat is not among the sessions loaded for the sidebar (an older chat): its name is asked from the
+  // server once (the rename name, else Claude's title).
+  const [fetchedNames, setFetchedNames] = useState<Record<string, string>>({});
+  const askedNames = useRef(new Set<string>());
+  useEffect(() => {
+    for (const id of [...panes.left, ...panes.right]) {
+      if (id === NEW_CHAT_TAB || planNameOf(id) || askedNames.current.has(id) || loadedName(id)) continue;
+      askedNames.current.add(id);
+      void api.sessionDetails(id).then((r) => r.json()).then((json) => {
+        const name = json?.data?.summary;
+        if (typeof name === 'string' && name) setFetchedNames((names) => ({ ...names, [id]: name }));
+      });
+    }
+  }, [panes.left, panes.right, loadedName]);
+
   const nameOf = useCallback((id: string) => {
     if (id === NEW_CHAT_TAB) {
       return 'New chat';
@@ -59,14 +85,8 @@ function ProjectWorkspaceShell({
     if (planNameOf(id)) {
       return `Plan: ${planNameOf(id)}`;
     }
-    for (const project of projects) {
-      const session = project.sessions?.find((s) => s.id === id);
-      if (session) {
-        return String(session.summary || session.name || 'New chat');
-      }
-    }
-    return `chat ${id.slice(0, 8)}`;
-  }, [projects]);
+    return loadedName(id) ?? fetchedNames[id] ?? `chat ${id.slice(0, 8)}`;
+  }, [loadedName, fetchedNames]);
 
   // Status dots (useLiveChats): the chats on screen are each pane's active tab; showing a chat marks it seen.
   useEffect(() => {
