@@ -139,6 +139,10 @@ Earlier rulings that still stand, verbatim:
 > meaning live chats that are not closed take precedence over tickets.
 > which is why i expected to see 5 chats on the top of the queue
 
+2026-10-26 21:56, verbatim (about ticket 7, "oct_12 Argus and rubrics before delivery", still open on GitHub while its chat was finalized on 2026-10-14):
+
+> so it should be demoted back to a ticket level and the priority rule should demote closed chats back to ticket level if they were not closed
+
 ## The requirements, as read
 
 ### Sources
@@ -159,6 +163,7 @@ Earlier rulings that still stand, verbatim:
 | 6.1 | Closing a root that still has open blockers raises a popup first: "are you sure", with an explanation of what is flagged as its blockers. The options: "yes"; convert the blockers to quests; convert them to side quests; close the blockers too; other (a kind Noam types). The popup comes up both in the chats (the ticket-work close step and the finalize-chat skill, in salomonskinoam/tickets) and in the quests page. | 20:35, 21:05 |
 | 7 | A permission prompt ranks above everything: a chat waiting on a permission prompt in the lowest family ranks above every entry of the highest family. | 28, 20:11 |
 | 7.1 | Below the permission prompts (and the latched chat), every entry with a chat (a claimed ticket, or a chat with no ticket) ranks above every ticket no chat has claimed, whatever the kinds: a claimed side quest ranks above an unclaimed blocker or quest. The family rules order entries only inside each of these two levels. | 26 Oct 21:41 |
+| 7.2 | A claim by a closed chat (one that ran /finalize-chat) does not count. A ticket still open whose chat was closed drops back to the ticket level of rule 7.1, as a ticket no chat has claimed; clicking it starts a new chat for it. | 26 Oct 21:56 |
 | 8 | Entries with the same priority are ordered by kind of wait: permission prompt, then question, then Done; oldest first inside each. | 23, 28, 34 |
 | 9 | Noam changes one thing by hand: the place of a root. Never the order inside a family, and never across the levels of rules 7 and 8. | 28 |
 | 10 | Dragging a root moves the root alone. Entries of other families may end up between members of its family, above them or below them. When the root would pass a member of its own family that must stay on the other side, that member joins the dragged block; the block grows each time and moves on as one block. | 23, 20:11 |

@@ -173,7 +173,9 @@ function isFinalizeCommand(line: string): boolean {
 export async function noteTranscript(file: string): Promise<void> {
   if (!file.endsWith('.jsonl') || file.includes(`${path.sep}subagents${path.sep}`)) return;
   const sid = path.basename(file, '.jsonl');
-  const lines = await readTail(file, 256 * 1024);
+  // A /finalize-chat run writes a lot (merges, audits): the command can sit hundreds of KB before the end
+  // (371 KB on 2026-10-14's "oct_12 Argus and rubrics before delivery"), so read 8 MB back.
+  const lines = await readTail(file, 8 * 1024 * 1024);
   let kind: string | null = null;
   let text: string | null = null;
   let at: string | null = null;

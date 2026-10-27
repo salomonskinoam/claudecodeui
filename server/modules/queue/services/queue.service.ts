@@ -45,12 +45,14 @@ export function buildEntries(): QueueEntry[] {
   const lines = new Map(queueDb.listChats().map((c) => [c.provider_session_id, c]));
   const open = new Set(tickets.map((t) => t.number));
 
-  // A ticket shows its newest claimant. A chat's own ticket is the open one it claimed without an open
-  // parent, else the first it claimed (the rule of the tickets' session start hook).
+  // A ticket shows its newest claimant whose chat is still open. A claim by a closed (finalized) chat does not
+  // count: the ticket drops back to the ticket level, as if unclaimed (Noam 2026-10-27). A chat's own ticket is
+  // the open one it claimed without an open parent, else the first it claimed (the tickets' session start hook).
+  const closed = (sid: string) => lines.get(sid)?.finalized === 1;
   const claimant = new Map<number, string>();
   const ticketOf = new Map<string, number>();
   for (const t of tickets) {
-    const c = t.claims[t.claims.length - 1];
+    const c = t.claims.filter((x) => !closed(x.sid)).pop();
     if (c) claimant.set(t.number, c.sid);
     const isRoot = !(t.parent && t.parent.state === 'OPEN' && open.has(t.parent.number));
     for (const { sid } of t.claims) if (!ticketOf.has(sid) || isRoot) ticketOf.set(sid, t.number);

@@ -110,3 +110,4 @@ One ordered queue of chats and tickets that brings the user the next thing that 
 | 64 | Tabs in their family's color | A tab whose chat is in the queue has its family's background color, the same as its line and its node; the active tab keeps its red bottom edge. | built |
 | 65 | No logos | No logo anywhere: no provider logos in rows, menus or settings, no app logo on the login screens, no update banner with its icon (the version line at the bottom of the sidebar offers "update" instead). | built |
 | 66 | Tab names for older chats | A tab whose chat is not among the chats the page has loaded asks the server for the chat's name once, so it shows the name (rename, else Claude's title) instead of "chat <id>". | built |
+| 67 | Closed chats drop to ticket level | A ticket still open whose chat was closed (it ran /finalize-chat) counts as a ticket no chat has claimed: it sits with the tickets, below every open chat, and clicking it starts a new chat for it. | built |
