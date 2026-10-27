@@ -317,12 +317,16 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'synccursor') {
-    // "Sync from Cursor" puts the chats open in Cursor on top of the list (it changes the real order, as asked).
+    // "Sync from Cursor" puts the chats open in Cursor on top of the list (it changes the real order, as asked) and
+    // makes them the left pane's tabs, showing the first. Every line's name starts at the same x (no false indent).
     const lines = async () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.slice(0, 9).map((n) => n.title));
-    const before = await lines();
+    const state = async () => page.evaluate(() => ({ url: location.pathname, left: JSON.parse(localStorage.getItem('quests-panes') || '{}').left }));
+    const before = { lines: await lines(), ...(await state()) };
     await page.locator('[data-quests-queue="sync-cursor"]').click();
-    await page.waitForTimeout(1500);
-    console.log(JSON.stringify({ before, after: await lines() }, null, 1));
+    await page.waitForTimeout(3000);
+    const textX = await page.locator('[data-quests-queue="list"] [data-queue-key] span.truncate').evaluateAll((ns) => [...new Set(ns.map((n) => Math.round(n.getBoundingClientRect().left)))]);
+    console.log(JSON.stringify({ before, after: { lines: await lines(), ...(await state()) }, textX, latch: (await apiQueue()).latch }, null, 1));
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   }
 
   if (check === 'newtab') {

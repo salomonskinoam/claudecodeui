@@ -94,6 +94,7 @@ export function buildEntries(): QueueEntry[] {
       chatName: sid ? chatName(sid) : null,
       projectPath: s?.project_path ?? null,
       heldOutside: sid ? OUTSIDE.has(live.get(sid)?.entrypoint ?? '') || tabs.has(sid) : false,
+      open: sid ? live.has(sid) || tabs.has(sid) : false,
     };
   };
 
@@ -191,14 +192,21 @@ export function getQueue() {
   return { entries, order, latch, view: viewOrder(order, latch, entries) };
 }
 
-/** "Sync from Cursor": the chats open in Cursor (its Claude tabs in tab order, then live Cursor chats) jump to the top. */
+/**
+ * "Sync from Cursor": the chats open in Cursor (its Claude tabs in tab order, then live Cursor chats) jump to the
+ * top, and the latch is released so nothing sits above them. Returns their page session ids too: the page opens
+ * them as its tabs.
+ */
 export function syncFromCursor() {
   const entries = buildEntries();
   const cursor = [...getLive()].filter(([, p]) => p.entrypoint === 'claude-vscode').map(([sid]) => sid);
-  const keys = [...getCursorTabs(), ...cursor].map((sid) => entries.find((e) => e.providerSessionId === sid)?.key)
-    .filter((k): k is string => Boolean(k));
-  store(liftOrder(repair(queueDb.getState<string[]>('order') ?? [], entries), entries, [...new Set(keys)]));
-  return getQueue();
+  const synced = [...new Set([...getCursorTabs(), ...cursor])]
+    .map((sid) => entries.find((e) => e.providerSessionId === sid))
+    .filter((e): e is QueueEntry => Boolean(e));
+  store(liftOrder(repair(queueDb.getState<string[]>('order') ?? [], entries), entries, synced.map((e) => e.key)));
+  queueDb.setState('latch', null);
+  scheduleMirror();
+  return { ...getQueue(), cursorSessionIds: synced.map((e) => e.sessionId).filter((id): id is string => Boolean(id)) };
 }
 
 export function setOrder(order: string[]) {

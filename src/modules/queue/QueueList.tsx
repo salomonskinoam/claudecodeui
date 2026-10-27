@@ -9,10 +9,10 @@ import { openRightTab } from '@/shared/hooks/useSplitPane';
 import CloseTicketDialog from '@/modules/queue/CloseTicketDialog';
 import KindSign from '@/modules/queue/KindSign';
 import {
-  dragQueue, familyColors, previewQueue, setQueueHover, setQueueLatch, syncQueueFromCursor, useQueue, useQueueHover,
+  dragQueue, familyColors, previewQueue, setQueueHover, setQueueLatch, useQueue, useQueueHover,
 } from '@/modules/queue/useQueue';
 import type { QueueEntry } from '@/modules/queue/useQueue';
-import { setQueueOpener } from '@/modules/queue/queueNavigation';
+import { setQueueOpener, syncTabsFromCursor } from '@/modules/queue/queueNavigation';
 
 const DRAG_TYPE = 'application/x-quests-queue';
 
@@ -100,26 +100,26 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
 
   return (
     <div className="flex flex-col" data-quests-queue="list">
-      <div className="mx-2 mb-1 flex">
+      {[
+        { label: 'New Session', icon: Plus, onClick: onNewSession, id: 'new-session', title: 'A new empty chat' },
+        {
+          label: 'Sync from Cursor', icon: RefreshCw, onClick: () => void syncTabsFromCursor(), id: 'sync-cursor',
+          title: "The chats open in Cursor go on top of the queue and become this page's tabs",
+        },
+      ].map(({ label, icon: Icon, onClick, id, title }) => (
         <button
+          key={id}
           type="button"
-          className="flex h-[26px] flex-1 items-center gap-2 rounded-sm px-2 text-[13px] text-[#7f8081] hover:bg-[#2a2d2e]"
-          onClick={onNewSession}
+          data-quests-queue={id}
+          title={title}
+          className="mx-2 flex h-[26px] items-center gap-2 whitespace-nowrap rounded-sm px-2 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e]"
+          onClick={onClick}
         >
-          <Plus className="h-3 w-3" />
-          New Session
+          <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+          {label}
         </button>
-        <button
-          type="button"
-          data-quests-queue="sync-cursor"
-          title="Put the chats open in Cursor on top, in Cursor's tab order"
-          className="flex h-[26px] items-center gap-2 rounded-sm px-2 text-[13px] text-[#7f8081] hover:bg-[#2a2d2e]"
-          onClick={() => void syncQueueFromCursor()}
-        >
-          <RefreshCw className="h-3 w-3" />
-          Sync from Cursor
-        </button>
-      </div>
+      ))}
+      <div className="mb-1" />
       <div
         onDragOver={(event) => { if (dragged.current) event.preventDefault(); }}
         onDrop={(event) => {
@@ -130,8 +130,10 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
           if (key) void dragQueue(key, before);
         }}
       >
-        {keys.map((key) => {
+        {keys.map((key, i) => {
           const e = byKey.get(key)!;
+          // The separator: above it the chats open right now, below it the rest.
+          const separator = i > 0 && byKey.get(keys[i - 1])!.open && !e.open;
           const dot = e.sessionId ? dots[e.sessionId] : undefined;
           const isRoot = e.rootKey === e.key && e.state !== 'permission';
           const isShown = e.sessionId !== null && e.sessionId === shownSessionId;
@@ -156,6 +158,7 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
                 isShown && 'outline outline-1 outline-[#3794ff]',
                 hover === key && 'ring-1 ring-inset ring-white/80 brightness-150',
                 blinking.has(key) && 'animate-pulse',
+                separator && 'mt-[7px] before:absolute before:-top-[5px] before:left-0 before:right-0 before:h-[2px] before:bg-[#8a8a8a]',
               )}
               style={{ backgroundColor: colors.get(e.rootKey) }}
             >
@@ -163,7 +166,8 @@ export default function QueueList({ shownSessionId, onNewSession, onStartTicket 
                 className={cn('h-2 w-2 flex-shrink-0 rounded-full', dot === 'running' && 'animate-pulse')}
                 style={{ backgroundColor: dot ? CHAT_DOT_STYLE[dot].color : 'transparent' }}
               />
-              <KindSign kind={e.kind} />
+              {/* A chat with no ticket keeps the sign's slot, so no line looks indented under another. */}
+              {e.kind === 'chat' ? <span className="w-3 flex-shrink-0" /> : <KindSign kind={e.kind} />}
               <span className="min-w-0 flex-1 truncate">{e.title}</span>
               {queue.latch === key && (
                 <button type="button" title="Release from the top" className="opacity-70 hover:opacity-100"

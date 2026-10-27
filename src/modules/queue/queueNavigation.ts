@@ -1,4 +1,5 @@
-import { currentQueue, setQueueLatch } from '@/modules/queue/useQueue';
+import { setLeftTabs } from '@/shared/hooks/useSplitPane';
+import { currentQueue, setQueueLatch, syncQueueFromCursor } from '@/modules/queue/useQueue';
 import type { QueueEntry } from '@/modules/queue/useQueue';
 
 /**
@@ -32,6 +33,16 @@ export function noteShownChat(sessionId: string | null): void {
   if (!left || !leftQuietly) return;
   const entry = currentQueue().entries.find((e) => e.sessionId === left);
   if (entry && !entry.heldOutside) void setQueueLatch(entry.key).catch((error: unknown) => console.error(error));
+}
+
+/** "Sync from Cursor": the chats open in Cursor go on top of the queue and become the left pane's tabs. */
+export async function syncTabsFromCursor(): Promise<void> {
+  const ids = await syncQueueFromCursor();
+  const first = currentQueue().entries.find((e) => e.sessionId === ids[0]);
+  if (!first || !opener) return;
+  if (first.sessionId !== shown) viaNext = true; // a sync is not a switch by hand: it never latches
+  opener(first);
+  setLeftTabs(ids);
 }
 
 export function openNextInQueue(): boolean {

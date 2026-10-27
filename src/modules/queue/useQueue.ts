@@ -26,6 +26,8 @@ export type QueueEntry = {
   rootKey: string;
   needsNoam: boolean;
   heldOutside: boolean;
+  /** Open right now: a live Claude Code process, or a Claude tab in Cursor. The list draws a line under these. */
+  open: boolean;
   closingLine: string | null;
   parentChatSid: string | null;
   openBlockers: number[];
@@ -42,7 +44,7 @@ let timer: number | null = null;
 
 const publish = () => listeners.forEach((l) => l());
 
-async function call(method: string, route: string, body?: unknown): Promise<void> {
+async function call(method: string, route: string, body?: unknown): Promise<unknown> {
   const response = await authenticatedFetch(`/api/quests/queue${route}`, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
@@ -54,6 +56,7 @@ async function call(method: string, route: string, body?: unknown): Promise<void
     queue = json.data;
     publish();
   }
+  return json.data;
 }
 
 let openTabs: string[] | null = null;
@@ -69,7 +72,9 @@ export async function previewQueue(key: string, beforeKey: string | null): Promi
 export const dragQueue = (key: string, beforeKey: string | null) => call('PUT', '/drag', { key, beforeKey });
 export const setQueueLatch = (key: string | null) => call('PUT', '/latch', { key });
 export const closeQueueTicket = (number: number, choice: string) => call('POST', '/close', { number, choice });
-export const syncQueueFromCursor = () => call('POST', '/sync-cursor', {});
+/** Puts the chats open in Cursor on top; returns their page session ids, in Cursor's tab order. */
+export const syncQueueFromCursor = async () =>
+  ((await call('POST', '/sync-cursor', {})) as { cursorSessionIds: string[] }).cursorSessionIds;
 
 /**
  * The chats open as tabs (page session ids, in tab order) join the queue. Every poll reports them,

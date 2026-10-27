@@ -75,6 +75,9 @@ export const openLeftTab = (id: string) =>
 export const replaceNewChatTab = (id: string) =>
   write((p) => ({ ...p, left: p.left.includes(id) ? without(p.left, NEW_CHAT_TAB) : p.left.map((x) => (x === NEW_CHAT_TAB ? id : x)) }));
 
+/** The left pane's tabs become `ids` (a chat already in the right pane stays there). */
+export const setLeftTabs = (ids: string[]) => write((p) => ({ ...p, left: ids.filter((id) => !p.right.includes(id)) }));
+
 export const closeLeftTab = (id: string) => write((p) => ({ ...p, left: without(p.left, id) }));
 
 export const openRightTab = (id: string) =>

@@ -71,6 +71,14 @@ test('entries with a chat rank above tickets no chat has claimed, whatever their
   assert.deepEqual(view(['U', 'B', 'R', 'S', 'P'], 'S', c), ['P', 'R', 'S', 'B', 'U']);
 });
 
+test('chats open right now form the first level, the latched entry leads its own level', () => {
+  const o = [e('A', 'quest', { state: 'running' }), e('B', 'chat', { open: true }), e('U', 'quest', { state: 'unclaimed' }),
+    e('C', 'chat', { open: true }), e('P', 'chat', { state: 'permission', open: true })];
+  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], null, o), ['P', 'B', 'C', 'A', 'U']);
+  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'C', o), ['P', 'C', 'B', 'A', 'U']);
+  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'U', o), ['P', 'B', 'C', 'A', 'U']);
+});
+
 test('sync from Cursor lifts the given keys to the top in their order, each with its family block', () => {
   assert.deepEqual(lift(['A', 'B', 'C', 'U'], [e('A', 'chat'), e('B', 'chat'), e('C', 'chat'), e('U', 'chat')], ['C', 'A']),
     ['C', 'A', 'B', 'U']);
