@@ -3,11 +3,15 @@ import type { Queue } from '@/modules/queue/types';
 
 /**
  * quests priority queue: one color per family, the same on the list, the forest and the tabs, and STATIC: a family
- * keeps the color it got for good (kept in the browser), whatever moves or arrives. Ten dark colors far apart; a new
- * family takes the color worn by the fewest families, an open family (group 0) weighing as much as a hundred others,
- * so the open chats stay apart while the closed chats and the unclaimed tickets share.
+ * keeps the color it got for good (kept in the browser), whatever moves or arrives. Ten dark colors far apart, each
+ * in three shades; a new family takes the color worn by the fewest families, an open family (group 0) weighing as
+ * much as a hundred others, so the open chats stay apart and the next families get a lighter shade of a worn color.
  */
-const PALETTE = ['#1f4e79', '#7a4a10', '#2d5a27', '#6b1f52', '#16585e', '#6b2020', '#5e5e14', '#2a3a8a', '#4b5260', '#4b2a6b'];
+const BASE = ['#1f4e79', '#7a4a10', '#2d5a27', '#6b1f52', '#16585e', '#6b2020', '#5e5e14', '#2a3a8a', '#4b5260', '#4b2a6b'];
+const lighten = (hex: string, f: number): string =>
+  '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - f) + 255 * f).toString(16).padStart(2, '0')).join('');
+/** The ten colors, then the same ten 18% lighter, then 36% lighter: thirty, the darkest shades taken first. */
+const PALETTE = [0, 0.18, 0.36].flatMap((f) => BASE.map((c) => lighten(c, f)));
 const STORE = 'quests-family-colors';
 
 const readSaved = (): Record<string, string> => {
