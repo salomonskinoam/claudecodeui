@@ -8,6 +8,6 @@ export { default as QueueForest } from '@/modules/queue/QueueForest';
 export { default as OutsideChatBanner } from '@/modules/queue/OutsideChatBanner';
 export { default as KindSign } from '@/modules/queue/KindSign';
 export { useQueueLook } from '@/modules/queue/useQueueLook';
-export { reportQueueTabs, useQueue } from '@/modules/queue/queueStore';
+export { reportPageTabs, useQueue } from '@/modules/queue/queueStore';
 export type { Queue, QueueEntry, QueueKind } from '@/modules/queue/types';
 export { noteSentInChat, noteShownChat, noteSwitchKeepsPlace, openNextInQueue } from '@/modules/queue/queueNavigation';

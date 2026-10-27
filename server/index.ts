@@ -47,7 +47,7 @@ import {
     initializeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
-import { closeQueue, initializeQueue, queueRoutes } from './modules/queue/index.js';
+import { closeQueue, initializeQueue, processStates, queueRoutes } from './modules/queue/index.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -265,34 +265,10 @@ app.get('/api/quests/plan/:name', authenticateToken, async (req: Request, res: R
 });
 
 // quests: live state of every chat, for the tab dots. { appSessionId: 'running' | 'waiting' }; idle chats are absent.
-// Chats in an IDE or terminal: Claude Code's registry, one file per live process in ~/.claude/sessions, whose
-// status is busy, waiting (a prompt waits on the user, waitingFor says which) or idle. Chats run from this page
-// are not in that registry: their state comes from this server's runs and pending permission prompts.
+// Chats in an IDE or terminal come from the chats model (Claude Code's registry, read every 2 seconds). Chats run
+// from this page are not in that registry: their state comes from this server's runs and pending permission prompts.
 app.get('/api/quests/live', authenticateToken, async (_req: Request, res: Response) => {
-    const states: Record<string, 'running' | 'waiting'> = {};
-    const registryDir = path.join(os.homedir(), '.claude', 'sessions');
-    for (const file of await fsPromises.readdir(registryDir)) {
-        if (!file.endsWith('.json')) continue;
-        let entry;
-        try {
-            entry = JSON.parse(await fsPromises.readFile(path.join(registryDir, file), 'utf8'));
-        } catch (error) {
-            // The process exited between readdir and read, or is rewriting its file right now.
-            if ((error as NodeJS.ErrnoException).code === 'ENOENT' || error instanceof SyntaxError) continue;
-            throw error;
-        }
-        try {
-            process.kill(entry.pid, 0);
-        } catch {
-            continue; // a leftover file of a process that has exited
-        }
-        const state = entry.status === 'busy' ? 'running' : entry.status === 'waiting' ? 'waiting' : null;
-        if (state && entry.sessionId) {
-            const id = sessionsDb.getSessionByProviderSessionId(entry.sessionId)?.session_id ?? entry.sessionId;
-            // One chat with two live processes: running wins, whatever order the files are read in.
-            if (states[id] !== 'running') states[id] = state;
-        }
-    }
+    const states = processStates();
     for (const run of chatRunRegistry.listRunningRuns()) {
         states[run.sessionId] = providerRuntimeService.getPendingApprovalsForSession(run.sessionId).length > 0 ? 'waiting' : 'running';
     }

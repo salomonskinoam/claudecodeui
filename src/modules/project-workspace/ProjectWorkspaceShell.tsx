@@ -10,7 +10,7 @@ import SplitDropZone, { type SplitSide } from '@/modules/project-workspace/Split
 import { useTabDragging } from '@/modules/project-workspace/tabDrag';
 import { PlanView } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
-import { noteShownChat, noteSwitchKeepsPlace, reportQueueTabs } from '@/modules/queue';
+import { noteShownChat, noteSwitchKeepsPlace, reportPageTabs } from '@/modules/queue';
 import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -103,7 +103,7 @@ function ProjectWorkspaceShell({
   }, [showTabs, sessionId]);
   // quests priority queue: the chats open as tabs rank at the top of the queue (the user chose to open them).
   useEffect(() => {
-    if (showTabs) reportQueueTabs([...panes.left, ...panes.right].filter((id) => id !== NEW_CHAT_TAB && !planNameOf(id)));
+    if (showTabs) reportPageTabs([...panes.left, ...panes.right].filter((id) => id !== NEW_CHAT_TAB && !planNameOf(id)));
   }, [showTabs, panes.left, panes.right]);
   const dots = useChatDots();
   const dotOf = useCallback((id: string): ChatDot | null => dots[id] ?? null, [dots]);

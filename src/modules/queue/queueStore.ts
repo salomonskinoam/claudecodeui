@@ -45,7 +45,7 @@ const windowId = crypto.randomUUID();
 let openTabs: string[] | null = null;
 const refresh = () => (openTabs ? request('PUT', '/tabs', { windowId, sessionIds: openTabs }) : request('GET', ''));
 
-export function reportQueueTabs(sessionIds: string[]): void {
+export function reportPageTabs(sessionIds: string[]): void {
   if (openTabs?.join() === sessionIds.join()) return;
   openTabs = sessionIds;
   void refresh().catch((error: unknown) => console.error(error));
