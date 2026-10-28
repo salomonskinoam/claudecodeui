@@ -12,6 +12,7 @@ Three things exist, each with one home, and the views read them.
 | Chats | One record per chat this machine knows: its name, its running process (if any), where it is open right now (Cursor, the Claude desktop app, a terminal, this page), its last closing line, whether /finalize-chat ran. A chat is open when a process runs it or a tab holds it somewhere. | `server/modules/queue/chats.ts`, joined on every read from the readers in `sources/` | The queue (its entries, the open group, read-only in the page) and the status dots (`/api/quests/live`) |
 | Tickets | The open GitHub issues of salomonskinoam/tickets, with their kind, parent, blocks and claims | `server/modules/queue/sources/tickets.ts` | The queue |
 | The queue | The entries (a ticket with its claiming chat, or a chat without a ticket), the stored order with the "on top" mark, and the rules (`queue-order.ts`) that give the view | `server/modules/queue/queue.service.ts` | The list and the forest in the sidebar; the tab rows, for a tab's color, sign and hover |
+| The family colors | Which color each family wears: the palette, the rule (a pure function, `assignColors`) and the memory in the browser that keeps a color for good | `src/modules/queue/familyColors.ts`, test `src/modules/queue/tests/familyColors.test.ts` | The list, the forest and the tab rows, by a root key lookup only |
 
 The page's tabs are the page's own place: the page owns them (`src/shared/hooks/useSplitPane.ts`) and reports them to the chats
 model. "Sync from Cursor" copies Cursor's place into the page's.
