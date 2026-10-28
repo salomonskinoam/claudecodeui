@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useShownChat } from '@/modules/queue/shownChat';
 import { isChat, type Queue } from '@/modules/queue/types';
 
 /**
  * quests priority queue: the lines that blink. An entry ranked above the shown chat blinks from the moment it turns
  * ready for the user until it is opened or is no longer ready.
  */
-export function useBlink(queue: Queue, shownSessionId: string | null): Set<string> {
+export function useBlink(queue: Queue): Set<string> {
+  const shownSessionId = useShownChat();
   const wasReady = useRef(new Map<string, boolean>());
   const [blinking, setBlinking] = useState<Set<string>>(new Set());
   useEffect(() => {

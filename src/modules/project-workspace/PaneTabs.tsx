@@ -3,7 +3,7 @@ import type { DragEvent } from 'react';
 
 import { type ChatDot, CHAT_DOT_STYLE } from '@/shared/hooks/useLiveChats';
 import { cn } from '@/shared/utils';
-import { KindSign, useQueueLook } from '@/modules/queue';
+import { KindSign, useChatLook } from '@/modules/queue';
 import { TAB_DRAG_TYPE } from '@/modules/project-workspace/tabDrag';
 
 type PaneTabsProps = {
@@ -29,7 +29,7 @@ type PaneTabsProps = {
 function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf, onDropTab, onNewChat }: PaneTabsProps) {
   // Where a dragged tab would land: before this id, or null for the end of the row; undefined while no drag.
   const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined);
-  const lookOf = useQueueLook();
+  const lookOf = useChatLook();
 
   const targetOf = (event: DragEvent<HTMLElement>, id: string): string | null => {
     const rect = event.currentTarget.getBoundingClientRect();

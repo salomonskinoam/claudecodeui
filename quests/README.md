@@ -17,6 +17,21 @@ Three things exist, each with one home, and the views read them.
 The page's tabs are the page's own place: the page owns them (`src/shared/hooks/useSplitPane.ts`) and reports them to the chats
 model. "Sync from Cursor" copies Cursor's place into the page's.
 
+On the server, `chats.ts` is the only module that reads the sources (`sources/`); the service (`queue.service.ts`) asks the chats
+and the entries, never a source. On the page (`src/modules/queue/`), each piece of state has one home and the widgets only paint:
+
+| Page module | One responsibility |
+|---|---|
+| `queueStore.ts` | The page's copy of the queue and every call that changes it |
+| `shownChat.ts` | The chat on screen in the left pane, and the latch a chat takes when left quietly |
+| `queueHover.ts` | The entry under the mouse, one key for all widgets |
+| `familyColors.ts` | Which color a family wears |
+| `entryLook.ts` | The look of an entry (color, shown, hover) joined once for the list, the forest and the tabs |
+| `queueNavigation.ts` | Moving between chats: next, Sync from Cursor, how an entry is opened |
+| `EntryDot.tsx`, `EntryTitle.tsx`, `KindSign.tsx` | The pieces of a line: the dot, "#n title" or the chat's name, the kind's sign |
+| `QueueList.tsx`, `QueueLine.tsx`, `QueueForest.tsx`, `QueueToolbar.tsx`, `CloseTicketDialog.tsx`, `OutsideChatBanner.tsx` | The widgets |
+| `useLineDrag.ts`, `useBlink.ts`, `useOpenEntry.ts` | Dragging a line, the blink, opening an entry |
+
 | Path | What | Installed as |
 |---|---|---|
 | `system/quests-ui.service` | The page's server as a user service, on 127.0.0.1:3001, started at login | Link: `~/.config/systemd/user/quests-ui.service`, enabled (`default.target.wants`) |

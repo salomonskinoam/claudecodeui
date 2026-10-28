@@ -1,8 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 
-import { dragTo, getQueue, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
-import { setPageTabs } from '@/modules/queue/sources/page-tabs.js';
+import { dragTo, getQueue, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
 import { closeTicket, type CloseChoice } from '@/modules/queue/sources/tickets.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -22,8 +21,7 @@ router.get('/', asyncHandler(async (_req: Request, res: Response) => {
 router.put('/tabs', asyncHandler(async (req: Request, res: Response) => {
   const { windowId, sessionIds } = req.body ?? {};
   if (typeof windowId !== 'string' || !keys(sessionIds)) throw bad('windowId and a list of sessionIds are required.');
-  setPageTabs(windowId, sessionIds);
-  res.json(createApiSuccessResponse(getQueue()));
+  res.json(createApiSuccessResponse(reportPageTabs(windowId, sessionIds)));
 }));
 
 router.put('/order', asyncHandler(async (req: Request, res: Response) => {

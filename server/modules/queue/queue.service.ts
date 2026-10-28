@@ -1,8 +1,9 @@
+import { chatsIn } from '@/modules/queue/chats.js';
 import { buildEntries, type QueueEntry } from '@/modules/queue/entries.js';
 import { readLatch, readOrder, writeLatch, writeOrder } from '@/modules/queue/order-store.js';
 import { drag, lift, repair, view } from '@/modules/queue/queue-order.js';
-import { getCursorTabs } from '@/modules/queue/sources/cursor-tabs.js';
-import { getLive } from '@/modules/queue/sources/live.js';
+import { setPageTabs } from '@/modules/queue/sources/page-tabs.js';
+import { noteTranscriptOnce } from '@/modules/queue/sources/transcripts.js';
 
 /** quests priority queue: what the page asks of the queue. Each call answers with the whole queue. */
 
@@ -34,16 +35,21 @@ export function setLatch(key: string | null): Queue {
   return getQueue();
 }
 
+/** A page window reports its tabs; a chat the queue never read gets its transcript read now, for its name and state. */
+export function reportPageTabs(windowId: string, pageSessionIds: string[]): Queue {
+  setPageTabs(windowId, pageSessionIds);
+  for (const c of chatsIn('page')) if (c.transcriptPath) noteTranscriptOnce(c.sid, c.transcriptPath);
+  return getQueue();
+}
+
 /**
- * "Sync from Cursor": the chats open in Cursor (its Claude tabs in tab order, then live Cursor chats) jump to the
- * top, and the latch is released so nothing sits above them. Answers their page session ids too: the page opens
- * them as its tabs.
+ * "Sync from Cursor": the chats open in Cursor jump to the top, in Cursor's tab order, and the latch is released
+ * so nothing sits above them. Answers their page session ids too: the page opens them as its tabs.
  */
 export function syncFromCursor(): Queue & { cursorSessionIds: string[] } {
   const entries = buildEntries();
-  const cursor = [...getLive()].filter(([, p]) => p.entrypoint === 'claude-vscode').map(([sid]) => sid);
-  const synced = [...new Set([...getCursorTabs(), ...cursor])]
-    .map((sid) => entries.find((e) => e.providerSessionId === sid))
+  const synced = chatsIn('cursor')
+    .map((c) => entries.find((e) => e.providerSessionId === c.sid))
     .filter((e): e is QueueEntry => Boolean(e));
   writeOrder(lift(repair(readOrder(), entries), entries, synced.map((e) => e.key)));
   writeLatch(null);

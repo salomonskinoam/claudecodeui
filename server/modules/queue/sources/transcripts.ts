@@ -90,6 +90,14 @@ export async function noteTranscript(file: string): Promise<void> {
   });
 }
 
+/** Reads a chat's transcript once, in the background, if it was never read (a chat that just appeared as a tab). */
+const read = new Set<string>();
+export function noteTranscriptOnce(sid: string, file: string): void {
+  if (read.has(sid) || titles.has(sid)) return;
+  read.add(sid);
+  void noteTranscript(file).catch(() => undefined);
+}
+
 /** At start: the chats changed in the last 14 days. */
 export async function noteRecentTranscripts(): Promise<void> {
   for (const s of queueDb.listClaudeSessions(14)) {

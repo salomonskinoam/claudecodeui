@@ -2,18 +2,17 @@ import type { MouseEvent } from 'react';
 import { CircleCheck, SquareArrowOutUpRight, X } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
-import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
+import EntryDot from '@/modules/queue/EntryDot';
+import type { EntryLook } from '@/modules/queue/entryLook';
+import EntryTitle from '@/modules/queue/EntryTitle';
 import KindSign from '@/modules/queue/KindSign';
-import { HOVER_CLASS, SHOWN_CLASS } from '@/modules/queue/looks';
-import { setQueueHover, useQueueHover } from '@/modules/queue/queueHover';
 import { setQueueLatch } from '@/modules/queue/queueStore';
 import type { QueueEntry } from '@/modules/queue/types';
 import type { LineMarker } from '@/modules/queue/useLineDrag';
 
 type QueueLineProps = {
   entry: QueueEntry;
-  color: string | undefined;
-  shown: boolean;
+  look: EntryLook;
   blinking: boolean;
   latched: boolean;
   /** A separator above this line: it opens a new group of the list. */
@@ -28,45 +27,32 @@ type QueueLineProps = {
 
 /**
  * quests priority queue: one line of the list. The chat's dot, the kind's sign, the title, and on the right the
- * release button of the latched line, the Cursor link, the ticket's GitHub link and its close button.
+ * release button of the latched line, the Cursor link and the ticket's close button.
  */
-export default function QueueLine({ entry: e, color, shown, blinking, latched, separator, marker, drag, onOpen, onCloseTicket }: QueueLineProps) {
-  const dots = useChatDots();
-  const dot = e.sessionId ? dots[e.sessionId] : undefined;
-  const hovered = useQueueHover() === e.key;
+export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket }: QueueLineProps) {
   return (
     <div
       data-queue-key={e.key}
       {...drag}
-      onMouseEnter={() => setQueueHover(e.key)}
-      onMouseLeave={() => setQueueHover(null)}
+      onMouseEnter={look.onMouseEnter}
+      onMouseLeave={look.onMouseLeave}
       onClick={onOpen}
       title={e.chatName ?? e.title}
       className={cn(
         'group relative mx-1 flex h-[26px] cursor-pointer items-center gap-2 rounded-sm px-2 text-[15px] text-[#cccccc]',
-        shown && SHOWN_CLASS,
-        hovered && HOVER_CLASS,
+        look.shownClass,
+        look.hoverClass,
         blinking && 'animate-pulse',
         separator && 'mt-[7px] before:absolute before:-top-[5px] before:left-0 before:right-0 before:h-[2px] before:bg-[#8a8a8a]',
       )}
-      style={{ backgroundColor: color }}
+      style={{ backgroundColor: look.color }}
     >
       {marker?.key === e.key && (
         <span className={cn('pointer-events-none absolute left-0 right-0 z-10 h-[3px] rounded-full bg-[#3794ff]', marker.below ? '-bottom-[2px]' : '-top-[2px]')} />
       )}
-      <span
-        className={cn('h-2 w-2 flex-shrink-0 rounded-full', dot === 'running' && 'animate-pulse')}
-        style={{ backgroundColor: dot ? CHAT_DOT_STYLE[dot].color : 'transparent' }}
-      />
+      <EntryDot sessionId={e.sessionId} className="h-2 w-2" />
       <KindSign kind={e.kind} />
-      {/* A ticket reads "#n title" (the number is its GitHub link); a chat reads its name. */}
-      {e.url && (
-        <a href={e.url} target="_blank" rel="noreferrer" title={`Ticket #${e.number} on GitHub`}
-          className="flex-shrink-0 text-[13px] text-[#9d9d9d] hover:text-[#3794ff]" onClick={(event) => event.stopPropagation()}>
-          #{e.number}
-        </a>
-      )}
-      <span className="min-w-0 flex-1 truncate">{e.title}</span>
+      <EntryTitle entry={e} className="min-w-0 flex-1 truncate" />
       {latched && (
         <button type="button" title="Release from the top" className="opacity-70 hover:opacity-100"
           onClick={(event) => { event.stopPropagation(); void setQueueLatch(null); }}>

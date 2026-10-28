@@ -676,9 +676,8 @@ export default function SidebarContent({
         ) : (
           // quests: the priority queue replaces the grouping by project; its forest sits above the list.
           <>
-          <QueueForest shownSessionId={projectListProps.selectedSession?.id ?? null} />
+          <QueueForest />
           <QueueList
-            shownSessionId={projectListProps.selectedSession?.id ?? null}
             onNewSession={() => {
               const project = projectListProps.selectedProject ?? projects[0];
               if (project) projectListProps.onNewSession(project);
