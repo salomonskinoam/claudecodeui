@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -348,6 +348,40 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       asExpected: rows.every(([, s], i) => s === expected[i]),
       groups: [0, 1, 2].map((g) => rows.filter(([k]) => group.get(k) === g).length),
     }));
+  }
+
+  if (check === 'livescroll') {
+    // Reading older messages while the transcript changes on disk: the reading position must not move. The pane
+    // is scrolled to the middle, a row in view is marked, the transcript's mtime is touched (the watcher reloads
+    // the chat), and the marked row's place is measured again 4 s later.
+    const jsonl = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
+      .prepare('select jsonl_path from sessions where session_id = ?').get(sessionId)?.jsonl_path;
+    await page.locator('.chat-messages-pane .chat-message').first().waitFor({ timeout: 40000 }).catch(() => undefined);
+    await page.waitForTimeout(2000);
+    await pane.evaluate((p) => { p.scrollTop = Math.round(p.scrollHeight * 0.5); });
+    await page.waitForTimeout(2500);
+    const measure = () => pane.evaluate((p) => {
+      const top = p.getBoundingClientRect().top;
+      let marker = p.querySelector('[data-quests-marker]');
+      if (!marker) {
+        marker = Array.from(p.querySelectorAll('.chat-message')).find((m) => m.getBoundingClientRect().top >= top);
+        marker?.setAttribute('data-quests-marker', '');
+      }
+      return { scrollTop: p.scrollTop, markerTop: marker ? Math.round(marker.getBoundingClientRect().top - top) : null, markerStillThere: Boolean(marker), rows: p.querySelectorAll('.chat-message').length, height: p.scrollHeight };
+    });
+    const before = await measure();
+    const now = new Date();
+    require('node:fs').utimesSync(jsonl, now, now);
+    // Then 30 s of watching, every 3 s: on a running chat, rows land meanwhile.
+    const samples = [];
+    for (let i = 0; i < 10; i++) {
+      await page.waitForTimeout(3000);
+      const m = await measure();
+      samples.push({ rows: m.rows, height: m.height, scrollTop: m.scrollTop, markerTop: m.markerTop });
+    }
+    const jumped = samples.some((s) => s.markerTop !== before.markerTop);
+    const rowsLanded = samples[samples.length - 1].rows - before.rows;
+    console.log(JSON.stringify({ jsonl: path.basename(jsonl), before, samples, rowsLanded, jumped }));
   }
 
   if (check === 'subagents') {

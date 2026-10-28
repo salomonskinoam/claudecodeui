@@ -814,12 +814,31 @@ export function useChatSessionState({
   useEffect(() => {
     if (!externalMessageUpdate || !selectedSession || !selectedProject) return;
 
+    // The first row in view, by its timestamp (every row carries one, also a lazy row's placeholder), and where
+    // its top sits below the pane's top.
+    const findAnchorRow = (pane: HTMLElement): { timestamp: string; offset: number } | null => {
+      const paneTop = pane.getBoundingClientRect().top;
+      for (const row of pane.querySelectorAll<HTMLElement>('[data-message-timestamp]')) {
+        const top = row.getBoundingClientRect().top;
+        if (top + row.offsetHeight > paneTop) {
+          return { timestamp: row.dataset.messageTimestamp ?? '', offset: top - paneTop };
+        }
+      }
+      return null;
+    };
+
     const reloadExternalMessages = async () => {
       try {
         // Skip store refresh during active streaming. quests: only while this page streams the run; a run
         // outside the page (an IDE or the CLI, not interruptible from here) reaches us only as transcript changes.
         if (!isProcessing || isRunOutsidePage) {
           const shouldStickToBottom = isActiveRef.current && isNearBottom();
+          // quests: reading older messages while the chat goes on. The reload can change the height of what is
+          // above the reading position (a tool group of a running chat grows and folds; a row re-renders), and a
+          // kept scrollTop then shows another place. The first row in view is the anchor: after the reload it is
+          // put back where it was, so new rows land below, out of view.
+          const container = scrollContainerRef.current;
+          const anchor = !shouldStickToBottom && container ? findAnchorRow(container) : null;
           await requestLatestMessages(selectedSession.id);
 
           if (shouldStickToBottom) {
@@ -828,6 +847,30 @@ export function useChatSessionState({
                 scrollToBottom();
               }
             }, 200);
+          } else if (anchor) {
+            // Rows settle for a while after the reload (lazy rows mount and measure), so the anchor is put back
+            // several times over two seconds; a scroll by the user in between ends it.
+            let expected = container?.scrollTop ?? 0;
+            const restore = () => {
+              const pane = scrollContainerRef.current;
+              if (!pane || pane.scrollTop !== expected) return;
+              const row = pane.querySelector<HTMLElement>(`[data-message-timestamp="${anchor.timestamp}"]`);
+              if (!row) return;
+              const moved = row.getBoundingClientRect().top - pane.getBoundingClientRect().top - anchor.offset;
+              if (moved !== 0) {
+                pane.scrollTop += moved;
+                expected = pane.scrollTop;
+              }
+            };
+            requestAnimationFrame(restore);
+            for (const ms of [250, 700, 1400, 2200]) setTimeout(restore, ms);
+            // And right as the content's height changes, so the correction lands in the same frame as the change.
+            const content = container?.firstElementChild ?? container;
+            if (content && typeof ResizeObserver !== 'undefined') {
+              const observer = new ResizeObserver(restore);
+              observer.observe(content);
+              setTimeout(() => observer.disconnect(), 3000);
+            }
           }
         }
       } catch (error) {
