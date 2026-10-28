@@ -12,6 +12,7 @@ Three things exist, each with one home, and the views read them.
 | Chats | One record per chat this machine knows: its name, its running process (if any), where it is open right now (Cursor, the Claude desktop app, a terminal, this page), its last closing line, whether /finalize-chat ran. A chat is open when a process runs it or a tab holds it somewhere. | `server/modules/queue/chats.ts`, joined on every read from the readers in `sources/` | The queue (its entries, the open group, read-only in the page) and the status dots (`/api/quests/live`) |
 | Tickets | The open GitHub issues of salomonskinoam/tickets, with their kind, parent, blocks and claims | `server/modules/queue/sources/tickets.ts` | The queue |
 | The queue | The entries (a ticket with its claiming chat, or a chat without a ticket), the stored order with the "on top" mark, and the rules (`queue-order.ts`) that give the view | `server/modules/queue/queue.service.ts` | The list and the forest in the sidebar; the tab rows, for a tab's color, sign and hover |
+| The dismissals | Which reply of which chat Noam dismissed (the trash icon): the chat is hidden while that reply is its last one | `server/modules/queue/dismissals.ts`, in the local database | The entries (`waitsForMe`) |
 | The family colors | Which color each family wears: the palette, the rule (a pure function, `assignColors`) and the memory in the browser that keeps a color for good | `src/modules/queue/familyColors.ts`, test `src/modules/queue/tests/familyColors.test.ts` | The list, the forest and the tab rows, by a root key lookup only |
 
 The page's tabs are the page's own place: the page owns them (`src/shared/hooks/useSplitPane.ts`) and reports them to the chats
@@ -28,6 +29,8 @@ and the entries, never a source. On the page (`src/modules/queue/`), each piece 
 | `familyColors.ts` | Which color a family wears |
 | `entryLook.ts` | The look of an entry (color, shown, hover) joined once for the list, the forest and the tabs |
 | `queueNavigation.ts` | Moving between chats: next, Sync from Cursor, how an entry is opened |
+| `queueView.ts` | What the list shows: focus (the chats that wait for Noam, the two collapsed groups) or archive (everything); the mode kept in the browser |
+| `DoneButton.tsx`, `DismissDialog.tsx`, `QueueGroupLine.tsx` | The DONE button of the composer, the trash's popup, a collapsed group line |
 | `EntryDot.tsx`, `EntryTitle.tsx`, `KindSign.tsx` | The pieces of a line: the dot, "#n title" or the chat's name, the kind's sign |
 | `QueueList.tsx`, `QueueLine.tsx`, `QueueForest.tsx`, `QueueToolbar.tsx`, `CloseTicketDialog.tsx`, `OutsideChatBanner.tsx` | The widgets |
 | `useLineDrag.ts`, `useBlink.ts`, `useOpenEntry.ts` | Dragging a line, the blink, opening an entry |

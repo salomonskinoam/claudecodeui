@@ -41,11 +41,24 @@ function parse(line: string): Record<string, any> | null {
   }
 }
 
-/** A user turn that ran /finalize-chat (the text alone also appears in replies that talk about it). */
+/**
+ * The chat was finalized: a user turn ran the /finalize-chat command (the text alone also appears in replies
+ * that talk about it), or the chat invoked the finalize-chat skill by words (a Skill tool call; the "oct_27 grpo
+ * dupe check #45" chat finalized that way and stayed listed).
+ */
+const FINALIZE_SKILL = '"skill":"finalize-chat"';
 const isFinalizeCommand = (line: string): boolean => {
-  if (!line.includes(FINALIZE) || !line.includes('"type":"user"')) return false;
-  const row = parse(line);
-  return row?.type === 'user' && typeof row.message?.content === 'string' && row.message.content.includes(FINALIZE);
+  if (line.includes(FINALIZE) && line.includes('"type":"user"')) {
+    const row = parse(line);
+    return row?.type === 'user' && typeof row.message?.content === 'string' && row.message.content.includes(FINALIZE);
+  }
+  if (line.includes(FINALIZE_SKILL) && line.includes('"name":"Skill"')) {
+    const row = parse(line);
+    return row?.type === 'assistant' && (row.message?.content ?? []).some(
+      (b: { type: string; name?: string; input?: { skill?: string } }) => b.type === 'tool_use' && b.name === 'Skill' && b.input?.skill === 'finalize-chat',
+    );
+  }
+  return false;
 };
 
 /** The closing line of the last reply, with the reply's time. */

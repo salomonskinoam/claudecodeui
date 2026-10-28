@@ -23,10 +23,11 @@ export type QueueOrderEntry = {
   open?: boolean;
 };
 
-const NEEDS_NOAM: ReadonlySet<QueueState> = new Set(['permission', 'question', 'done', 'unclaimed']);
+/** The states that wait for Noam's input: a permission prompt, a question, a Done he has not approved. A ticket no chat has claimed waits for nobody. */
+const WAITS: ReadonlySet<QueueState> = new Set(['permission', 'question', 'done']);
 const TIE: Partial<Record<QueueState, number>> = { permission: 0, question: 1, done: 2 };
 
-export const needsNoam = (e: QueueOrderEntry): boolean => NEEDS_NOAM.has(e.state);
+export const waitsForMe = (e: QueueOrderEntry): boolean => WAITS.has(e.state);
 
 /**
  * The three groups of the list, top to bottom: 0 the chats open right now, 1 the chats that were closed without
@@ -164,5 +165,5 @@ export function view(stored: string[], latch: string | null, entries: QueueOrder
 /** The first entry of the view that needs Noam and is not the shown one. */
 export function next(viewKeys: string[], entries: QueueOrderEntry[], current: string | null): string | null {
   const byKey = index(entries);
-  return viewKeys.find((k) => k !== current && needsNoam(byKey.get(k)!)) ?? null;
+  return viewKeys.find((k) => k !== current && waitsForMe(byKey.get(k)!)) ?? null;
 }

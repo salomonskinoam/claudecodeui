@@ -10,7 +10,7 @@ import SplitDropZone, { type SplitSide } from '@/modules/project-workspace/Split
 import { useTabDragging } from '@/modules/project-workspace/tabDrag';
 import { PlanView } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
-import { noteShownChat, noteSwitchKeepsPlace, reportPageTabs } from '@/modules/queue';
+import { noteShownChat, reportPageTabs } from '@/modules/queue';
 import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -97,7 +97,7 @@ function ProjectWorkspaceShell({
       setChatsInView([sessionId, showSplit ? panes.rightActive : null]);
     }
   }, [showTabs, sessionId, showSplit, panes.rightActive]);
-  // quests priority queue: a chat left without a message, by a switch made by hand, takes the "on top latch".
+  // quests priority queue: the chat on screen, for the list's marks and "Next".
   useEffect(() => {
     if (showTabs) noteShownChat(sessionId ?? null);
   }, [showTabs, sessionId]);
@@ -190,14 +190,12 @@ function ProjectWorkspaceShell({
   }, [leftActive, panes.left, showLeftTab]);
 
   // A tab dropped on the shown chat (SplitDropZone) splits the screen. Right half: the tab opens in the right
-  // pane. Left half: the tab takes the left pane and the shown chat moves to the right pane. Neither is a switch
-  // made by hand, so the chat that leaves the left pane does not take the queue's "on top latch".
+  // pane. Left half: the tab takes the left pane and the shown chat moves to the right pane.
   const tabDragging = useTabDragging();
   const dropSplit = useCallback((id: string, side: SplitSide) => {
     if (id === leftActive && side === 'left') {
       return;
     }
-    noteSwitchKeepsPlace();
     if (side === 'right') {
       dropTabRight(id, null);
       return;

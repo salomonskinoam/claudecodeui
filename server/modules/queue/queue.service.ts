@@ -1,4 +1,5 @@
 import { chatsIn } from '@/modules/queue/chats.js';
+import { dismiss } from '@/modules/queue/dismissals.js';
 import { buildEntries, type QueueEntry } from '@/modules/queue/entries.js';
 import { readLatch, readOrder, writeLatch, writeOrder } from '@/modules/queue/order-store.js';
 import { drag, lift, repair, view } from '@/modules/queue/queue-order.js';
@@ -32,6 +33,13 @@ export function dragTo(key: string, beforeKey: string | null): Queue {
 
 export function setLatch(key: string | null): Queue {
   writeLatch(key);
+  return getQueue();
+}
+
+/** The trash icon: hides the entry's chat until it replies again (its current reply is recorded as dismissed). */
+export function dismissEntry(key: string): Queue {
+  const entry = buildEntries().find((e) => e.key === key);
+  if (entry) dismiss(key, entry.replyAt ?? 'none');
   return getQueue();
 }
 

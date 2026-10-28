@@ -1,5 +1,6 @@
 import { getChats, isHeldOutside, isOpen, type Chat } from '@/modules/queue/chats.js';
-import { groupOf, needsNoam, rootOf, type QueueGroup, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
+import { dismissedAt } from '@/modules/queue/dismissals.js';
+import { groupOf, rootOf, waitsForMe, type QueueGroup, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import { getTickets, openBlockersOf, type Ticket } from '@/modules/queue/sources/tickets.js';
 
 /**
@@ -23,7 +24,14 @@ export type QueueEntry = QueueOrderEntry & {
   world: string | null;
   rootKey: string;
   group: QueueGroup;
-  needsNoam: boolean;
+  /** Waits for Noam's input: a permission prompt, or a question or Done he has not dismissed. The list shows these. */
+  waitsForMe: boolean;
+  /** The chat has a running process, whatever its state. */
+  live: boolean;
+  /** Noam dismissed the chat's current reply (the trash icon); over when it replies again. */
+  dismissed: boolean;
+  /** The time of the chat's last reply, the dismissal's key. */
+  replyAt: string | null;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
   heldOutside: boolean;
   closingLine: string | null;
@@ -60,6 +68,8 @@ const chatFields = (c: Chat | null) => ({
   closingLine: c?.closingLine ? `${c.closingLine.kind} ${c.closingLine.text}` : null,
   heldOutside: c ? isHeldOutside(c) : false,
   open: c ? isOpen(c) : false,
+  live: c?.process != null,
+  replyAt: c?.closingLine?.at ?? null,
 });
 
 export function buildEntries(): QueueEntry[] {
@@ -80,7 +90,7 @@ export function buildEntries(): QueueEntry[] {
     for (const { sid } of t.claims) if (!ticketOf.has(sid) || isRoot) ticketOf.set(sid, t.number);
   }
 
-  const entries: Omit<QueueEntry, 'rootKey' | 'group' | 'needsNoam'>[] = [];
+  const entries: Omit<QueueEntry, 'rootKey' | 'group' | 'waitsForMe' | 'dismissed'>[] = [];
   for (const t of tickets) {
     const chat = chats.get(claimant.get(t.number) ?? '') ?? null;
     const kind = kindOf(t);
@@ -108,5 +118,9 @@ export function buildEntries(): QueueEntry[] {
     });
   }
   const byKey = new Map(entries.map((e) => [e.key, e as QueueOrderEntry]));
-  return entries.map((e) => ({ ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), needsNoam: needsNoam(e) }));
+  // A dismissed reply hides a question or a Done; a permission prompt always waits, dismissed or not.
+  return entries.map((e) => {
+    const dismissed = dismissedAt(e.key) === (e.replyAt ?? 'none');
+    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), dismissed, waitsForMe: e.state === 'permission' || (waitsForMe(e) && !dismissed) };
+  });
 }

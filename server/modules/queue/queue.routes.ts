@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 
-import { dragTo, getQueue, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
+import { dismissEntry, dragTo, getQueue, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
 import { closeTicket, type CloseChoice } from '@/modules/queue/sources/tickets.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -40,6 +40,13 @@ router.put('/latch', asyncHandler(async (req: Request, res: Response) => {
   const { key } = req.body ?? {};
   if (!(key === null || typeof key === 'string')) throw bad('key must be a key or null.');
   res.json(createApiSuccessResponse(setLatch(key)));
+}));
+
+// The trash icon: hide the entry's chat until it replies again.
+router.put('/dismiss', asyncHandler(async (req: Request, res: Response) => {
+  const { key } = req.body ?? {};
+  if (typeof key !== 'string') throw bad('key is required.');
+  res.json(createApiSuccessResponse(dismissEntry(key)));
 }));
 
 router.post('/sync-cursor', asyncHandler(async (_req: Request, res: Response) => {

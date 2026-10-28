@@ -70,6 +70,7 @@ Name rule: right after the worktree question (or first, where there is none), as
   node ~/src/quests/claudecodeui/quests/tools/rename_chat.mjs $sid "<name>"
 or, for Haiku:
   node ~/src/quests/claudecodeui/quests/tools/rename_chat.mjs $sid --haiku "<his first message>" [--ticket <number>]
+Ticket rule: every chat has a ticket. Right after the name, before the first task: search the tickets for one that matches what Noam asked (gh issue list -R salomonskinoam/tickets --state open --search "<key words>"). If one matches, read it in full (gh issue view <n> -R salomonskinoam/tickets --comments) to make sure it fits, then claim it with the ticket-work skill. If none matches, create one with the ticket-create skill. A chat that starts from a ticket ("we are starting this ticket <link>") claims that one.
 EOF
 fi
 exit 0

@@ -53,6 +53,10 @@ export function reportPageTabs(sessionIds: string[]): void {
 
 export const dragQueue = (key: string, beforeKey: string | null) => request('PUT', '/drag', { key, beforeKey });
 export const setQueueLatch = (key: string | null) => request('PUT', '/latch', { key });
+/** The trash icon: hide the entry's chat until it replies again. */
+export const dismissQueueEntry = (key: string) => request('PUT', '/dismiss', { key });
+/** The slashed eye: the entry goes to the end of the queue. */
+export const sendQueueEntryToEnd = (key: string) => request('PUT', '/drag', { key, beforeKey: null });
 export const closeQueueTicket = (number: number, choice: string) => request('POST', '/close', { number, choice });
 /** Puts the chats open in Cursor on top; answers their page session ids, in Cursor's tab order. */
 export const syncQueueFromCursor = async (): Promise<string[]> =>

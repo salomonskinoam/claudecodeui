@@ -16,14 +16,16 @@ export type QueueSessionRow = {
   jsonl_path: string | null;
 };
 
-/** quests priority queue: the stored order and the chats' closing lines. */
+/** quests priority queue: the stored order, the pin, the dismissals, and the chats' closing lines. */
+type StateKey = 'order' | 'latch' | 'dismissed';
+
 export const queueDb = {
-  getState<T>(key: 'order' | 'latch'): T | undefined {
+  getState<T>(key: StateKey): T | undefined {
     const row = getConnection().prepare('SELECT value FROM queue_state WHERE key = ?').get(key) as { value: string } | undefined;
     return row ? (JSON.parse(row.value) as T) : undefined;
   },
 
-  setState(key: 'order' | 'latch', value: unknown): void {
+  setState(key: StateKey, value: unknown): void {
     getConnection()
       .prepare(`INSERT INTO queue_state (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`)

@@ -18,9 +18,9 @@ export function useBlink(queue: Queue): Set<string> {
     queue.view.forEach((k, i) => {
       const e = byKey.get(k);
       if (!e) return;
-      const turned = e.needsNoam && wasReady.current.get(k) === false;
-      if (e.needsNoam && e.sessionId !== shownSessionId && (blinking.has(k) || turned) && (shownIndex < 0 || i < shownIndex)) next.add(k);
-      wasReady.current.set(k, e.needsNoam);
+      const turned = e.waitsForMe && wasReady.current.get(k) === false;
+      if (e.waitsForMe && e.sessionId !== shownSessionId && (blinking.has(k) || turned) && (shownIndex < 0 || i < shownIndex)) next.add(k);
+      wasReady.current.set(k, e.waitsForMe);
     });
     if ([...next].join() !== [...blinking].join()) setBlinking(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps

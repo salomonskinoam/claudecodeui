@@ -24,7 +24,13 @@ export type QueueEntry = {
   world: string | null;
   rootKey: string;
   group: QueueGroup;
-  needsNoam: boolean;
+  /** Waits for Noam's input: a permission prompt, or a question or Done he has not dismissed. The list shows these. */
+  waitsForMe: boolean;
+  /** The chat has a running process, whatever its state. */
+  live: boolean;
+  /** Noam dismissed the chat's current reply (the trash icon); over when it replies again. */
+  dismissed: boolean;
+  replyAt: string | null;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
   heldOutside: boolean;
   /** Open right now: a live Claude Code process, or a Claude tab in Cursor. */

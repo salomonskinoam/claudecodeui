@@ -31,7 +31,7 @@ import { describeBackgroundTask, ownBackgroundTasks } from '@/modules/chat/utils
 import { useFileMentions } from '@/modules/chat/hooks/useFileMentions';
 import { useInputHistory } from '@/modules/chat/hooks/useInputHistory';
 import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
-import { noteSentInChat, openNextInQueue } from '@/modules/queue';
+import { openNextInQueue } from '@/modules/queue';
 
 type UseChatComposerStateArgs = {
   selectedProject: Project | null;
@@ -990,7 +990,6 @@ export function useChatComposerState({
         return;
       }
       submittingScopesRef.current.add(scope);
-      noteSentInChat(); // quests: a chat the user wrote to does not take the "on top latch" when left
       try {
         await submitMessage(event, queuedSubmission);
       } finally {

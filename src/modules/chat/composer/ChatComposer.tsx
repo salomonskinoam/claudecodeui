@@ -36,7 +36,7 @@ import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessageP
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
-import { openNextInQueue } from '@/modules/queue';
+import { DoneButton, openNextInQueue } from '@/modules/queue';
 
 type MentionableFile = {
   name: string;
@@ -71,6 +71,9 @@ type ChatComposerProps = {
   hasInput: boolean;
   onClearInput: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => void;
+  /** quests: the page's session id of this chat (null for a new chat) and a way to send a message as if typed, for the DONE button. */
+  sessionId: string | null;
+  onSendText: (text: string) => void;
   isDragActive: boolean;
   queuedDraft: QueuedDraft | null;
   /** Set while the composer is replacing an already-sent message. */
@@ -146,6 +149,8 @@ export default function ChatComposer({
   hasInput,
   onClearInput,
   onSubmit,
+  sessionId,
+  onSendText,
   isDragActive,
   queuedDraft,
   isEditingSentMessage,
@@ -505,6 +510,8 @@ export default function ChatComposer({
             >
               Next
             </button>
+            {/* quests: done with this chat (requirement 27): hide it from the queue and bring the next one. */}
+            <DoneButton sessionId={sessionId} hasInput={hasInput} onSendText={onSendText} />
 
             <PromptInputSubmit
               onClick={

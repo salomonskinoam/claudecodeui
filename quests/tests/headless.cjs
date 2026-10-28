@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -37,6 +37,9 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/google/chrome/chrome', headless: true, args: ['--disable-smooth-scrolling'] });
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await page.addInitScript((t) => localStorage.setItem('auth-token', t), token);
+  // The list's default (focus) shows only the chats that wait for the user; every check but `focus` reads the
+  // whole list, so they open the page in archive mode.
+  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), check === 'focus' ? 'focus' : 'archive');
   page.on('pageerror', (error) => console.log('page error:', (error.stack || error.message).slice(0, 700)));
   await page.goto(check === 'plan' ? 'http://127.0.0.1:3001/' : `http://127.0.0.1:3001/session/${sessionId}`);
   await page.waitForTimeout(6000);
@@ -227,7 +230,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // Alt+Enter with an empty input box brings the next entry that needs the user (nothing is sent).
     const q = await apiQueue();
     const current = q.entries.find((e) => e.sessionId === sessionId)?.key;
-    const expected = q.view.find((k) => k !== current && q.entries.find((e) => e.key === k).needsNoam);
+    const expected = q.view.find((k) => k !== current && q.entries.find((e) => e.key === k).waitsForMe);
     await page.locator('[data-slot="prompt-input-textarea"]').first().focus();
     await page.keyboard.press('Alt+Enter');
     await page.waitForTimeout(2500);
@@ -241,23 +244,23 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'latch') {
-    // Leave the chat without sending, by clicking another line: it takes the latch. Then the latch is released.
+    // The pin is manual only. Click the pin on the chat's line: it is first in the list, above everything, and its
+    // line shows the pin. Click the pin again: unpinned. The user's own pin, if any, is put back at the end.
     const q = await apiQueue();
     const mine = q.entries.find((e) => e.sessionId === sessionId);
-    const other = q.view.find((k) => k !== mine.key && q.entries.find((e) => e.key === k).sessionId);
-    await page.locator(`[data-quests-queue="list"] [data-queue-key="${other}"]`).click();
+    const line = page.locator(`[data-quests-queue="list"] [data-queue-key="${mine.key}"]`);
+    await line.hover();
+    await line.locator('[data-quests-pin]').click();
     await page.waitForTimeout(2500);
     const after = await apiQueue();
-    // The pinned chat is first in the list, above everything (the pin overrides any priority), and its line shows
-    // the pin. Clicking the pin unpins it.
     const onTop = after.view[0] === mine.key;
     const pinnedIcons = await page.locator('[data-quests-queue="list"] [data-quests-pin="pinned"]').count();
     const pinnedLine = await page.locator('[data-quests-queue="list"] [data-queue-key]').first().getAttribute('data-queue-key');
-    console.log(JSON.stringify({ left: mine.key, clicked: other, latch: after.latch, onTop, pinnedIcons, pinnedLine }));
+    console.log(JSON.stringify({ pinned: mine.key, latch: after.latch, onTop, pinnedIcons, pinnedLine }));
     await page.locator('[data-quests-queue="list"] [data-quests-pin="pinned"]').click();
     await page.waitForTimeout(2500);
-    console.log(JSON.stringify({ unpinnedByClick: (await apiQueue()).latch === null }));
-    await putLatch(null);
+    console.log(JSON.stringify({ unpinnedByClick: (await apiQueue()).latch === null, usersPinPutBack: q.latch }));
+    await putLatch(q.latch);
   }
 
   if (check === 'readonly') {
@@ -285,7 +288,6 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       rootsSideBySide: roots.length === q.entries.filter((e) => e.rootKey === e.key).length, root: root.key, kids, lineLit, nodeLit, folded,
       clickOpened: await page.evaluate((id) => location.pathname === `/session/${id}`, target.sessionId),
     }));
-    await putLatch(null); // the click above is a switch by hand: undo the latch it set
   }
 
   if (check === 'ticketchat') {
@@ -300,7 +302,6 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     console.log(JSON.stringify({ ticket: t.key, url: await page.evaluate(() => location.pathname), text, ok: text === `we are starting this ticket ${t.url}` }));
     await box.fill('');
     await page.waitForTimeout(1500);
-    await putLatch(null); // leaving the shown chat by hand may have set the latch
   }
 
   if (check === 'tabhover') {
@@ -346,6 +347,48 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       separators: rows.filter(([, s]) => s).map(([k]) => k),
       asExpected: rows.every(([, s], i) => s === expected[i]),
       groups: [0, 1, 2].map((g) => rows.filter(([k]) => group.get(k) === g).length),
+    }));
+  }
+
+  if (check === 'focus') {
+    // The default list: the chats that wait for the user plus the chat on screen, then "Live chats (n)" and
+    // "Tickets-Unclaimed (n)" collapsed; a click opens a group; Archive shows everything; the DONE button sits
+    // in the composer and is disabled while something is typed; the trash opens its popup; Cancel closes it.
+    const q = await apiQueue();
+    const view = q.view.map((k) => q.entries.find((e) => e.key === k));
+    const mine = q.entries.find((e) => e.sessionId === sessionId)?.key;
+    const expected = view.filter((e) => e.waitsForMe || e.key === mine).map((e) => e.key);
+    const keys = () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+    const shown = await keys();
+    const groupText = (label) => page.locator(`[data-quests-group="${label}"]`).textContent();
+    const live = await groupText('Live chats');
+    const unclaimed = await groupText('Tickets-Unclaimed');
+    await page.locator('[data-quests-group="Tickets-Unclaimed"]').click();
+    await page.waitForTimeout(300);
+    const opened = (await keys()).length;
+    await page.locator('[data-quests-group="Tickets-Unclaimed"]').click();
+    const done = page.locator('[data-quests-done="button"]');
+    const doneEnabled = await done.isEnabled();
+    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    await box.fill('x');
+    await page.waitForTimeout(300);
+    const doneWhileTyped = await done.isEnabled();
+    await box.fill('');
+    await page.waitForTimeout(300);
+    await page.locator(`[data-queue-key="${shown[0]}"]`).hover();
+    await page.locator(`[data-queue-key="${shown[0]}"] [data-quests-line="dismiss"]`).click();
+    await page.waitForTimeout(400);
+    const popup = await page.locator('[data-quests-queue="dismiss"]').isVisible();
+    await page.locator('[data-quests-queue="dismiss"] button', { hasText: 'Cancel' }).click();
+    await page.waitForTimeout(300);
+    await page.locator('[data-quests-queue="archive"]').click();
+    await page.waitForTimeout(500);
+    const archiveLines = (await keys()).length;
+    await page.locator('[data-quests-queue="archive"]').click();
+    console.log(JSON.stringify({
+      linesAsExpected: JSON.stringify(shown) === JSON.stringify(expected), lines: shown.length, live, unclaimed,
+      openedUnclaimed: opened - shown.length, expectedUnclaimed: view.filter((e) => e.state === 'unclaimed').length,
+      doneEnabled, doneWhileTyped, dismissPopup: popup, archiveLines, viewLines: view.length,
     }));
   }
 
@@ -499,7 +542,6 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.mouse.dblclick(row.right - 30, row.top + row.height / 2);
     await page.waitForTimeout(2000);
     console.log(JSON.stringify({ plus, doubleClick: await state() }));
-    await putLatch(null); // leaving the chat by hand for the new chat set the latch
   }
 
   if (check === 'mode') {

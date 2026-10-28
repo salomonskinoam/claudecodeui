@@ -8,6 +8,7 @@ import EntryTitle from '@/modules/queue/EntryTitle';
 import KindSign from '@/modules/queue/KindSign';
 import { openQueueEntry } from '@/modules/queue/queueNavigation';
 import { useQueue } from '@/modules/queue/queueStore';
+import { useQueueView } from '@/modules/queue/queueView';
 import type { QueueEntry } from '@/modules/queue/types';
 
 /**
@@ -17,15 +18,22 @@ import type { QueueEntry } from '@/modules/queue/types';
  */
 export default function QueueForest() {
   const queue = useQueue();
+  const { lines } = useQueueView();
   const lookOf = useEntryLook();
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const rank = new Map(queue.view.map((k, i) => [k, i]));
   const byRank = (a: QueueEntry, b: QueueEntry) => (rank.get(a.key) ?? 0) - (rank.get(b.key) ?? 0);
+  // The forest shows what the list shows (its lines), plus the ancestors a shown entry hangs under.
+  const byKey = new Map(queue.entries.map((e) => [e.key, e]));
+  const visible = new Set<string>();
+  for (const e of lines) {
+    for (let k: string | null = e.key; k && !visible.has(k); k = byKey.get(k)?.parentKey ?? null) visible.add(k);
+  }
   const children = new Map<string, QueueEntry[]>();
   for (const e of queue.entries) {
-    if (e.rootKey !== e.key && e.parentKey) children.set(e.parentKey, [...(children.get(e.parentKey) ?? []), e]);
+    if (visible.has(e.key) && e.rootKey !== e.key && e.parentKey) children.set(e.parentKey, [...(children.get(e.parentKey) ?? []), e]);
   }
-  const roots = queue.entries.filter((e) => e.rootKey === e.key).sort(byRank);
+  const roots = queue.entries.filter((e) => e.rootKey === e.key && visible.has(e.key)).sort(byRank);
 
   const node = (e: QueueEntry, depth: number) => {
     const kids = (children.get(e.key) ?? []).sort(byRank);
