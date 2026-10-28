@@ -10,6 +10,9 @@ import { setQueueLatch } from '@/modules/queue/queueStore';
 import type { QueueEntry } from '@/modules/queue/types';
 import type { LineMarker } from '@/modules/queue/useLineDrag';
 
+/** One of the three icon columns on the right of every line, 16 px wide, empty or not. */
+const SLOT = 'flex w-4 flex-shrink-0 items-center justify-center';
+
 type QueueLineProps = {
   entry: QueueEntry;
   look: EntryLook;
@@ -55,27 +58,34 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       <EntryDot sessionId={e.sessionId} className="h-2 w-2" />
       <KindSign kind={e.kind} />
       <EntryTitle entry={e} className="min-w-0 flex-1 truncate" />
-      {/* The pin: the pinned chat is first in the list, above everything; one chat at a time. */}
-      {e.sessionId && (
-        <button type="button" title={latched ? 'Unpin' : 'Pin on top'}
-          className={cn('hover:opacity-100', latched ? 'opacity-90 text-[#3794ff]' : 'opacity-0 group-hover:opacity-70')}
-          data-quests-pin={latched ? 'pinned' : 'pin'}
-          onClick={(event) => { event.stopPropagation(); void setQueueLatch(latched ? null : e.key); }}>
-          {latched ? <Pin className="h-3 w-3 fill-current" /> : <Pin className="h-3 w-3" />}
-        </button>
-      )}
-      {e.providerSessionId && (
-        <a href={`cursor://anthropic.claude-code/open?session=${e.providerSessionId}`} title="Open in Cursor"
-          className="opacity-0 group-hover:opacity-70" onClick={(event) => event.stopPropagation()}>
-          <SquareArrowOutUpRight className="h-3 w-3" />
-        </a>
-      )}
-      {e.number !== null && (
-        <button type="button" title="Close the ticket" className="opacity-0 group-hover:opacity-70"
-          onClick={(event) => { event.stopPropagation(); onCloseTicket(); }}>
-          <CircleCheck className="h-3 w-3" />
-        </button>
-      )}
+      {/* Three fixed columns on the right, the same on every line: the pin, the Cursor link, the ticket's close
+          button. A column stays empty when the line has nothing for it, so the icons never shift sideways. */}
+      <span className={SLOT}>
+        {e.sessionId && (
+          <button type="button" title={latched ? 'Unpin' : 'Pin on top'}
+            className={cn('hover:opacity-100', latched ? 'opacity-100 text-[#3794ff]' : 'opacity-0 group-hover:opacity-70')}
+            data-quests-pin={latched ? 'pinned' : 'pin'}
+            onClick={(event) => { event.stopPropagation(); void setQueueLatch(latched ? null : e.key); }}>
+            <Pin className={cn('h-3.5 w-3.5', latched && 'fill-current')} />
+          </button>
+        )}
+      </span>
+      <span className={SLOT}>
+        {e.providerSessionId && (
+          <a href={`cursor://anthropic.claude-code/open?session=${e.providerSessionId}`} title="Open in Cursor"
+            className="opacity-0 group-hover:opacity-70" onClick={(event) => event.stopPropagation()}>
+            <SquareArrowOutUpRight className="h-3 w-3" />
+          </a>
+        )}
+      </span>
+      <span className={SLOT}>
+        {e.number !== null && (
+          <button type="button" title="Close the ticket" className="opacity-0 group-hover:opacity-70"
+            onClick={(event) => { event.stopPropagation(); onCloseTicket(); }}>
+            <CircleCheck className="h-3 w-3" />
+          </button>
+        )}
+      </span>
     </div>
   );
 }
