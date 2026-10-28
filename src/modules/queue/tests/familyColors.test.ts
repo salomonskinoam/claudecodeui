@@ -18,6 +18,15 @@ test('the first ten families wear the ten base colors, the eleventh a lighter sh
   assert.ok(PALETTE.indexOf(out.get('f10') as string) >= 10);
 });
 
+test('when the family on a base color is gone, the family on its lighter shade takes the base', () => {
+  const given = assignColors(families(11), new Map());
+  const shade1 = given.get('f10') as string;
+  assert.equal(PALETTE.indexOf(shade1), 10); // the lighter shade of the first color
+  const after = assignColors(families(11).filter((f) => f.key !== 'f0'), given);
+  assert.equal(after.get('f10'), PALETTE[0]);
+  for (let i = 1; i < 10; i += 1) assert.equal(after.get(`f${i}`), given.get(`f${i}`)); // nobody else moves
+});
+
 test('open families stay apart: a new family avoids every color an open family wears', () => {
   const given = new Map([...families(10)].map((f, i) => [f.key, PALETTE[i]]));
   const out = assignColors([...families(10, 3), { key: 'new', open: true }], given);
