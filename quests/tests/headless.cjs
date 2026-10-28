@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -348,6 +348,20 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       asExpected: rows.every(([, s], i) => s === expected[i]),
       groups: [0, 1, 2].map((g) => rows.filter(([k]) => group.get(k) === g).length),
     }));
+  }
+
+  if (check === 'subagents') {
+    // The agents' live summary under their calls: each panel's step and figures (tokens, tools, time), read twice
+    // 4 s apart: a running agent's time ticks and its figures follow the agent's transcript.
+    const read = () => page.locator('[data-quests-subagent="figures"]').evaluateAll((ns) => ns.map((n) => ({
+      step: n.parentElement.querySelector('[data-quests-subagent="step"]')?.textContent ?? '',
+      figures: n.textContent.trim(),
+    })));
+    await page.locator('[data-quests-subagent="figures"]').first().waitFor({ timeout: 15000 }).catch(() => undefined);
+    const first = await read();
+    await page.waitForTimeout(4000);
+    const second = await read();
+    console.log(JSON.stringify({ panels: first.length, first: first.slice(-4), second: second.slice(-4) }));
   }
 
   if (check === 'focus') {

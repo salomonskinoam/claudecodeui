@@ -351,6 +351,12 @@ export type SubagentInfo = {
   model?: string;
   /** Total entries the agent recorded, which exceeds the received timeline when a long run was truncated for transport. */
   activityCount?: number;
+  /** quests: the agent's tokens (its context at its last call), tool count and run time so far, from its transcript. */
+  usage?: TaskUsage;
+  /** quests: what the agent is on: its last tool call ("Bash: npm test") or the head of its last text. */
+  lastStep?: string;
+  /** quests: when the agent started, so a running one's time ticks in the page. */
+  startedAt?: string;
 };
 
 /** One rendered entry in a chat transcript — user turn, assistant turn, tool call and result, local command output, or subagent container — and the shape the chat message list and message components consume. */

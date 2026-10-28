@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { Bot, ChevronRight, CircleAlert, CircleCheck, CircleDashed } from 'lucide-react';
 
 import type { DiffLine, LiveTaskStatus, Project, SubagentActivity, SubagentInfo, ToolResult } from '@/shared/types';
@@ -6,7 +6,7 @@ import { cn } from '@/shared/utils';
 import { SubagentTimeline } from '@/modules/chat/tools/SubagentTimeline';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MarkdownContent } from '@/modules/chat/tools/ContentRenderers/MarkdownContent';
-import { resolveBackgroundTaskStatus } from '@/modules/chat/utils/backgroundTasks';
+import { formatTaskDuration, resolveBackgroundTaskStatus } from '@/modules/chat/utils/backgroundTasks';
 
 type SubagentPanelProps = {
   /** Raw tool input of the call that spawned the agent, used for the prompt. */
@@ -113,6 +113,24 @@ export const SubagentPanel = memo(({
   const description = subagent?.description ?? String(parsedInput.description ?? '');
   const prompt = String(parsedInput.prompt ?? '');
 
+  // quests: the live summary, as Cursor's panel shows it: the agent's last step, its tokens, its tool count and
+  // its time, ticking every second while it runs. The figures come from the agent's own transcript (history
+  // load, also for a chat run in Cursor) or from the run's task events (a chat run by the page).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (status !== 'running') return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [status]);
+  const usage = taskStatus?.usage ?? subagent?.usage;
+  const tokens = usage?.totalTokens ?? 0;
+  const toolsUsed = usage?.toolUses ?? toolCount;
+  const elapsedMs = status === 'running' && subagent?.startedAt ? Math.max(0, now - Date.parse(subagent.startedAt)) : usage?.durationMs ?? 0;
+  const figures = usage
+    ? [`${tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : tokens} tokens`, `${toolsUsed} ${toolsUsed === 1 ? 'tool' : 'tools'}`, formatTaskDuration(elapsedMs)].join(' · ')
+    : '';
+  const lastStep = status === 'running' ? taskStatus?.summary ?? subagent?.lastStep ?? '' : '';
+
   return (
     <div className="my-1 border-l-2 border-l-purple-500 py-0.5 pl-3 dark:border-l-purple-400">
       <button
@@ -133,11 +151,14 @@ export const SubagentPanel = memo(({
         {nickname && (
           <span className="flex-shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground/70">{nickname}</span>
         )}
-        <span className={cn('ml-auto flex flex-shrink-0 items-center gap-1 text-[11px]', STATUS_STYLES[status])}>
+        {lastStep && (
+          <span data-quests-subagent="step" className="min-w-0 max-w-[40%] truncate text-[11px] text-muted-foreground/80" title={lastStep}>· {lastStep}</span>
+        )}
+        <span data-quests-subagent="figures" className={cn('ml-auto flex flex-shrink-0 items-center gap-1 text-[11px]', STATUS_STYLES[status])}>
           {status === 'running' ? (
             <>
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
-              running
+              {figures || 'running'}
             </>
           ) : status === 'failed' ? (
             <>
@@ -154,7 +175,7 @@ export const SubagentPanel = memo(({
           ) : (
             <>
               <CircleCheck className="h-3 w-3" />
-              {toolCount > 0 ? `${toolCount} ${toolCount === 1 ? 'tool' : 'tools'}` : 'done'}
+              {figures || (toolCount > 0 ? `${toolCount} ${toolCount === 1 ? 'tool' : 'tools'}` : 'done')}
             </>
           )}
         </span>

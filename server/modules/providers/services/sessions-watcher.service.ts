@@ -35,7 +35,7 @@ const WATCHER_IGNORED_PATTERNS = [
   '**/.git/**',
   '**/dist/**',
   '**/build/**',
-  '**/subagents/**',
+  // quests: `subagents/` is watched: a change in an agent's transcript reloads its parent chat (see onUpdate).
   '**/tool-results/**',
   '**/*.tmp',
   '**/*.swp',
@@ -168,6 +168,15 @@ async function onUpdate(
   provider: LLMProvider
 ): Promise<void> {
   if (!isWatcherTargetFile(provider, filePath)) {
+    return;
+  }
+
+  // quests: a subagent's transcript (`<project>/<session>/subagents/agent-<id>.jsonl`) is not a session; a change
+  // in it is a change of its parent chat, which the page reloads to show the agent's live summary.
+  const parts = path.normalize(filePath).split(path.sep);
+  const subagentsAt = parts.lastIndexOf('subagents');
+  if (provider === 'claude' && subagentsAt > 0) {
+    queuePendingWatcherUpdate(eventType, provider, parts[subagentsAt - 1]);
     return;
   }
 

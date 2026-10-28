@@ -17,6 +17,8 @@ const STATUS_RANK = { busy: 2, waiting: 1, idle: 0 } as const;
 
 let live = new Map<string, LiveProcess>();
 export const getLive = () => live;
+/** A Claude Code process runs this session right now (in Cursor, the desktop app, a terminal or the page). */
+export const hasLiveProcess = (sessionId: string): boolean => live.has(sessionId);
 
 /** When one chat has two processes, the strongest state wins (busy over waiting over idle). */
 export async function refreshLive(): Promise<void> {

@@ -33,8 +33,8 @@ type QueueLineProps = {
 };
 
 /**
- * quests priority queue: one line of the list. The chat's dot, the kind's sign, the title, and on the right the
- * release button of the latched line, the Cursor link and the ticket's close button.
+ * quests priority queue: one line of the list. The chat's dot, the kind's sign, the title, and on the right five
+ * icon columns: the pin, send to the end, hide (the trash), the Cursor link, the ticket's close button.
  */
 export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onDismiss, onSendToEnd }: QueueLineProps) {
   return (

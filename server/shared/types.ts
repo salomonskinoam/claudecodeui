@@ -595,6 +595,12 @@ export type SubagentInfo = {
    * lets the UI say so instead of silently showing a partial timeline.
    */
   activityCount?: number;
+  /** quests: the agent's tokens (its context at its last call), tool count and run time so far, from its transcript. */
+  usage?: TaskUsage;
+  /** quests: what the agent is on: its last tool call ("Bash: npm test") or the head of its last text. */
+  lastStep?: string;
+  /** quests: when the agent started, so a running one's time ticks in the page. */
+  startedAt?: string;
 };
 
 /**

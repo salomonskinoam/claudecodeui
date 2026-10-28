@@ -3,6 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import readline from 'node:readline';
 
+import { hasLiveProcess } from '@/modules/queue/index.js';
 import type { IProviderSessions } from '@/shared/interfaces.js';
 import type {
   AnyRecord,
@@ -91,7 +92,22 @@ type ClaudeSubagentTranscript = {
   model?: string;
   /** When the agent's first row was written: the moment it was spawned. */
   startedAt?: string;
+  /** quests: when its last row was written. */
+  lastAt?: string;
+  /** quests: the agent's context at its last call (input + cache + output tokens), the number Cursor's panel shows. */
+  totalTokens?: number;
+  /** quests: what the agent is on: its last tool call ("Bash: npm test") or the head of its last text. */
+  lastStep?: string;
 };
+
+/** quests: one line for a tool call, the tool's name and the head of its first string input. */
+function describeToolCall(name: string, input: unknown): string {
+  const first = input && typeof input === 'object'
+    ? Object.values(input as Record<string, unknown>).find((v) => typeof v === 'string' && v.trim())
+    : undefined;
+  const head = typeof first === 'string' ? first.trim().split('\n', 1)[0].slice(0, 60) : '';
+  return head ? `${name}: ${head}` : name;
+}
 
 /**
  * Flattens one subagent transcript into the shared activity timeline.
@@ -123,14 +139,24 @@ async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSub
         if (timestamp && !transcript.startedAt) {
           transcript.startedAt = timestamp;
         }
+        if (timestamp) {
+          transcript.lastAt = timestamp;
+        }
 
         if (entry.message?.role === 'assistant' && Array.isArray(entry.message?.content)) {
           if (typeof entry.message.model === 'string') {
             transcript.model = entry.message.model;
           }
+          // quests: the context size of the newest call.
+          const usage = entry.message.usage as AnyRecord | undefined;
+          if (usage) {
+            transcript.totalTokens = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens']
+              .reduce((n, field) => n + (typeof usage[field] === 'number' ? usage[field] : 0), 0);
+          }
 
           for (const part of entry.message.content as AnyRecord[]) {
             if (part.type === 'tool_use') {
+              transcript.lastStep = describeToolCall(String(part.name ?? 'Tool'), part.input);
               const tool: SubagentActivity = {
                 kind: 'tool',
                 toolId: String(part.id ?? ''),
@@ -145,6 +171,7 @@ async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSub
               continue;
             }
             if (part.type === 'text' && typeof part.text === 'string' && part.text.trim()) {
+              transcript.lastStep = part.text.trim().split('\n', 1)[0].slice(0, 70);
               activity.push({ kind: 'text', content: part.text, timestamp });
               continue;
             }
@@ -236,6 +263,50 @@ async function findClaudeSubagentTranscript(
   }
 
   return null;
+}
+
+/** quests: the figures the agent's header shows: its tokens, its tool count, how long it ran (so far), and its last step. */
+function subagentStats(transcript: ClaudeSubagentTranscript): Pick<SubagentInfo, 'usage' | 'lastStep' | 'startedAt'> {
+  const started = transcript.startedAt ? Date.parse(transcript.startedAt) : NaN;
+  const last = transcript.lastAt ? Date.parse(transcript.lastAt) : NaN;
+  return {
+    usage: {
+      totalTokens: transcript.totalTokens ?? 0,
+      toolUses: transcript.activity.filter((entry) => entry.kind === 'tool').length,
+      durationMs: Number.isFinite(started) && Number.isFinite(last) ? Math.max(0, last - started) : 0,
+    },
+    lastStep: transcript.lastStep,
+    startedAt: transcript.startedAt,
+  };
+}
+
+/**
+ * quests: the subagent transcripts of a session, by the id of the Agent call that spawned each (its sidecar
+ * `.meta.json` carries `toolUseId`). Read once per history load, only while an Agent call is still running.
+ */
+async function listClaudeSubagentMetas(projectDirectory: string, providerSessionId: string): Promise<Map<string, string>> {
+  const directory = path.join(projectDirectory, providerSessionId, 'subagents');
+  const byToolUseId = new Map<string, string>();
+  let names: string[];
+  try {
+    names = await fsp.readdir(directory);
+  } catch {
+    return byToolUseId;
+  }
+  for (const name of names) {
+    if (!name.endsWith('.meta.json')) {
+      continue;
+    }
+    try {
+      const meta = JSON.parse(await fsp.readFile(path.join(directory, name), 'utf8')) as AnyRecord;
+      if (typeof meta.toolUseId === 'string') {
+        byToolUseId.set(meta.toolUseId, path.join(directory, name.replace(/\.meta\.json$/, '.jsonl')));
+      }
+    } catch {
+      // A sidecar being written right now, or a malformed one: no agent for this call.
+    }
+  }
+  return byToolUseId;
 }
 
 /**
@@ -747,8 +818,59 @@ async function getSessionMessages(
           description: meta.description,
           model: transcript.model,
           activityCount: transcript.activity.length,
+          ...subagentStats(transcript),
         },
       });
+    }
+
+    // quests: an Agent call still running has no tool result yet, so nothing above found its agent. Its agent's
+    // sidecar `.meta.json` names the call's id, so the running agent's transcript is read through it and hung
+    // on the call's own row (`pendingSubagents`, by tool use id), status running. This is what the live summary
+    // under the call shows (requirement: "just like in cursor").
+    const answered = new Set<string>();
+    const pendingCalls: Array<{ row: AnyRecord; toolUseId: string }> = [];
+    for (const message of messages) {
+      const content = message.message?.content;
+      if (!Array.isArray(content)) {
+        continue;
+      }
+      for (const part of content) {
+        if (part?.type === 'tool_result' && typeof part.tool_use_id === 'string') {
+          answered.add(part.tool_use_id);
+        } else if (part?.type === 'tool_use' && (part.name === 'Agent' || part.name === 'Task') && typeof part.id === 'string') {
+          pendingCalls.push({ row: message, toolUseId: part.id });
+        }
+      }
+    }
+    const metaByToolUseId = pendingCalls.some((call) => !answered.has(call.toolUseId))
+      ? await listClaudeSubagentMetas(projectDir, providerSessionId)
+      : new Map<string, string>();
+    for (const { row, toolUseId } of pendingCalls) {
+      const transcriptPath = answered.has(toolUseId) ? undefined : metaByToolUseId.get(toolUseId);
+      if (!transcriptPath) {
+        continue;
+      }
+      const [transcript, meta] = await Promise.all([
+        readClaudeSubagentTranscript(transcriptPath),
+        readClaudeSubagentMeta(transcriptPath.replace(/\.jsonl$/, '.meta.json')),
+      ]);
+      const agentId = path.basename(transcriptPath, '.jsonl').replace(/^agent-/, '');
+      row.pendingSubagents = {
+        ...(row.pendingSubagents ?? {}),
+        [toolUseId]: {
+          subagentTools: transcript.activity.slice(-MAX_TRANSMITTED_SUBAGENT_ACTIVITIES).map(truncateSubagentActivity),
+          subagent: {
+            id: agentId,
+            name: meta.agentType,
+            type: meta.agentType,
+            description: meta.description,
+            model: transcript.model,
+            activityCount: transcript.activity.length,
+            status: 'running' as const,
+            ...subagentStats(transcript),
+          },
+        },
+      };
     }
 
     // Read each workflow run's journal once, keyed by the directory the launch
@@ -786,7 +908,10 @@ async function getSessionMessages(
     // runtime keys its process map by the app session id when the chat gateway
     // starts a run and by the provider-native id when the agent API does, so
     // both are asked.
-    const liveRunStartedAt = getLiveRunStartTime(sessionId) ?? getLiveRunStartTime(providerSessionId);
+    // quests: a chat run in Cursor or a terminal has no run the page started, but its process is in Claude Code's
+    // registry; while it lives, an agent that has not reported is still running, not stopped.
+    const liveRunStartedAt = getLiveRunStartTime(sessionId) ?? getLiveRunStartTime(providerSessionId)
+      ?? (hasLiveProcess(providerSessionId) ? 0 : null);
     const launchedByLiveRun = (message: AnyRecord): boolean =>
       liveRunStartedAt !== null && Date.parse(String(message.timestamp ?? '')) >= liveRunStartedAt;
 
@@ -1790,6 +1915,21 @@ export class ClaudeSessionsProvider implements IProviderSessions {
         msg.subagentTools = toolResult.subagentTools;
         msg.subagent = toolResult.subagent;
         msg.workflow = toolResult.workflow;
+      }
+    }
+
+    // quests: an Agent call still running carries its agent on its own row (`pendingSubagents`, see getSessionMessages).
+    const pendingSubagents = new Map<string, { subagent: SubagentInfo; subagentTools: SubagentActivity[] }>();
+    for (const raw of rawMessages) {
+      for (const [toolUseId, pending] of Object.entries(raw.pendingSubagents ?? {})) {
+        pendingSubagents.set(toolUseId, pending as { subagent: SubagentInfo; subagentTools: SubagentActivity[] });
+      }
+    }
+    for (const msg of normalized) {
+      const pending = msg.kind === 'tool_use' && msg.toolId && !toolResultMap.has(msg.toolId) ? pendingSubagents.get(msg.toolId) : undefined;
+      if (pending) {
+        msg.subagent = pending.subagent;
+        msg.subagentTools = pending.subagentTools;
       }
     }
 
