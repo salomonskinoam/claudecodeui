@@ -227,3 +227,4 @@ Earlier rulings that still stand, verbatim:
 | # | Requirement | Source |
 |---|---|---|
 | 24 | Every chat tells its immediate family, if it has one, about the events that happen to it. Its home is an instruction file the chats read. | 22:26 |
+| 25 | A tab's title is the chat's name (the rename, else Claude's title), the same name the list and the forest show. It never becomes a message Noam wrote. Noam, 28 Oct: "the tab title changes to the last thing I wrote to it instead of remaining the name of the chat. that's a bug." | 28 Oct |

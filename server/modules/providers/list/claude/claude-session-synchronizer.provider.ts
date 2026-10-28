@@ -16,6 +16,8 @@ type ParsedSession = {
   sessionId: string;
   projectPath: string;
   sessionName?: string;
+  /** quests: the transcript's own title (a /rename, else Claude's title); it replaces a stored name, see `storeName`. */
+  renamed?: string;
 };
 
 /**
@@ -64,16 +66,7 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
         continue;
       }
 
-      const timestamps = await readFileTimestamps(filePath);
-      sessionsDb.createSession(
-        parsed.sessionId,
-        this.provider,
-        parsed.projectPath,
-        parsed.sessionName,
-        timestamps.createdAt,
-        timestamps.updatedAt,
-        filePath
-      );
+      await this.store(parsed, filePath);
       processed += 1;
     }
 
@@ -97,8 +90,17 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       return null;
     }
 
+    return this.store(parsed, filePath);
+  }
+
+  /**
+   * Upserts the session row. The upsert keeps a stored name on a session the page created (its id differs from
+   * Claude's), so the first message's head, which the page stores at creation, would stand forever. quests: a
+   * title in the transcript (a /rename, else Claude's title) is the chat's name everywhere and replaces it.
+   */
+  private async store(parsed: ParsedSession, filePath: string): Promise<string> {
     const timestamps = await readFileTimestamps(filePath);
-    return sessionsDb.createSession(
+    const sessionId = sessionsDb.createSession(
       parsed.sessionId,
       this.provider,
       parsed.projectPath,
@@ -107,6 +109,10 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       timestamps.updatedAt,
       filePath
     );
+    if (parsed.renamed && sessionsDb.getSessionById(sessionId)?.custom_name !== parsed.renamed) {
+      sessionsDb.updateSessionCustomName(sessionId, parsed.renamed);
+    }
+    return sessionId;
   }
 
   /**
@@ -139,7 +145,8 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
     // ponytail: reads the whole transcript on each sync, fine at tens of MB.
     const renamed = await this.extractCustomTitle(filePath);
     if (renamed) {
-      return { ...parsed, sessionName: normalizeSessionName(renamed, 'Untitled Claude Session') };
+      const sessionName = normalizeSessionName(renamed, 'Untitled Claude Session');
+      return { ...parsed, sessionName, renamed: sessionName };
     }
 
     // App-created sessions are keyed by an app id, so disk-discovered provider
