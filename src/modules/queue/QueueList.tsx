@@ -27,11 +27,12 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
   const open = useOpenEntry(onStartTicket);
   useEffect(() => setQueueOpener(open));
   const blinking = useBlink(queue);
-  const { marker, lineProps, listProps } = useLineDrag(queue.order);
-  const [closing, setClosing] = useState<QueueEntry | null>(null);
-
   const byKey = new Map(queue.entries.map((e) => [e.key, e]));
   const lines = queue.view.map((k) => byKey.get(k)).filter((e): e is QueueEntry => Boolean(e));
+  // Lines the view shows where the stored order has them: not the permission prompts, not the latched chat.
+  const anchors = new Set(lines.filter((e) => e.state !== 'permission' && e.key !== queue.latch).map((e) => e.key));
+  const { marker, lineProps, listProps } = useLineDrag(queue.view, anchors);
+  const [closing, setClosing] = useState<QueueEntry | null>(null);
 
   return (
     <div className="flex flex-col" data-quests-queue="list">
@@ -46,7 +47,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
             latched={queue.latch === e.key}
             separator={i > 0 && lines[i - 1].group !== e.group}
             marker={marker}
-            drag={lineProps(e.key, e.rootKey === e.key && e.state !== 'permission')}
+            drag={lineProps(e.key, e.rootKey === e.key && e.state !== 'permission' && e.key !== queue.latch)}
             onOpen={(event) => open(e, event)}
             onCloseTicket={() => setClosing(e)}
           />

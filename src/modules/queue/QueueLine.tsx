@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { CircleCheck, SquareArrowOutUpRight, X } from 'lucide-react';
+import { CircleCheck, Pin, SquareArrowOutUpRight } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import EntryDot from '@/modules/queue/EntryDot';
@@ -41,6 +41,8 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       className={cn(
         'group relative mx-1 flex h-[26px] cursor-pointer items-center gap-2 rounded-sm px-2 text-[15px] text-[#cccccc]',
         look.shownClass,
+        // The shown chat bulges 8 px to the left, past the list's edge; the text keeps its place.
+        look.shown && '-ml-1 pl-4',
         look.hoverClass,
         blinking && 'animate-pulse',
         separator && 'mt-[7px] before:absolute before:-top-[5px] before:left-0 before:right-0 before:h-[2px] before:bg-[#8a8a8a]',
@@ -53,10 +55,13 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       <EntryDot sessionId={e.sessionId} className="h-2 w-2" />
       <KindSign kind={e.kind} />
       <EntryTitle entry={e} className="min-w-0 flex-1 truncate" />
-      {latched && (
-        <button type="button" title="Release from the top" className="opacity-70 hover:opacity-100"
-          onClick={(event) => { event.stopPropagation(); void setQueueLatch(null); }}>
-          <X className="h-3 w-3" />
+      {/* The pin: the pinned chat is first in the list, above everything; one chat at a time. */}
+      {e.sessionId && (
+        <button type="button" title={latched ? 'Unpin' : 'Pin on top'}
+          className={cn('hover:opacity-100', latched ? 'opacity-90 text-[#3794ff]' : 'opacity-0 group-hover:opacity-70')}
+          data-quests-pin={latched ? 'pinned' : 'pin'}
+          onClick={(event) => { event.stopPropagation(); void setQueueLatch(latched ? null : e.key); }}>
+          {latched ? <Pin className="h-3 w-3 fill-current" /> : <Pin className="h-3 w-3" />}
         </button>
       )}
       {e.providerSessionId && (

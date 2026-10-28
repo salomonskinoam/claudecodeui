@@ -49,12 +49,12 @@ test('dragging a root below its side quest carries the side quest; above its blo
   assert.deepEqual(drag(list, fam, 'X', null), ['B', 'R', 'S', 'Y', 'X']);
 });
 
-test('the view puts permission prompts first, then the latched chat', () => {
+test('the view puts the pinned entry first, above the permission prompts; nothing else moves for it', () => {
   const v = [e('A', 'quest'), e('C', 'chat', { state: 'permission' }), e('D', 'chat')];
   assert.deepEqual(view(['A', 'D', 'C'], null, v), ['C', 'A', 'D']);
-  assert.deepEqual(view(['A', 'D', 'C'], 'D', v), ['C', 'D', 'A']);
-  assert.deepEqual(view(['B', 'R', 'S', 'X', 'Y'], 'S', fam), ['B', 'R', 'S', 'X', 'Y']);
-  assert.deepEqual(view(['X', 'Y', 'B', 'R', 'S'], 'R', fam), ['B', 'R', 'X', 'Y', 'S']);
+  assert.deepEqual(view(['A', 'D', 'C'], 'D', v), ['D', 'C', 'A']);
+  assert.deepEqual(view(['B', 'R', 'S', 'X', 'Y'], 'S', fam), ['S', 'B', 'R', 'X', 'Y']);
+  assert.deepEqual(view(['X', 'Y', 'B', 'R', 'S'], 'R', fam), ['R', 'X', 'Y', 'B', 'S']);
 });
 
 test('entries with a chat rank above tickets no chat has claimed, whatever their kind', () => {
@@ -67,16 +67,16 @@ test('entries with a chat rank above tickets no chat has claimed, whatever their
     e('P', 'chat', { state: 'permission' }),
   ];
   assert.deepEqual(view(['U', 'B', 'R', 'S', 'P'], null, c), ['P', 'R', 'S', 'U', 'B']);
-  // Latched side quest: its parent stays above it; the blocker came along, so it leads the unclaimed tickets.
-  assert.deepEqual(view(['U', 'B', 'R', 'S', 'P'], 'S', c), ['P', 'R', 'S', 'B', 'U']);
+  // Pinned side quest: first, even above its parent and the permission prompt; the rest stays as it was.
+  assert.deepEqual(view(['U', 'B', 'R', 'S', 'P'], 'S', c), ['S', 'P', 'R', 'U', 'B']);
 });
 
-test('chats open right now form the first level, the latched entry leads its own level', () => {
+test('chats open right now form the first level; the pinned entry is first whatever its level', () => {
   const o = [e('A', 'quest', { state: 'running' }), e('B', 'chat', { open: true }), e('U', 'quest', { state: 'unclaimed' }),
     e('C', 'chat', { open: true }), e('P', 'chat', { state: 'permission', open: true })];
   assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], null, o), ['P', 'B', 'C', 'A', 'U']);
-  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'C', o), ['P', 'C', 'B', 'A', 'U']);
-  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'U', o), ['P', 'B', 'C', 'A', 'U']);
+  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'C', o), ['C', 'P', 'B', 'A', 'U']);
+  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'U', o), ['U', 'P', 'B', 'C', 'A']);
 });
 
 test('sync from Cursor lifts the given keys to the top in their order, each with its family block', () => {

@@ -149,15 +149,16 @@ export function lift(list: string[], entries: QueueOrderEntry[], keys: string[])
 }
 
 /**
- * Permission prompts first, in stored order; then the three groups of `groupOf`, the latched entry leading its
- * group. The family rules order entries only inside each group.
+ * The pinned entry first, above everything ("it overrides any prio", Noam 2026-10-28); then the permission
+ * prompts, in stored order; then the three groups of `groupOf`. The family rules order entries only inside each
+ * group; nothing else moves for the pin.
  */
 export function view(stored: string[], latch: string | null, entries: QueueOrderEntry[]): string[] {
   const byKey = index(entries);
-  const perm = stored.filter((k) => byKey.get(k)?.state === 'permission');
-  let rest = stored.filter((k) => byKey.has(k) && !perm.includes(k));
-  if (latch && rest.includes(latch)) rest = drag(rest, entries, latch, rest.find((k) => k !== latch) ?? null);
-  return [...perm, ...[0, 1, 2].flatMap((g) => rest.filter((k) => groupOf(byKey.get(k)!) === g))];
+  const pinned = latch && byKey.has(latch) ? [latch] : [];
+  const perm = stored.filter((k) => byKey.get(k)?.state === 'permission' && !pinned.includes(k));
+  const rest = stored.filter((k) => byKey.has(k) && !perm.includes(k) && !pinned.includes(k));
+  return [...pinned, ...perm, ...[0, 1, 2].flatMap((g) => rest.filter((k) => groupOf(byKey.get(k)!) === g))];
 }
 
 /** The first entry of the view that needs Noam and is not the shown one. */

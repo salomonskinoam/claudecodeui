@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -199,8 +199,10 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const side = before.entries.find((e) => e.kind === 'sidequest' && e.parentKey && before.view.includes(e.parentKey));
     const root = side.parentKey;
     const next = before.view[before.view.indexOf(side.key) + 1];
-    // Aim at the top edge of the line after `next`: the root lands right after `next`, below its own side quest.
-    await mouseDrag(root, page.locator(`[data-queue-key="${before.view[before.view.indexOf(side.key) + 2]}"]`), 3);
+    // Aim at the top edge of the line after `next` (or, when `next` is the last line, at its lower half): the root
+    // lands right after `next`, below its own side quest.
+    const afterNext = before.view[before.view.indexOf(side.key) + 2];
+    await mouseDrag(root, page.locator(`[data-queue-key="${afterNext ?? next}"]`), afterNext ? 3 : 22);
     const after = await apiQueue();
     const at = (o, k) => o.indexOf(k);
     console.log(JSON.stringify({
@@ -246,15 +248,16 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.locator(`[data-quests-queue="list"] [data-queue-key="${other}"]`).click();
     await page.waitForTimeout(2500);
     const after = await apiQueue();
-    const permissions = after.view.filter((k) => after.entries.find((e) => e.key === k).state === 'permission').length;
-    // On top of its group: below the permission prompts and the higher groups (rule 7.0.1), with nothing above it
-    // but members of its own family (its blockers).
-    const entry = (k) => after.entries.find((e) => e.key === k);
-    const onTop = after.view.slice(permissions, after.view.indexOf(mine.key))
-      .every((k) => entry(k).group < entry(mine.key).group || entry(k).rootKey === mine.rootKey);
-    console.log(JSON.stringify({ left: mine.key, clicked: other, latch: after.latch, onTop, position: after.view.indexOf(mine.key) }));
+    // The pinned chat is first in the list, above everything (the pin overrides any priority), and its line shows
+    // the pin. Clicking the pin unpins it.
+    const onTop = after.view[0] === mine.key;
+    const pinnedIcons = await page.locator('[data-quests-queue="list"] [data-quests-pin="pinned"]').count();
+    const pinnedLine = await page.locator('[data-quests-queue="list"] [data-queue-key]').first().getAttribute('data-queue-key');
+    console.log(JSON.stringify({ left: mine.key, clicked: other, latch: after.latch, onTop, pinnedIcons, pinnedLine }));
+    await page.locator('[data-quests-queue="list"] [data-quests-pin="pinned"]').click();
+    await page.waitForTimeout(2500);
+    console.log(JSON.stringify({ unpinnedByClick: (await apiQueue()).latch === null }));
     await putLatch(null);
-    console.log(JSON.stringify({ released: (await apiQueue()).latch === null }));
   }
 
   if (check === 'readonly') {
@@ -346,12 +349,42 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     }));
   }
 
+  if (check === 'dragtop') {
+    // Drag the last line of the first group, then the first line of the second group, onto the upper half of the
+    // top line: where each lands in the view, and in the stored order. The order is put back after.
+    const before = await apiQueue();
+    const keysNow = () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+    const groupOf = (k) => before.entries.find((e) => e.key === k)?.group;
+    const shown = await keysNow();
+    const roots = shown.filter((k) => { const e = before.entries.find((e) => e.key === k); return e.rootKey === k && e.state !== 'permission'; });
+    const picks = [[...roots].reverse().find((k) => groupOf(k) === 0), roots.find((k) => groupOf(k) === 1)].filter(Boolean);
+    const results = [];
+    for (const key of picks) {
+      const from = await page.locator(`[data-queue-key="${key}"]`).boundingBox();
+      const top = await page.locator(`[data-queue-key="${shown[0]}"]`).boundingBox();
+      await page.mouse.move(from.x + 40, from.y + from.height / 2);
+      await page.mouse.down();
+      for (let i = 1; i <= 10; i++) await page.mouse.move(top.x + 40, from.y + (top.y + 3 - from.y) * (i / 10));
+      await page.waitForTimeout(200);
+      await page.mouse.up();
+      await page.waitForTimeout(2000);
+      const after = await apiQueue();
+      results.push({ key, group: groupOf(key), viewIndexBefore: shown.indexOf(key), viewIndexAfter: (await keysNow()).indexOf(key), orderIndexAfter: after.order.indexOf(key), latch: after.latch });
+      await page.evaluate(async (order) => fetch('/api/quests/queue/order', {
+        method: 'PUT', headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order }),
+      }), before.order);
+      await page.waitForTimeout(2000);
+    }
+    console.log(JSON.stringify({ top: shown[0], results }));
+  }
+
   if (check === 'dropline') {
     // Dragging a line keeps the list still and shows one blue landing line; released outside the list, nothing moves.
     const before = await apiQueue();
     const keysNow = () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
     const shown = await keysNow();
-    const root = shown.find((k) => before.entries.find((e) => e.key === k).rootKey === k && before.entries.find((e) => e.key === k).state !== 'permission');
+    const root = shown.find((k) => before.entries.find((e) => e.key === k).rootKey === k && before.entries.find((e) => e.key === k).state !== 'permission' && k !== before.latch);
     const from = await page.locator(`[data-queue-key="${root}"]`).boundingBox();
     const to = await page.locator(`[data-queue-key="${shown[shown.indexOf(root) + 3]}"]`).boundingBox();
     await page.mouse.move(from.x + 40, from.y + from.height / 2);
