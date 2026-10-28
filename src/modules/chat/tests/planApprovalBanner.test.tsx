@@ -14,7 +14,7 @@ it('a plan waiting for approval gets a card with Revise and Build the plan', () 
     <PermissionRequestsBanner
       pendingPermissionRequests={[request]}
       handlePermissionDecision={decide}
-      handleGrantToolPermission={() => {}}
+      handleGrantToolPermission={() => ({ success: true })}
     />,
   );
   expect(screen.getByText('The plan waits for your approval')).toBeTruthy();

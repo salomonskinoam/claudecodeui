@@ -317,7 +317,7 @@ function mapCliOptionsToSDK(options = {}) {
  * @param {Object} writer - WebSocket writer for reconnect support
  * @param {Function} releaseInput - Closes the held stdin stream so the CLI can exit
  */
-function addSession(sessionId, queryInstance, writer = null, releaseInput = null) {
+function addSession(sessionId, queryInstance, writer = null, releaseInput = null, beginTurn = null) {
   const existing = activeSessions.get(sessionId);
   // A different live instance under the same key means an earlier run was
   // superseded without being stopped (e.g. an abort that raced run setup and
@@ -348,7 +348,9 @@ function addSession(sessionId, queryInstance, writer = null, releaseInput = null
     status: 'active',
     writer,
     // Re-registered mid-run once the provider session id lands; keep the closer.
-    releaseInput: releaseInput || carried?.releaseInput || null
+    releaseInput: releaseInput || carried?.releaseInput || null,
+    // quests: takes a new user turn into this process while it is held (null once it winds down).
+    beginTurn: beginTurn || carried?.beginTurn || null
   });
   // The history reader reports a background agent as running or stopped by
   // whether this entry exists, and the cached history does not see this map.
@@ -824,18 +826,46 @@ async function buildPromptMessages(command, images, files, cwd) {
  * @returns {{ stream: AsyncIterable, release: () => void }} Stream plus its closer
  */
 function createHeldPromptStream(messages) {
-  let release;
-  const held = new Promise((resolve) => { release = resolve; });
+  // quests: the stream takes more turns while it is held. A new user message pushed here reaches the same CLI
+  // process, as in Cursor, so the background work of the earlier turn goes on and reports back into the chat.
+  const queue = [];
+  let wake = null;
+  let released = false;
+  const signal = () => {
+    if (wake) {
+      const w = wake;
+      wake = null;
+      w();
+    }
+  };
+  const release = () => {
+    released = true;
+    signal();
+  };
+  const push = (nextMessages) => {
+    if (released) {
+      return false;
+    }
+    queue.push(...nextMessages);
+    signal();
+    return true;
+  };
 
   const stream = (async function* () {
     for (const message of messages) {
       yield message;
     }
-    // Keeps stdin open — the CLI stays alive until release() is called.
-    await held;
+    // Keeps stdin open — the CLI stays alive until release() is called; pushed turns go out meanwhile.
+    while (!released) {
+      if (queue.length === 0) {
+        await new Promise((resolve) => { wake = resolve; });
+        continue;
+      }
+      yield queue.shift();
+    }
   })();
 
-  return { stream, release };
+  return { stream, release, push, isReleased: () => released };
 }
 
 /**
@@ -904,7 +934,9 @@ async function loadMcpConfig(cwd) {
  * @returns {Promise<void>}
  */
 async function queryClaudeSDK(command, options = {}, ws, context) {
-  const { sessionId, sessionSummary } = options;
+  const { sessionId } = options;
+  // quests: a pushed turn may carry a newer name.
+  let { sessionSummary } = options;
   // Callers pass the stable app session id; the SDK only understands the
   // provider-native id recorded on the session row.
   const providerSessionId = context.resolveProviderSessionId(sessionId);
@@ -943,9 +975,29 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   // True while the process is being held open for background work, so a later
   // `result` can be recognised as that work reporting back.
   let heldForBackgroundWork = false;
+  // quests: resolves the promise of a user turn pushed into this held process, at that turn's `result`.
+  let resolveTurn = null;
   // Set once a turn publishes a budget read from an assistant message, so the
   // turn-ending `result` is only mined for usage when nothing better arrived.
   let assistantBudgetSent = false;
+
+  // quests: a process still held open for this session (background work going on) takes the new turn itself,
+  // as Cursor does, so the work goes on and reports back into the chat. The turn's messages go to this run's
+  // writer; the promise resolves at the turn's `result`. Only when the held process cannot take it (it is
+  // winding down, or runs in another folder) does the new turn supersede it, as before.
+  const held = sessionKey() ? getSession(sessionKey()) : null;
+  if (held?.beginTurn && held.status === 'active') {
+    const promptMessages = await buildPromptMessages(command, options.images, options.files, options.cwd);
+    const taken = await held.beginTurn(promptMessages, ws, {
+      cwd: options.cwd,
+      model: options.model,
+      permissionMode: options.permissionMode,
+      sessionSummary
+    });
+    if (taken) {
+      return;
+    }
+  }
 
   // A new turn supersedes any earlier one still holding this session's process
   // open, so held runs cannot stack up across a conversation.
@@ -1131,8 +1183,44 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     }
 
     // Track the query instance for abort capability
+    // quests: a later user message joins this process while it is held open (see the top of queryClaudeSDK).
+    // The turn's events go to the new run's writer, the per-turn flags start over, and the promise resolves at
+    // the turn's `result`. A model or permission mode changed in between is applied to the process first. The
+    // process must work in the same folder; else the caller supersedes it.
+    const heldOptions = { cwd: options.cwd, model: resolvedModel || options.model, permissionMode: sdkOptions.permissionMode };
+    const beginTurn = async (messages, newWs, next) => {
+      if (heldPrompt.isReleased() || (next.cwd && heldOptions.cwd && next.cwd !== heldOptions.cwd)) {
+        return false;
+      }
+      try {
+        if (next.permissionMode && next.permissionMode !== heldOptions.permissionMode) {
+          await queryInstance.setPermissionMode(next.permissionMode);
+          heldOptions.permissionMode = next.permissionMode;
+          sdkOptions.permissionMode = next.permissionMode;
+        }
+        if (next.model && next.model !== heldOptions.model) {
+          await queryInstance.setModel(next.model);
+          heldOptions.model = next.model;
+        }
+      } catch (error) {
+        console.warn('[Claude SDK] Could not retune the held process for the new turn:', error?.message || error);
+        return false;
+      }
+      return new Promise((resolve) => {
+        ws = newWs;
+        sessionSummary = next.sessionSummary ?? sessionSummary;
+        turnCompleteSent = false;
+        assistantBudgetSent = false;
+        resolveTurn = () => resolve(true);
+        if (!heldPrompt.push(messages)) {
+          resolveTurn = null;
+          resolve(false);
+        }
+      });
+    };
+
     if (sessionKey()) {
-      addSession(sessionKey(), queryInstance, ws, releasePromptStream);
+      addSession(sessionKey(), queryInstance, ws, releasePromptStream, beginTurn);
     }
 
     // Process streaming messages
@@ -1142,7 +1230,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       if (message.session_id && !capturedSessionId) {
 
         capturedSessionId = message.session_id;
-        addSession(sessionKey(), queryInstance, ws, releasePromptStream);
+        addSession(sessionKey(), queryInstance, ws, releasePromptStream, beginTurn);
 
         // Set session ID on writer
         if (ws.setSessionId && typeof ws.setSessionId === 'function') {
@@ -1226,6 +1314,12 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
             sessionName: sessionSummary,
             stopReason: 'completed'
           });
+          // quests: a turn pushed into this held process is over; its caller's promise resolves.
+          if (resolveTurn) {
+            const done = resolveTurn;
+            resolveTurn = null;
+            done();
+          }
         } else if (heldForBackgroundWork && !abortPending && !stillOutstanding) {
           // A result after the turn already reported complete means the work we
           // held the process open for has finished and pushed a follow-up turn
@@ -1280,6 +1374,13 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
 
     // A superseded run winds down silently: the map entry, the abort flag,
     // and all client-facing events belong to the run that replaced it.
+    // quests: a pushed turn whose process ended first is over too.
+    if (resolveTurn) {
+      const done = resolveTurn;
+      resolveTurn = null;
+      done();
+    }
+
     const superseded = supersededInstances.has(queryInstance);
 
     // Send the terminal completion event — skipped for aborted runs, whose
@@ -1303,6 +1404,11 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
 
   } catch (error) {
     console.error('SDK query error:', error);
+    if (resolveTurn) {
+      const done = resolveTurn;
+      resolveTurn = null;
+      done();
+    }
 
     // Clean up session on error — only while this run still owns the map entry
     // (a superseding run may have replaced it).
