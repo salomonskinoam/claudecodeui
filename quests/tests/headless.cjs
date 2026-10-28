@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -347,6 +347,18 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       separators: rows.filter(([, s]) => s).map(([k]) => k),
       asExpected: rows.every(([, s], i) => s === expected[i]),
       groups: [0, 1, 2].map((g) => rows.filter(([k]) => group.get(k) === g).length),
+    }));
+  }
+
+  if (check === 'planwait') {
+    // A chat whose plan waits for approval shows the approval card above the input box, with "Revise" and
+    // "Build the plan". Nothing is clicked.
+    await page.locator('[data-quests-plan="approval"]').first().waitFor({ timeout: 15000 }).catch(() => undefined);
+    const card = page.locator('[data-quests-plan="approval"]');
+    console.log(JSON.stringify({
+      cards: await card.count(),
+      text: (await card.first().textContent().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160),
+      buttons: await card.locator('button').allTextContents().catch(() => []),
     }));
   }
 

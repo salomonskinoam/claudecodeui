@@ -8,8 +8,9 @@ import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
 import { collectRunningBackgroundTasks } from '@/modules/chat/utils/backgroundTasks';
 
+// quests: a plan waiting for approval is as actionable as any permission prompt (the sound plays for it too).
 const isActionablePermissionRequest = (request: { toolName?: unknown } | null | undefined): boolean => {
-  return request?.toolName !== 'ExitPlanMode' && request?.toolName !== 'exit_plan_mode';
+  return Boolean(request);
 };
 
 const hasActionablePermissionRequests = (requests: Array<{ toolName?: unknown }> | null | undefined): boolean => {

@@ -36,17 +36,41 @@ export default function PermissionRequestsBanner({
   handleGrantToolPermission,
 }: PermissionRequestsBannerProps) {
   const { t } = useTranslation();
-  // Filter out plan tool requests — they are handled inline by PlanDisplay
-  const filteredRequests = pendingPermissionRequests.filter(
-    (r) => r.toolName !== 'ExitPlanMode' && r.toolName !== 'exit_plan_mode'
-  );
+  // quests: a plan that waits for approval gets its own card here, above the input box, with the two decisions
+  // (the plan card in the transcript carries the same buttons, but it is folded and easy to miss; Noam, 28 Oct:
+  // "when a plan is done there should be a popup like in cursor or at least a 'waiting for approval' message").
+  const isPlan = (r: { toolName?: string }) => r.toolName === 'ExitPlanMode' || r.toolName === 'exit_plan_mode';
+  const planRequests = pendingPermissionRequests.filter(isPlan);
+  const filteredRequests = pendingPermissionRequests.filter((r) => !isPlan(r));
 
-  if (!filteredRequests.length) {
+  if (!filteredRequests.length && !planRequests.length) {
     return null;
   }
 
   return (
     <div className="mb-3 space-y-2">
+      {planRequests.map((request) => (
+        <Confirmation key={request.requestId} approval="pending" data-quests-plan="approval">
+          <ConfirmationTitle className="flex items-start gap-3">
+            <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <ConfirmationRequest>
+              <span className="font-medium text-foreground">The plan waits for your approval</span>
+              <span className="ml-2 text-muted-foreground">Build it, or ask for changes. The chat waits until you decide.</span>
+            </ConfirmationRequest>
+          </ConfirmationTitle>
+          <ConfirmationActions>
+            <ConfirmationAction
+              variant="outline"
+              onClick={() => handlePermissionDecision(request.requestId, { allow: false, message: t('chat:misc.userAskedRevise') })}
+            >
+              Revise
+            </ConfirmationAction>
+            <ConfirmationAction variant="default" onClick={() => handlePermissionDecision(request.requestId, { allow: true })}>
+              Build the plan
+            </ConfirmationAction>
+          </ConfirmationActions>
+        </Confirmation>
+      ))}
       {filteredRequests.map((request) => {
         const CustomPanel = getPermissionPanel(request.toolName);
         if (CustomPanel) {
