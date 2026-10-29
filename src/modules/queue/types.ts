@@ -2,7 +2,7 @@
 
 export type QueueKind = 'quest' | 'sidequest' | 'blocker' | 'chat';
 export type QueueState = 'permission' | 'running' | 'question' | 'done' | 'waiting' | 'blocker' | 'unclaimed' | 'none';
-/** The list's groups, top to bottom: 0 open chats, 1 chats closed without /finalize-chat, 2 unclaimed tickets. */
+/** 0 a chat open right now, 1 a chat closed without /finalize-chat, 2 an unclaimed ticket. Only 2 is a level of the order. */
 export type QueueGroup = 0 | 1 | 2;
 
 export type QueueEntry = {

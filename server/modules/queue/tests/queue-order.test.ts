@@ -24,8 +24,8 @@ test('a blocker below what it blocks moves above it; a side quest above its pare
   assert.deepEqual(repair(['B', 'S', 'R', 'X', 'Y'], fam), ['B', 'R', 'S', 'X', 'Y']);
 });
 
-test('closed entries drop out, new roots go last, a new blocker goes right above, a new side quest below its family', () => {
-  assert.deepEqual(repair(['X', 'R', 'gone'], [e('X', 'quest'), e('R', 'quest'), e('Y', 'chat')]), ['X', 'R', 'Y']);
+test('a gone entry keeps its slot, new roots go last, a new blocker goes right above, a new side quest below its family', () => {
+  assert.deepEqual(repair(['X', 'R', 'gone'], [e('X', 'quest'), e('R', 'quest'), e('Y', 'chat')]), ['X', 'R', 'gone', 'Y']);
   assert.deepEqual(repair(['X', 'R', 'Y'], [e('X', 'quest'), e('R', 'quest'), e('Y', 'chat'), e('B', 'blocker', { parentKey: 'R', blocks: ['R'] })]),
     ['X', 'B', 'R', 'Y']);
   assert.deepEqual(repair(['R', 'X'], [e('R', 'quest'), e('X', 'quest'), e('S', 'sidequest', { parentKey: 'R' })]), ['R', 'S', 'X']);
@@ -35,11 +35,19 @@ test('a quest with a parent is a root and goes last', () => {
   assert.deepEqual(repair(['R', 'X'], [e('R', 'quest'), e('X', 'quest'), e('Q', 'quest', { parentKey: 'R' })]), ['R', 'X', 'Q']);
 });
 
-test('side quests of one parent sort by kind of wait inside their slots, then age', () => {
+test('quests: an entry that leaves returns to its place; a change of state or of openness never reorders', () => {
   const sq = [e('R', 'quest'), e('X', 'quest'),
     e('S1', 'sidequest', { parentKey: 'R', state: 'done', since: 1 }),
     e('S2', 'sidequest', { parentKey: 'R', state: 'question', since: 5 })];
-  assert.deepEqual(repair(['R', 'S1', 'X', 'S2'], sq), ['R', 'S2', 'X', 'S1']);
+  assert.deepEqual(repair(['R', 'S1', 'X', 'S2'], sq), ['R', 'S1', 'X', 'S2']);
+  const a = e('A', 'chat', { state: 'question' });
+  const b = e('B', 'chat', { state: 'done' });
+  const c = e('C', 'chat', { state: 'question' });
+  const gone = repair(['A', 'B', 'C'], [a, c]); // B stopped waiting: it is not an entry now
+  assert.deepEqual(gone, ['A', 'B', 'C']);
+  const back = repair(gone, [a, { ...b, open: true, state: 'question', since: 9 }, c]);
+  assert.deepEqual(back, ['A', 'B', 'C']);
+  assert.deepEqual(view(back, null, [a, { ...b, open: true }, c]), ['A', 'B', 'C']);
 });
 
 test('dragging a root below its side quest carries the side quest; above its blocker carries the blocker', () => {
@@ -71,12 +79,12 @@ test('entries with a chat rank above tickets no chat has claimed, whatever their
   assert.deepEqual(view(['U', 'B', 'R', 'S', 'P'], 'S', c), ['S', 'P', 'R', 'U', 'B']);
 });
 
-test('chats open right now form the first level; the pinned entry is first whatever its level', () => {
+test('being open moves nothing; the pinned entry is first whatever it is', () => {
   const o = [e('A', 'quest', { state: 'running' }), e('B', 'chat', { open: true }), e('U', 'quest', { state: 'unclaimed' }),
     e('C', 'chat', { open: true }), e('P', 'chat', { state: 'permission', open: true })];
-  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], null, o), ['P', 'B', 'C', 'A', 'U']);
-  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'C', o), ['C', 'P', 'B', 'A', 'U']);
-  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'U', o), ['U', 'P', 'B', 'C', 'A']);
+  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], null, o), ['P', 'A', 'B', 'C', 'U']);
+  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'C', o), ['C', 'P', 'A', 'B', 'U']);
+  assert.deepEqual(view(['A', 'B', 'U', 'C', 'P'], 'U', o), ['U', 'P', 'A', 'B', 'C']);
 });
 
 test('sync from Cursor lifts the given keys to the top in their order, each with its family block', () => {

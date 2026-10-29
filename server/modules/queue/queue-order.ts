@@ -4,6 +4,11 @@
  * The stored order is one list of entry keys, top first. Constraints "a above b": every blocker above each
  * entry it blocks, every open parent above its side quest. Roots keep the place they were given; new roots
  * go last. Permission prompts and the "on top latch" are applied only in the view.
+ *
+ * The relative order is kept, always (Noam, 29 Oct: "if i see a task above or below another task, i will always
+ * see that same order, or one of them will just not show"). So: a key that leaves the entries keeps its slot in
+ * the stored list and returns to it; a change of state or of openness never moves an entry; only a new entry's
+ * first place, a drag, the pin and a permission prompt move anything.
  */
 
 export type QueueKind = 'quest' | 'sidequest' | 'blocker' | 'chat';
@@ -30,8 +35,9 @@ const TIE: Partial<Record<QueueState, number>> = { permission: 0, question: 1, d
 export const waitsForMe = (e: QueueOrderEntry): boolean => WAITS.has(e.state);
 
 /**
- * The three groups of the list, top to bottom: 0 the chats open right now, 1 the chats that were closed without
- * /finalize-chat (and the tickets they claimed), 2 the tickets no chat has claimed. A separator sits between them.
+ * The groups of an entry: 0 a chat open right now, 1 a chat that was closed without /finalize-chat (or a ticket it
+ * claimed), 2 a ticket no chat has claimed. Only group 2 is a level of the order (below the others); 0 and 1 are
+ * information, since moving between them must not reorder.
  */
 export type QueueGroup = 0 | 1 | 2;
 export const groupOf = (e: QueueOrderEntry): QueueGroup => (e.open ? 0 : e.state === 'unclaimed' ? 2 : 1);
@@ -62,20 +68,9 @@ export function constraints(entries: QueueOrderEntry[]): Array<[string, string]>
   return pairs;
 }
 
-/** Side quests of one parent keep their slots and sort inside them; then a stable topological sort. */
+/** A stable topological sort over the constraints; keys absent from the entries carry no constraint. */
 function settle(list: string[], entries: QueueOrderEntry[]): string[] {
-  const byKey = index(entries);
   const out = [...list];
-  const groups = new Map<string, string[]>();
-  for (const k of out) {
-    const e = byKey.get(k)!;
-    if (e.kind === 'sidequest' && e.parentKey) groups.set(e.parentKey, [...(groups.get(e.parentKey) ?? []), k]);
-  }
-  for (const keys of groups.values()) {
-    const slots = keys.map((k) => out.indexOf(k)).sort((a, b) => a - b);
-    const sorted = keys.map((k) => byKey.get(k)!).sort(tieCmp);
-    slots.forEach((slot, i) => { out[slot] = sorted[i].key; });
-  }
   const present = new Set(out);
   const above = new Map<string, Set<string>>(out.map((k) => [k, new Set()]));
   for (const [a, b] of constraints(entries)) if (present.has(a) && present.has(b)) above.get(b)!.add(a);
@@ -93,10 +88,13 @@ function settle(list: string[], entries: QueueOrderEntry[]): string[] {
   return result;
 }
 
-/** Drop closed entries, place new ones, settle. */
+/**
+ * Place new entries, settle. A key whose entry is gone stays in its slot, so the entry returns to its place.
+ * ponytail: the list grows by one key per entry ever seen and is never pruned; prune by age if it ever matters.
+ */
 export function repair(stored: string[], entries: QueueOrderEntry[]): string[] {
   const byKey = index(entries);
-  const list = [...new Set(stored.filter((k) => byKey.has(k)))];
+  const list = [...new Set(stored)];
   for (const n of entries.filter((e) => !list.includes(e.key)).sort(tieCmp)) {
     const root = rootOf(n.key, byKey);
     if (root === n.key) {
@@ -104,7 +102,7 @@ export function repair(stored: string[], entries: QueueOrderEntry[]): string[] {
     } else if (n.kind === 'blocker' && n.blocks.some((k) => list.includes(k))) {
       list.splice(Math.min(...n.blocks.map((k) => list.indexOf(k)).filter((i) => i >= 0)), 0, n.key);
     } else {
-      const family = list.map((k, i) => [k, i] as const).filter(([k]) => rootOf(k, byKey) === root);
+      const family = list.map((k, i) => [k, i] as const).filter(([k]) => byKey.has(k) && rootOf(k, byKey) === root);
       list.splice(family.length ? family[family.length - 1][1] + 1 : list.length, 0, n.key);
     }
   }
@@ -151,15 +149,16 @@ export function lift(list: string[], entries: QueueOrderEntry[], keys: string[])
 
 /**
  * The pinned entry first, above everything ("it overrides any prio", Noam 2026-10-28); then the permission
- * prompts, in stored order; then the three groups of `groupOf`. The family rules order entries only inside each
- * group; nothing else moves for the pin.
+ * prompts, in stored order; then the stored order, the tickets no chat has claimed last. Nothing else moves for
+ * the pin, and being open moves nothing.
  */
 export function view(stored: string[], latch: string | null, entries: QueueOrderEntry[]): string[] {
   const byKey = index(entries);
   const pinned = latch && byKey.has(latch) ? [latch] : [];
   const perm = stored.filter((k) => byKey.get(k)?.state === 'permission' && !pinned.includes(k));
   const rest = stored.filter((k) => byKey.has(k) && !perm.includes(k) && !pinned.includes(k));
-  return [...pinned, ...perm, ...[0, 1, 2].flatMap((g) => rest.filter((k) => groupOf(byKey.get(k)!) === g))];
+  const unclaimed = (k: string) => groupOf(byKey.get(k)!) === 2;
+  return [...pinned, ...perm, ...rest.filter((k) => !unclaimed(k)), ...rest.filter(unclaimed)];
 }
 
 /** The first entry of the view that needs Noam and is not the shown one. */

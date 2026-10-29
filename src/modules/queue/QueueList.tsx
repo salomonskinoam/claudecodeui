@@ -22,8 +22,8 @@ type QueueListProps = {
 
 /**
  * quests priority queue: the session list. In focus mode (the default) the chats that wait for Noam, then two
- * collapsed groups, "Live chats" and "Tickets-Unclaimed"; in archive mode every entry in queue order, in three
- * groups with a separator between them (open chats, chats closed without /finalize-chat, unclaimed tickets).
+ * collapsed groups, "Live chats" and "Tickets-Unclaimed"; in archive mode every entry in queue order, with a
+ * separator before the tickets no chat has claimed.
  */
 export default function QueueList({ onNewSession, onStartTicket }: QueueListProps) {
   const queue = useQueue();
@@ -63,7 +63,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
     <div className="flex flex-col" data-quests-queue="list" data-quests-mode={mode}>
       <QueueToolbar onNewSession={onNewSession} />
       <div {...listProps}>
-        {lines.map((e, i) => line(e, mode === 'archive' && i > 0 && lines[i - 1].group !== e.group))}
+        {lines.map((e, i) => line(e, mode === 'archive' && i > 0 && (lines[i - 1].group === 2) !== (e.group === 2)))}
         {mode === 'focus' && groups.map(([label, members]) => (
           <div key={label}>
             <QueueGroupLine label={label} count={members.length} open={openGroups.has(label)} onToggle={() => toggle(label)} />
