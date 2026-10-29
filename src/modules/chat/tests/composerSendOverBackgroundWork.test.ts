@@ -9,9 +9,11 @@ import type { PermissionMode, Project, ProjectSession, SessionActivityMap } from
 
 /**
  * A session whose turn has ended with background work still running keeps
- * its composer usable — but a new turn replaces the CLI process that work
- * runs under, so the work is stopped or finishes where nothing listens. The
- * composer says so and asks before sending; nothing else in the app does.
+ * its composer usable — but for a provider other than Claude a new turn
+ * replaces the CLI process that work runs under, so the work is stopped or
+ * finishes where nothing listens. The composer says so and asks before
+ * sending. quests: a Claude chat never asks and never queues: its message is
+ * pushed into the same process (the server does that), so the work goes on.
  */
 
 const PROJECT: Project = { projectId: 'project-1', displayName: 'Project One', fullPath: '/tmp/project-one' };
@@ -32,20 +34,20 @@ const backgroundOnly: SessionActivityMap = new Map([[
   },
 ]]);
 
-const submit = async (processingSessions: SessionActivityMap) => {
+const submit = async (processingSessions: SessionActivityMap, provider: 'claude' | 'codex' = 'codex', isLoading = false) => {
   const sent: Array<{ type: string }> = [];
   const view = renderHook(() =>
     useChatComposerState({
       selectedProject: PROJECT,
       selectedSession: SESSION,
       currentSessionId: SESSION.id,
-      provider: 'claude',
+      provider,
       permissionMode: 'default',
       cyclePermissionMode: () => undefined,
       resolvePermissionModeForProvider: () => 'default' as PermissionMode,
       currentProviderModel: 'test-model',
       currentProviderEffort: 'medium',
-      isLoading: false,
+      isLoading,
       processingSessions,
       canAbortSession: false,
       tokenBudget: null,
@@ -96,6 +98,20 @@ test('confirming sends the message', async () => {
   const { sends } = await submit(backgroundOnly);
 
   assert.equal(sends.length, 1);
+});
+
+test('quests: a Claude chat with background work sends at once, no question', async () => {
+  const { sends } = await submit(backgroundOnly, 'claude');
+
+  assert.equal(confirm.mock.calls.length, 0);
+  assert.equal(sends.length, 1);
+});
+
+test('quests: a Claude chat whose turn is running sends at once instead of queueing', async () => {
+  const { sends, view } = await submit(new Map(), 'claude', true);
+
+  assert.equal(sends.length, 1, 'the message goes out and joins the running turn');
+  assert.equal(view.result.current.queuedDraft, null, 'nothing is queued');
 });
 
 test('a session with nothing in the background sends without asking', async () => {

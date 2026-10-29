@@ -4,6 +4,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 
 import { hasLiveProcess } from '@/modules/queue/index.js';
+import { describeToolCall } from '@/modules/providers/list/claude/describe-tool-call.js';
 import type { IProviderSessions } from '@/shared/interfaces.js';
 import type {
   AnyRecord,
@@ -99,15 +100,6 @@ type ClaudeSubagentTranscript = {
   /** quests: what the agent is on: its last tool call ("Bash: npm test") or the head of its last text. */
   lastStep?: string;
 };
-
-/** quests: one line for a tool call, the tool's name and the head of its first string input. */
-function describeToolCall(name: string, input: unknown): string {
-  const first = input && typeof input === 'object'
-    ? Object.values(input as Record<string, unknown>).find((v) => typeof v === 'string' && v.trim())
-    : undefined;
-  const head = typeof first === 'string' ? first.trim().split('\n', 1)[0].slice(0, 60) : '';
-  return head ? `${name}: ${head}` : name;
-}
 
 /**
  * Flattens one subagent transcript into the shared activity timeline.
@@ -1443,6 +1435,22 @@ export class ClaudeSessionsProvider implements IProviderSessions {
       }
 
       return [];
+    }
+
+    // quests: a message sent from the page while the chat was working is pushed into the running turn, and
+    // Claude Code writes it as an attachment row of type queued_command, not as a user row. It is the user's
+    // message all the same.
+    if (raw.type === 'attachment' && raw.attachment?.type === 'queued_command' && typeof raw.attachment.prompt === 'string') {
+      messages.push(createNormalizedMessage({
+        id: baseId,
+        sessionId,
+        timestamp: ts,
+        provider: PROVIDER,
+        kind: 'text',
+        role: 'user',
+        content: raw.attachment.prompt,
+      }));
+      return messages;
     }
 
     if (raw.message?.role === 'user' && raw.message?.content && raw.isMeta !== true) {

@@ -7,6 +7,7 @@ import test from 'node:test';
 import { ClaudeSessionsProvider } from '@/modules/providers/list/claude/claude-sessions.provider.js';
 import { CLAUDE_PREDEFINED_MODELS } from '@/modules/providers/list/claude/claude-models.provider.js';
 import {
+  canJoinClaudeSDKTurn,
   listClaudeSDKBackgroundWork,
   queryClaudeSDK,
   stopClaudeSDKTask,
@@ -353,6 +354,54 @@ test('quests: a new turn from the same folder joins the held process; its backgr
     first.script.emit(taskNotification('a1', 'toolu_agent', 'completed'));
     first.script.emit(result());
     await waitFor(() => first.script.released());
+    first.script.end();
+    await firstRun;
+    await secondRun;
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('quests: a message sent while the turn runs joins that turn; its tools keep running, one complete', async () => {
+  // Measured on the real SDK (2026-10-29, 0.3.165): a user message pushed mid-turn is delivered inside the running
+  // turn, with one `result` for both. So the runtime pushes it into the same process, resolves the caller at
+  // once, and the running turn's `complete` covers the message. The banner says what the turn is doing.
+  const cwd = await mkdtemp(path.join(os.tmpdir(), 'claude-runtime-hold-'));
+  const first = createScriptedQuery();
+  const second = createScriptedQuery();
+  const sent: NormalizedMessage[] = [];
+  const writer = { send: (message: NormalizedMessage) => { sent.push(message); }, userId: null };
+  const sessions = new ClaudeSessionsProvider({ getLiveRunStartTime: () => null });
+  const context: Omit<ProviderRuntimeContext, 'createQuery'> = {
+    resolveProviderSessionId: () => null,
+    resolveResumeModel: async () => undefined,
+    getProviderModels: async () => CLAUDE_PREDEFINED_MODELS as never,
+    normalizeMessage: (raw, sessionId) => sessions.normalizeMessage(raw, sessionId),
+    isProviderInstalled: async () => true,
+  };
+
+  try {
+    const firstRun = queryClaudeSDK('run the checks', { sessionId: SESSION_ID, cwd }, writer as never, { ...context, createQuery: first.createQuery });
+    await settle();
+    first.script.emit(init());
+    first.script.emit(toolUse('toolu_bash', 'Bash', { command: 'python hor.py status', description: 'status' }));
+    await waitFor(() => sent.some((message) => message.kind === 'status' && message.text === 'Bash: python hor.py status'));
+    assert.equal(canJoinClaudeSDKTurn(SESSION_ID), true, 'the running process takes a message');
+
+    let secondDone = false;
+    const secondRun = queryClaudeSDK('also check the logs', { sessionId: SESSION_ID, cwd }, writer as never, { ...context, createQuery: second.createQuery })
+      .then(() => { secondDone = true; });
+    await waitFor(() => first.script.read.length === 2);
+    await waitFor(() => secondDone);
+    assert.equal(second.script.created(), 0, 'no second process');
+    assert.equal(first.script.released(), false, 'the running process goes on');
+    assert.equal(sent.filter((message) => message.kind === 'complete').length, 0, 'the turn is not over');
+
+    first.script.emit(ack('toolu_bash', 'ok', {}));
+    first.script.emit(result());
+    await waitFor(() => sent.filter((message) => message.kind === 'complete').length === 1);
+    await settle();
+    assert.equal(sent.filter((message) => message.kind === 'complete').length, 1, 'one complete for the turn and the message it took');
     first.script.end();
     await firstRun;
     await secondRun;

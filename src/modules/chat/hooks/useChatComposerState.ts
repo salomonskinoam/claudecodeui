@@ -686,7 +686,9 @@ export function useChatComposerState({
       // A turn is already in flight: stash this message instead of sending it.
       // Upload attached files now so the queued record contains durable image
       // descriptors that can be sent even if another session is open later.
-      if (isLoading) {
+      // quests: not for a Claude chat. Its message goes out now and joins the running turn in the same process,
+      // as in Cursor; the server pushes it into that process (chat-websocket dispatchRun).
+      if (isLoading && provider !== 'claude') {
         // A run can restart in the tiny gap between scheduling and flushing a
         // queued submission. Put the same durable draft back without uploading
         // its files again.

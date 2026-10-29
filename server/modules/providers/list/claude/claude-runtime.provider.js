@@ -38,6 +38,7 @@ import {
 } from '@/modules/notifications/index.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
 import { createCompleteMessage, createNormalizedMessage } from '@/shared/utils.js';
+import { describeToolCall } from '@/modules/providers/list/claude/describe-tool-call.js';
 
 const activeSessions = new Map();
 // Outstanding background tasks per live session, keyed like activeSessions. An
@@ -1206,6 +1207,14 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         console.warn('[Claude SDK] Could not retune the held process for the new turn:', error?.message || error);
         return false;
       }
+      // quests: the turn is still running (no `result` yet): the message joins it. Claude Code delivers a user
+      // message pushed mid-turn inside that turn (measured 2026-10-29, SDK 0.3.165: one `result` covers both, the
+      // transcript gets a queued_command row), so the per-turn flags stay as they are and the caller is done
+      // at once; the running turn's `complete` covers the pushed message too. Tools keep running.
+      if (!turnCompleteSent) {
+        ws = newWs;
+        return heldPrompt.push(messages);
+      }
       return new Promise((resolve) => {
         ws = newWs;
         sessionSummary = next.sessionSummary ?? sessionSummary;
@@ -1273,6 +1282,14 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
           assistantBudgetSent = true;
         }
         ws.send(createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget: tokenBudgetData, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+      }
+
+      // quests: the running banner says what the chat is doing, its last tool call, as the agent summary does.
+      if (message.type === 'assistant') {
+        const call = (message.message?.content ?? []).find((part) => part?.type === 'tool_use');
+        if (call) {
+          ws.send(createNormalizedMessage({ kind: 'status', text: describeToolCall(String(call.name ?? 'Tool'), call.input), sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+        }
       }
 
       if (startsBackgroundWork(message)) {
@@ -1503,6 +1520,17 @@ async function abortClaudeSDKSession(sessionId) {
 }
 
 /**
+ * quests: whether a live process of this session takes a new message itself: mid-turn (the message joins the
+ * running turn) or held for background work (the message starts the next turn in the same process).
+ * @param {string} sessionId - App session identifier
+ * @returns {boolean}
+ */
+function canJoinClaudeSDKTurn(sessionId) {
+  const session = getSession(sessionId);
+  return Boolean(session?.beginTurn && session.status === 'active');
+}
+
+/**
  * Sessions whose background tasks are still outstanding, with the tasks.
  *
  * A session stays here after its turn's `result` for as long as the process
@@ -1611,12 +1639,14 @@ export const claudeRuntime = {
   },
   listBackgroundWork: listClaudeSDKBackgroundWork,
   stopBackgroundTask: stopClaudeSDKTask,
+  canJoinTurn: canJoinClaudeSDKTurn,
 };
 
 // Export public API
 export {
   queryClaudeSDK,
   abortClaudeSDKSession,
+  canJoinClaudeSDKTurn,
   listClaudeSDKBackgroundWork,
   stopClaudeSDKTask,
   isClaudeSDKSessionActive,

@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -394,6 +394,35 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const jumped = samples.some((s) => s.markerTop !== before.markerTop);
     const rowsLanded = samples[samples.length - 1].rows - before.rows;
     console.log(JSON.stringify({ jsonl: path.basename(jsonl), before, samples, rowsLanded, jumped }));
+  }
+
+  if (check === 'typejump') {
+    // At the bottom of a long chat, typing one character into the input box must not move the view. The pane is
+    // scrolled to its end, the last row in view is marked, one character is typed, and the row's place and the
+    // pane's scrollTop are measured again; the character is then deleted.
+    await page.locator('.chat-messages-pane .chat-message').first().waitFor({ timeout: 40000 }).catch(() => undefined);
+    await page.waitForTimeout(2000);
+    await pane.evaluate((p) => { p.scrollTop = p.scrollHeight; });
+    await page.waitForTimeout(1500);
+    const measure = () => pane.evaluate((p) => {
+      const top = p.getBoundingClientRect().top;
+      let marker = p.querySelector('[data-quests-marker]');
+      if (!marker) {
+        marker = Array.from(p.querySelectorAll('.chat-message')).reverse().find((m) => m.getBoundingClientRect().top >= top);
+        marker?.setAttribute('data-quests-marker', '');
+      }
+      return { scrollTop: p.scrollTop, clientHeight: p.clientHeight, height: p.scrollHeight, markerTop: marker ? Math.round(marker.getBoundingClientRect().top - top) : null, downArrow: Boolean(document.querySelector('[aria-label="Scroll to bottom"]')) };
+    });
+    const before = await measure();
+    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    await box.focus();
+    await page.keyboard.type('s');
+    await page.waitForTimeout(1200);
+    const after = await measure();
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(500);
+    const cleared = await measure();
+    console.log(JSON.stringify({ before, after, cleared, jumped: after.markerTop !== before.markerTop }));
   }
 
   if (check === 'subagents') {

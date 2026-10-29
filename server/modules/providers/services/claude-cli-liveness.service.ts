@@ -84,6 +84,12 @@ async function readLiveBusySession(filePath: string): Promise<LiveClaudeCliSessi
   if (!providerSessionId || !Number.isInteger(pid) || pid <= 0 || record.status !== 'busy') {
     return null;
   }
+  // quests: a process this server started through the SDK is known to the chat-run registry and the background
+  // work tracker. One that is busy and known to neither is a leftover of an earlier server, not a CLI the user
+  // runs; listing it as "Running in the Claude CLI" froze the chat and queued every message behind it.
+  if (record.entrypoint === 'sdk-ts') {
+    return null;
+  }
 
   if (!(await isRecordedProcessAlive(pid, record.procStart))) {
     return null;

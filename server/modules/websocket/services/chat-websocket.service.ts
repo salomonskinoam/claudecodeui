@@ -76,6 +76,7 @@ export type ProviderRuntimeGateway = {
   stopBackgroundTask(provider: LLMProvider, sessionId: string, taskId: string): Promise<boolean>;
   /** Whether a provider runtime still holds background work for the session after its turn ended. */
   hasBackgroundWork(sessionId: string): boolean;
+  canJoinTurn(provider: LLMProvider, sessionId: string): boolean;
   resolveToolApproval(requestId: string, payload: ProviderPermissionDecision): void;
   getPendingApprovalsForSession(sessionId: string): unknown[];
 };
@@ -228,7 +229,12 @@ async function dispatchRun(
     userId,
   });
 
-  if (!run) {
+  // quests: a Claude chat whose process is live takes the message itself, as Cursor does: pushed into the same
+  // process, it joins the running turn (tools keep running) or starts the next one. Its events go through the
+  // run that is already going; nothing is refused or queued.
+  const joined = run ? null : chatRunRegistry.getRun(sessionId);
+  const joining = Boolean(!run && joined && joined.status === 'running' && dependencies.runtime.canJoinTurn(provider, sessionId));
+  if (!run && !joining) {
     if (ws) {
       sendProtocolError(
         ws,
@@ -238,6 +244,9 @@ async function dispatchRun(
       );
     }
     return { started: false, error: 'A run is already in progress for this session.' };
+  }
+  if (!run && ws) {
+    chatRunRegistry.attachConnection(sessionId, ws);
   }
 
   const clientOptions = (data.options ?? {}) as AnyRecord;
@@ -281,6 +290,17 @@ async function dispatchRun(
     cwd: clientOptions.cwd ?? session.project_path ?? undefined,
     projectPath: session.project_path ?? clientOptions.projectPath,
   };
+
+  if (!run) {
+    try {
+      await dependencies.runtime.run(provider, command, runtimeOptions, joined!.writer);
+      return { started: true, error: null };
+    } catch (error) {
+      const failure = error instanceof Error ? error.message : String(error);
+      console.error(`[Chat] Provider runtime "${provider}" could not take the message into the running turn`, { sessionId, error: failure });
+      return { started: true, error: failure };
+    }
+  }
 
   let failure: string | null = null;
   try {

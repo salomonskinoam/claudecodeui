@@ -46,6 +46,11 @@ export interface IProviderRuntime {
    */
   listBackgroundWork?(): Array<{ sessionId: string; tasks: BackgroundTaskSummary[] }>;
   /**
+   * quests: whether a live process of the session takes a new message itself (its turn is running, or it is held
+   * for background work), so the chat gateway hands the message to it instead of refusing the send.
+   */
+  canJoinTurn?(sessionId: string): boolean;
+  /**
    * Stops one outstanding background task. Resolves false when the session has
    * no live process or that process is not tracking the task — it already
    * settled, or the id was never one of its own.
