@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -429,6 +429,34 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(500);
     const cleared = await measure();
     console.log(JSON.stringify({ before, after, cleared, jumped: after.markerTop !== before.markerTop }));
+  }
+
+  if (check === 'join') {
+    // A message sent while the chat works joins the running turn: the process (pid) stays, the running Bash
+    // finishes, both replies land. Starts a throwaway chat from the "+" tab; <sessionId> is only the page to start on.
+    const fs = require('node:fs');
+    const reg = () => fs.readdirSync(path.join(os.homedir(), '.claude', 'sessions')).map((f) => {
+      try { return JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'sessions', f), 'utf8')); } catch { return null; }
+    }).filter((d) => d && d.entrypoint === 'sdk-ts').map((d) => `${String(d.sessionId).slice(0, 8)}:${d.pid}:${d.status}`).sort().join(' ');
+    const texts = () => page.locator('[data-message-timestamp]').evaluateAll((rows) => rows.slice(-6).map((r) => r.textContent.replace(/\s+/g, ' ').slice(0, 90)));
+    await page.locator('[data-quests-tab="new"]').first().click();
+    await page.waitForTimeout(2500);
+    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    const t0 = Date.now();
+    await box.fill('Use Bash to run exactly: sleep 45; echo finished. Then reply with exactly: first done');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(12000);
+    const during = { at: Date.now() - t0, reg: reg(), url: await page.evaluate(() => location.pathname) };
+    await box.fill('Reply with exactly: second done');
+    await page.keyboard.press('Enter');
+    const samples = [];
+    for (let i = 0; i < 30; i += 1) {
+      await page.waitForTimeout(3000);
+      samples.push({ at: Date.now() - t0, reg: reg(), last: (await texts()).slice(-2) });
+      const all = (await texts()).join(' | ');
+      if (all.includes('first done') && all.includes('second done')) break;
+    }
+    console.log(JSON.stringify({ during, samples, rows: await texts() }, null, 1));
   }
 
   if (check === 'subagents') {
