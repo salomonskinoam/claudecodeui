@@ -413,13 +413,19 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       }
       return { scrollTop: p.scrollTop, clientHeight: p.clientHeight, height: p.scrollHeight, markerTop: marker ? Math.round(marker.getBoundingClientRect().top - top) : null, downArrow: Boolean(document.querySelector('[aria-label="Scroll to bottom"]')) };
     });
-    const before = await measure();
+    // As Noam had it: a draft of several lines already in the box, the view at the end, then one more character.
     const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    await box.fill('46.2 yes. and all false positive rulings that repeat.\ndoes that mean some classifications change?\n\n\nwe dont want to DO any fixes in this chat.\nInstead, I want a ticket per task and i will fix each one in its own chat.\n');
+    await page.waitForTimeout(800);
+    await pane.evaluate((p) => { p.scrollTop = p.scrollHeight; });
+    await page.waitForTimeout(1200);
+    const before = await measure();
     await box.focus();
+    await page.keyboard.press('End');
     await page.keyboard.type('s');
     await page.waitForTimeout(1200);
     const after = await measure();
-    await page.keyboard.press('Backspace');
+    await box.fill('');
     await page.waitForTimeout(500);
     const cleared = await measure();
     console.log(JSON.stringify({ before, after, cleared, jumped: after.markerTop !== before.markerTop }));
