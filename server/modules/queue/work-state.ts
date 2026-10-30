@@ -103,8 +103,11 @@ export async function readWorkState(appSessionId: string): Promise<WorkState | n
     text: chat?.closingLine && queueState.state !== 'running' && queueState.state !== 'permission' ? chat.closingLine.text : null,
     since: queueState.since || null,
   };
-  // No live process, no worker: everything the chat launched died with it (a restart, a close).
-  const open = chat?.process ? getOpenTasks(sid) : [];
+  // A worker lives inside the chat's process: no live process, no worker, and a task launched before the
+  // current process started died with the process that launched it (Noam, 30 Oct: "only live ones should be
+  // shown. i see stale ones").
+  const process = chat?.process;
+  const open = process ? getOpenTasks(sid).filter((t) => !t.startedAt || Date.parse(t.startedAt) >= process.startedAt - 5000) : [];
   const workers = (await Promise.all(open.map((task) => workerOf(task, appSessionId, sid, row.jsonl_path ?? null))))
     // A command whose output ends with "[killed]" was stopped by Claude Code without a report.
     .filter((w) => w.step !== '[killed]');
