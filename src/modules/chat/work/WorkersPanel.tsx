@@ -1,6 +1,8 @@
 import { memo, useEffect, useState } from 'react';
 
 import { authenticatedFetch } from '@/shared/api';
+import { Shimmer } from '@/shared/ui';
+import type { SessionActivity } from '@/shared/types';
 import { formatTaskDuration } from '@/modules/chat/utils/backgroundTasks';
 import { openWorkTab, type WorkKind } from '@/modules/chat/work/workTabs';
 
@@ -56,7 +58,19 @@ function liveness(worker: Worker, now: number): { alive: boolean; text: string }
 
 const OPEN_STORE = 'quests-workers-open';
 
-function WorkersPanel({ sessionId }: { sessionId: string | null }) {
+type WorkersPanelProps = {
+  sessionId: string | null;
+  /** The turn in flight as the page sees it live (the status frames), which beats the server's 3 second read. */
+  activity: SessionActivity | null;
+  onAbort?: () => void;
+};
+
+/**
+ * One row for the chat, labelled "Chat", so it is never taken for a worker (Noam, 30 Oct, through another chat:
+ * "unclear what is the main chat and what is the other message"). While a turn is in flight the live activity
+ * fills the row (its step, its time, Stop); otherwise the server's state does.
+ */
+function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
   const [state, setState] = useState<WorkState | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // The workers fold under the main line (Noam, 30 Oct: "the UI hides the entire screen right now, you have to
@@ -102,11 +116,14 @@ function WorkersPanel({ sessionId }: { sessionId: string | null }) {
     };
   }, [sessionId]);
 
-  if (!sessionId || !state) return null;
+  const inFlight = activity && !activity.background ? activity : null;
+  if (!sessionId || (!state && !inFlight)) return null;
   // A worker quiet for half an hour is not live, whatever the server still lists (Noam, 30 Oct: "350 minutes
   // idle is not live is it"); the Monitor tool itself gives up after 30 minutes.
-  const workers = state.workers.filter((w) => now - (w.lastActivityAt ?? w.startedAt ?? now) < 30 * 60_000);
-  const { main } = state;
+  const workers = (state?.workers ?? []).filter((w) => now - (w.lastActivityAt ?? w.startedAt ?? now) < 30 * 60_000);
+  const main: MainState = inFlight
+    ? { state: 'answering', step: inFlight.statusText ?? state?.main.step ?? null, text: null, since: inFlight.startedAt }
+    : state!.main;
   if (main.state === 'idle' && workers.length === 0) return null;
   const mainDetail = main.state === 'answering' ? main.step : main.text;
 
@@ -114,9 +131,17 @@ function WorkersPanel({ sessionId }: { sessionId: string | null }) {
     <div className="pointer-events-auto mb-1 rounded-md border border-border/50 bg-card px-3 py-1.5 text-xs" data-quests-workers="panel">
       <div className="flex items-center gap-2" data-quests-workers="main">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${main.state === 'answering' ? 'animate-pulse bg-primary' : main.state === 'permission' ? 'bg-blue-400' : 'bg-muted-foreground/50'}`} />
-        <span className="shrink-0 font-medium text-foreground">{MAIN_LABEL[main.state]}</span>
+        <span className="shrink-0 text-muted-foreground/70">Chat</span>
+        {main.state === 'answering'
+          ? <Shimmer className="shrink-0 font-medium">{`${MAIN_LABEL[main.state]}…`}</Shimmer>
+          : <span className="shrink-0 font-medium text-foreground">{MAIN_LABEL[main.state]}</span>}
         {mainDetail && <span className="min-w-0 truncate text-muted-foreground" title={mainDetail}>{mainDetail}</span>}
         {main.since !== null && <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">{formatTaskDuration(Math.max(0, now - main.since))}</span>}
+        {inFlight?.canInterrupt && onAbort && (
+          <button type="button" onClick={onAbort} data-quests-workers="stop" className="shrink-0 rounded px-1 text-muted-foreground hover:bg-muted hover:text-destructive">
+            Stop <kbd className="rounded border border-border/60 px-1 text-[10px]">esc</kbd>
+          </button>
+        )}
         {workers.length > 0 && (
           <button type="button" data-quests-workers="toggle" onClick={toggle} className="shrink-0 rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground">
             {open ? '▾' : '▸'} {workers.length} {workers.length === 1 ? 'worker' : 'workers'}

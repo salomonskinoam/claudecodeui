@@ -279,8 +279,10 @@ export default function ChatComposer({
     <div className="chat-composer-shell relative flex-shrink-0 px-8 pb-4 pt-0">
       {!hasPendingPermissions && (
         <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-[calc(100%-4rem)] -translate-x-1/2 translate-y-px bg-transparent">
-          <WorkersPanel sessionId={sessionId} />
-          <ActivityIndicator activity={activity} onAbort={onAbortSession} isInputFocused={isInputFocused} />
+          {/* quests: one row for the chat, one per worker; the old indicator only while the panel has no session. */}
+          {sessionId
+            ? <WorkersPanel sessionId={sessionId} activity={activity} onAbort={onAbortSession} />
+            : <ActivityIndicator activity={activity} onAbort={onAbortSession} isInputFocused={isInputFocused} />}
         </div>
       )}
 
