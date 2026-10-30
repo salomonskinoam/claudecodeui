@@ -103,6 +103,10 @@ export async function readWorkState(appSessionId: string): Promise<WorkState | n
     text: chat?.closingLine && queueState.state !== 'running' && queueState.state !== 'permission' ? chat.closingLine.text : null,
     since: queueState.since || null,
   };
-  const workers = await Promise.all(getOpenTasks(sid).map((task) => workerOf(task, appSessionId, sid, row.jsonl_path ?? null)));
+  // No live process, no worker: everything the chat launched died with it (a restart, a close).
+  const open = chat?.process ? getOpenTasks(sid) : [];
+  const workers = (await Promise.all(open.map((task) => workerOf(task, appSessionId, sid, row.jsonl_path ?? null))))
+    // A command whose output ends with "[killed]" was stopped by Claude Code without a report.
+    .filter((w) => w.step !== '[killed]');
   return { main, workers };
 }

@@ -64,10 +64,12 @@ export function openTasksOf(lines: string[]): OpenTask[] {
       if (launch && typeof id === 'string') launch.taskId = id;
       // A synchronous agent reports in its result at once: not a worker.
       if (launch && launch.kind === 'agent' && result && result.isAsync !== true && result.status !== 'async_launched') closedToolUse.add(toolUseId);
-    } else if (line.includes('<task-notification>') && line.includes('"type":"user"')) {
+    } else if (line.includes('<task-notification>') && (line.includes('"type":"user"') || line.includes('"queued_command"'))) {
+      // A report lands as a user row, or, when it arrives mid-turn, as a queued_command attachment.
       const row = parse(line);
-      const text = typeof row?.message?.content === 'string' ? row.message.content
-        : Array.isArray(row?.message?.content) ? row.message.content.map((b: { text?: string }) => b.text ?? '').join('\n') : '';
+      const text = typeof row?.attachment?.prompt === 'string' ? row.attachment.prompt
+        : typeof row?.message?.content === 'string' ? row.message.content
+          : Array.isArray(row?.message?.content) ? row.message.content.map((b: { text?: string }) => b.text ?? '').join('\n') : '';
       for (const note of text.split('<task-notification>').slice(1)) {
         const status = /<status>([a-z_]+)<\/status>/.exec(note)?.[1];
         const ended = (status && TERMINAL.has(status)) || note.includes('Monitor expired');

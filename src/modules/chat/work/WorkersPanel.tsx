@@ -54,9 +54,30 @@ function liveness(worker: Worker, now: number): { alive: boolean; text: string }
   return quiet < 20_000 ? { alive: true, text: 'alive' } : { alive: false, text: `quiet for ${formatTaskDuration(quiet)}` };
 }
 
+const OPEN_STORE = 'quests-workers-open';
+
 function WorkersPanel({ sessionId }: { sessionId: string | null }) {
   const [state, setState] = useState<WorkState | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // The workers fold under the main line (Noam, 30 Oct: "the UI hides the entire screen right now, you have to
+  // make this collapsable"); the choice is a per-viewer convenience kept in the browser.
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(OPEN_STORE) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () => {
+    setOpen((o) => {
+      try {
+        localStorage.setItem(OPEN_STORE, o ? '0' : '1');
+      } catch {
+        /* no storage */
+      }
+      return !o;
+    });
+  };
 
   useEffect(() => {
     setState(null);
@@ -92,8 +113,13 @@ function WorkersPanel({ sessionId }: { sessionId: string | null }) {
         <span className="shrink-0 font-medium text-foreground">{MAIN_LABEL[main.state]}</span>
         {mainDetail && <span className="min-w-0 truncate text-muted-foreground" title={mainDetail}>{mainDetail}</span>}
         {main.since !== null && <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">{formatTaskDuration(Math.max(0, now - main.since))}</span>}
+        {workers.length > 0 && (
+          <button type="button" data-quests-workers="toggle" onClick={toggle} className="shrink-0 rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+            {open ? '▾' : '▸'} {workers.length} {workers.length === 1 ? 'worker' : 'workers'}
+          </button>
+        )}
       </div>
-      {workers.map((worker) => {
+      {open && <div className="max-h-40 overflow-y-auto">{workers.map((worker) => {
         const life = liveness(worker, now);
         return (
           <div key={worker.taskId} className="mt-1 flex items-center gap-2 border-t border-border/30 pt-1" data-quests-workers="worker">
@@ -116,7 +142,7 @@ function WorkersPanel({ sessionId }: { sessionId: string | null }) {
             )}
           </div>
         );
-      })}
+      })}</div>}
     </div>
   );
 }

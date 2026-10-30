@@ -8,6 +8,7 @@ const launch = (id: string, name: string, input: Record<string, unknown>, ts = '
 const ack = (toolUseId: string, toolUseResult: Record<string, unknown>) =>
   JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: toolUseId, content: 'ok' }] }, toolUseResult });
 const report = (body: string) => JSON.stringify({ type: 'user', message: { content: `<task-notification>\n${body}` } });
+const queuedReport = (body: string) => JSON.stringify({ type: 'attachment', attachment: { type: 'queued_command', prompt: `<task-notification>\n${body}`, commandMode: 'prompt' } });
 
 test('quests: the open tasks are the launches without an end report; a synchronous agent and an orphan summary close', () => {
   const lines = [
@@ -27,6 +28,10 @@ test('quests: the open tasks are the launches without an end report; a synchrono
     ack('t_mon_old', { taskId: 'bmfu0xlzs', timeoutMs: 1800000 }),
     report('<task-id>bmfu0xlzs</task-id>\n<task-id>__orphan_summary__:shell</task-id>\n<status>stopped</status>\n<summary>1 background shell command task didn\'t finish</summary>'),
     launch('t_plain', 'Bash', { command: 'ls' }),
+    launch('t_agent2', 'Agent', { description: 'Upload resnet dataset', prompt: 'x' }),
+    ack('t_agent2', { isAsync: true, status: 'async_launched', agentId: 'ad5ebfd2' }),
+    // Its report came mid-turn: a queued_command attachment, not a user row.
+    queuedReport('<task-id>ad5ebfd2</task-id>\n<tool-use-id>t_agent2</tool-use-id>\n<status>completed</status>\n<summary>Agent done</summary>'),
   ];
   const open = openTasksOf(lines);
   assert.deepEqual(open.map((t) => [t.kind, t.taskId, t.name]), [
