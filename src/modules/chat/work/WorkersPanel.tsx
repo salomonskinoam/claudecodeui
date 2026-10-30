@@ -102,8 +102,12 @@ function WorkersPanel({ sessionId }: { sessionId: string | null }) {
     };
   }, [sessionId]);
 
-  if (!sessionId || !state || (state.main.state === 'idle' && state.workers.length === 0)) return null;
-  const { main, workers } = state;
+  if (!sessionId || !state) return null;
+  // A worker quiet for half an hour is not live, whatever the server still lists (Noam, 30 Oct: "350 minutes
+  // idle is not live is it"); the Monitor tool itself gives up after 30 minutes.
+  const workers = state.workers.filter((w) => now - (w.lastActivityAt ?? w.startedAt ?? now) < 30 * 60_000);
+  const { main } = state;
+  if (main.state === 'idle' && workers.length === 0) return null;
   const mainDetail = main.state === 'answering' ? main.step : main.text;
 
   return (
