@@ -25,6 +25,20 @@ export function outputFileOf(message: Pick<ChatMessage, 'taskStatus' | 'toolResu
   return /<output-file>([^<]+)<\/output-file>/.exec(text)?.[1];
 }
 
+/** The file a watcher (the Monitor tool) tails: the first absolute path after `tail` in its command, else undefined. */
+export function monitoredFileOf(message: Pick<ChatMessage, 'toolName' | 'toolInput'>): string | undefined {
+  if (message.toolName !== 'Monitor') return undefined;
+  let input: unknown = message.toolInput;
+  try {
+    input = typeof input === 'string' ? JSON.parse(input) : input;
+  } catch {
+    return undefined;
+  }
+  const command = input && typeof input === 'object' ? (input as { command?: unknown }).command : undefined;
+  const after = typeof command === 'string' ? command.split(/\btail\b/)[1] : undefined;
+  return after ? /(\/\S+)/.exec(after)?.[1] : undefined;
+}
+
 /** The chat on screen in this window, from its address (the right pane is an iframe on /session/<id> too). */
 export const sessionIdFromUrl = (): string | null => /^\/session\/([^/]+)/.exec(window.location.pathname)?.[1] ?? null;
 

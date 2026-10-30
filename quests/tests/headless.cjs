@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -519,6 +519,16 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       return messages.slice(-16).map((m) => [m.timestamp?.slice(11, 19), m.type, m.isToolUse ? `tool:${m.toolName}` : '', m.isThinking ? 'thinking' : '', typeof m.content, String(m.content ?? '').replace(/\s+/g, ' ').slice(0, 60), String(m.content ?? '').replace(/\s+/g, ' ').slice(-50)].join(' | '));
     });
     console.log(rows.join('\n'));
+  }
+
+  if (check === 'runners') {
+    // What the page says about a chat's background work: the strip's chips, the banner, the agent cards' figures.
+    await page.waitForTimeout(6000);
+    console.log(JSON.stringify({
+      strip: await page.locator('[role="status"][aria-label="Background tasks"] button').evaluateAll((ns) => ns.map((n) => (n.getAttribute('title') || n.textContent).replace(/\s+/g, ' ').trim().slice(0, 90))),
+      banner: await page.locator('.chat-activity-tab').evaluateAll((ns) => ns.map((n) => n.textContent.replace(/\s+/g, ' ').trim().slice(0, 160))),
+      agents: await page.locator('[data-quests-subagent="figures"]').evaluateAll((ns) => ns.slice(-5).map((n) => `${n.parentElement.querySelector('[data-quests-subagent="step"]')?.textContent ?? ''} | ${n.textContent.trim()}`)),
+    }, null, 1));
   }
 
   if (check === 'subagents') {

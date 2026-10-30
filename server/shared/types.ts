@@ -437,6 +437,8 @@ export type BackgroundTaskSummary = {
   taskType: string;
   description: string;
   workflowName?: string;
+  /** quests: a backgrounded command's output file, for its work tab. */
+  outputFile?: string;
   startedAt: number;
   /**
    * The task was launched by a subagent or workflow agent, not by the

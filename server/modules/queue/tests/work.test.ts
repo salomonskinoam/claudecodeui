@@ -6,11 +6,13 @@ import { test } from 'node:test';
 
 import { isTaskOutputFile, readOutputTail } from '../work.js';
 
-test('quests: only a task output file under /tmp/claude-<uid> is served', () => {
+test('quests: only a file under a /tmp/claude-* folder is served', () => {
   assert.equal(isTaskOutputFile('/tmp/claude-1000/-home-noam-src-noam-worlds/0fbea6ac-4450-4870-a6ab-d42aa8c20c96/tasks/bwy06286r.output'), true);
+  assert.equal(isTaskOutputFile('/tmp/claude-0fbea6ac/watch_all.log'), true);
   assert.equal(isTaskOutputFile('/tmp/claude-1000/-home-noam/../../etc/passwd'), false);
   assert.equal(isTaskOutputFile('/home/noam/.claude/plans/x.md'), false);
   assert.equal(isTaskOutputFile('/tmp/claude-1000/-home-noam/0fbea6ac-4450-4870-a6ab-d42aa8c20c96/tasks/x.output/../y.output'), false);
+  assert.equal(isTaskOutputFile('/tmp/claude-x/..'), false);
 });
 
 test('quests: the tail of the output file, whole when small', async () => {

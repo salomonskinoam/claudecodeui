@@ -15,13 +15,13 @@ type ActivityIndicatorProps = {
 };
 
 /**
- * quests: the tab a task opens as. An agent: its transcript. A backgrounded command: its output file, when the
- * launch named it. A workflow: none (its agents are reported on the workflow's card).
+ * quests: the tab a task opens as. An agent: its transcript. A backgrounded command, or a watcher: its output
+ * file, or the file it tails, when known. A workflow: none (its agents are reported on the workflow's card).
  */
 function workTarget(task: BackgroundTaskSummary, sessionId: string | null | undefined): { kind: WorkKind; ref: string } | null {
   if (!sessionId) return null;
-  if (task.taskType === 'local_bash') return task.outputFile ? { kind: 'output', ref: outputRef(task.outputFile) } : null;
-  if (task.taskType === 'local_workflow') return null;
+  if (task.outputFile) return { kind: 'output', ref: outputRef(task.outputFile) };
+  if (task.taskType === 'local_bash' || task.taskType === 'local_workflow') return null;
   return { kind: 'agent', ref: agentRef(sessionId, task.taskId) };
 }
 

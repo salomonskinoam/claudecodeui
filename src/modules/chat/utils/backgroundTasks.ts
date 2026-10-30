@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 
 import type { BackgroundTaskStatus, BackgroundTaskSummary, ChatMessage, WorkflowAgentProgress } from '@/shared/types';
-import { outputFileOf } from '@/modules/chat/work/workTabs';
+import { monitoredFileOf, outputFileOf } from '@/modules/chat/work/workTabs';
 
 /**
  * Settles one background task's status from its two sources.
@@ -82,7 +82,7 @@ export function collectRunningBackgroundTasks(messages: ChatMessage[]): Backgrou
     }
     const live = message.taskStatus;
     const workflowName = live?.workflowName ?? message.workflow?.name;
-    const outputFile = outputFileOf(message);
+    const outputFile = outputFileOf(message) ?? monitoredFileOf(message);
     tasks.push({
       taskId,
       toolUseId: message.toolId,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import { workOf, workTabId } from '@/shared/hooks/useSplitPane';
-import { agentRef, outputFileOf, outputRef, setWorkTitle } from '@/modules/chat/work/workTabs';
+import { agentRef, monitoredFileOf, outputFileOf, outputRef, setWorkTitle } from '@/modules/chat/work/workTabs';
 
 test('quests: a work tab id round-trips its kind and ref, slashes included', () => {
   const agent = workTabId('agent', agentRef('8ade61bb-1', 'a3f9'));
@@ -20,6 +20,13 @@ test('quests: the output file comes from the live task event, else from the laun
   assert.equal(outputFileOf({ taskStatus: { status: 'running', outputFile: file }, toolResult: null }), file);
   assert.equal(outputFileOf({ toolResult: { content: `Command running in background with ID: x\n<output-file>${file}</output-file>` } as never }), file);
   assert.equal(outputFileOf({ toolResult: { content: 'done' } as never }), undefined);
+});
+
+test('quests: a watcher opens the file it tails', () => {
+  const input = JSON.stringify({ command: 'cd /home/noam/src/x && tail -n 0 -f /tmp/claude-0fbea6ac/watch_all.log /tmp/claude-0fbea6ac/w2.log', description: 'rlhf runs' });
+  assert.equal(monitoredFileOf({ toolName: 'Monitor', toolInput: input }), '/tmp/claude-0fbea6ac/watch_all.log');
+  assert.equal(monitoredFileOf({ toolName: 'Monitor', toolInput: JSON.stringify({ command: 'python watch.py' }) }), undefined);
+  assert.equal(monitoredFileOf({ toolName: 'Bash', toolInput: input }), undefined);
 });
 
 test('quests: a work tab title is kept per tab id', () => {

@@ -14,13 +14,13 @@ import {
 } from '@/modules/chat/utils/backgroundTasks';
 import { parseToolPayload } from '@/modules/chat/utils/messageTransforms';
 import { parseWorkflowMeta } from '@/modules/chat/utils/workflowScriptMeta';
-import { agentRef, openWorkTab, outputFileOf, outputRef, type WorkKind } from '@/modules/chat/work/workTabs';
+import { agentRef, monitoredFileOf, openWorkTab, outputFileOf, outputRef, type WorkKind } from '@/modules/chat/work/workTabs';
 
 /** quests: the tab a running launch opens as: an agent's transcript, or a backgrounded command's output file. */
 function workTargetOf(message: ChatMessage, sessionId: string | null): { kind: WorkKind; ref: string } | null {
   if (!sessionId) return null;
-  if (message.toolName === 'Bash') {
-    const file = outputFileOf(message);
+  if (message.toolName === 'Bash' || message.toolName === 'Monitor') {
+    const file = outputFileOf(message) ?? monitoredFileOf(message);
     return file ? { kind: 'output', ref: outputRef(file) } : null;
   }
   if (message.toolName === 'Workflow') return null;

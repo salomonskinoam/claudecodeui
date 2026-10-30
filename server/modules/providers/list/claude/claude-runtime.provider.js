@@ -733,6 +733,10 @@ export function createBackgroundWorkTracker() {
           if (typeof message.workflow_name === 'string') {
             task.workflowName = message.workflow_name;
           }
+          // quests: a backgrounded command's output file, so its chip opens as a tab after a reload too.
+          if (typeof message.output_file === 'string' && message.output_file) {
+            task.outputFile = message.output_file;
+          }
           if (!ownToolUseIds.get(sessionKey)?.has(message.tool_use_id)) {
             task.nested = true;
           }
