@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 
 import { authenticatedFetch } from '@/shared/api';
 import { Shimmer } from '@/shared/ui';
@@ -117,6 +117,11 @@ function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
   }, [sessionId]);
 
   const inFlight = activity && !activity.background ? activity : null;
+  // When the current step began: the moment its text changed (Noam, 30 Oct, through another chat: "nothing says
+  // which time is the whole turn and which is the running command, nor whether it is stuck").
+  const stepRef = useRef<{ text: string | null; since: number }>({ text: null, since: Date.now() });
+  const stepText = inFlight ? inFlight.statusText ?? null : null;
+  if (stepText !== stepRef.current.text) stepRef.current = { text: stepText, since: Date.now() };
   if (!sessionId || (!state && !inFlight)) return null;
   // A worker quiet for half an hour is not live, whatever the server still lists (Noam, 30 Oct: "350 minutes
   // idle is not live is it"); the Monitor tool itself gives up after 30 minutes.
@@ -136,7 +141,9 @@ function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
           ? <Shimmer className="shrink-0 font-medium">{`${MAIN_LABEL[main.state]}…`}</Shimmer>
           : <span className="shrink-0 font-medium text-foreground">{MAIN_LABEL[main.state]}</span>}
         {mainDetail && <span className="min-w-0 truncate text-muted-foreground" title={mainDetail}>{mainDetail}</span>}
-        {main.since !== null && <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">{formatTaskDuration(Math.max(0, now - main.since))}</span>}
+        {inFlight && stepText && <span className="shrink-0 tabular-nums text-muted-foreground/70">for {formatTaskDuration(Math.max(0, now - stepRef.current.since))}</span>}
+        {main.since !== null && <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">{main.state === 'answering' ? 'turn ' : ''}{formatTaskDuration(Math.max(0, now - main.since))}</span>}
+        {workers.length === 0 && main.state !== 'idle' && <span className="shrink-0 text-muted-foreground/50">no workers</span>}
         {inFlight?.canInterrupt && onAbort && (
           <button type="button" onClick={onAbort} data-quests-workers="stop" className="shrink-0 rounded px-1 text-muted-foreground hover:bg-muted hover:text-destructive">
             Stop <kbd className="rounded border border-border/60 px-1 text-[10px]">esc</kbd>
