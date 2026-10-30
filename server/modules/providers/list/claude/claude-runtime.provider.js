@@ -978,6 +978,12 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   let heldForBackgroundWork = false;
   // quests: resolves the promise of a user turn pushed into this held process, at that turn's `result`.
   let resolveTurn = null;
+  // quests: true from a pushed user message until the first assistant message after it. A `result` that arrives
+  // in between closes the turn that was ending when the message was pushed (a follow-up turn of background work,
+  // or a turn past its last model call); the message then starts the next turn, and that turn's result is the one
+  // the client waits for. Seen 2026-10-29 22:35 on "oct_28 all catalogue samples": the watcher turn's result
+  // completed the user's message before the model had read it, so the page beeped and showed no work.
+  let pushedAwaitingAssistant = false;
   // Set once a turn publishes a budget read from an assistant message, so the
   // turn-ending `result` is only mined for usage when nothing better arrived.
   let assistantBudgetSent = false;
@@ -1219,6 +1225,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       // at once; the running turn's `complete` covers the pushed message too. Tools keep running.
       if (!turnCompleteSent) {
         ws = newWs;
+        pushedAwaitingAssistant = true;
         return heldPrompt.push(messages);
       }
       return new Promise((resolve) => {
@@ -1227,6 +1234,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         turnCompleteSent = false;
         assistantBudgetSent = false;
         resolveTurn = () => resolve(true);
+        pushedAwaitingAssistant = true;
         if (!heldPrompt.push(messages)) {
           console.warn(`[quests] held process of ${sessionKey()} was released before the push`);
           resolveTurn = null;
@@ -1301,6 +1309,14 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
 
       if (startsBackgroundWork(message)) {
         backgroundWorkPending = true;
+      }
+      if (message.type === 'assistant') {
+        pushedAwaitingAssistant = false;
+      }
+      if (message.type === 'result' && pushedAwaitingAssistant) {
+        // The turn that was ending when the message was pushed; see the flag. The next turn is the message's.
+        scheduleRelease();
+        continue;
       }
       if (message.type === 'system' && message.subtype === 'task_started') {
         sawTaskEventThisTurn = true;

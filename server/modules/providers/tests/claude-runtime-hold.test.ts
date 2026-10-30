@@ -140,6 +140,10 @@ const taskNotification = (taskId: string, toolUseId: string, status: string) => 
   type: 'system', subtype: 'task_notification', session_id: NATIVE_ID, task_id: taskId, tool_use_id: toolUseId, status, summary: `Task ${taskId} ${status}`, output_file: '',
 });
 const result = () => ({ type: 'result', subtype: 'success', session_id: NATIVE_ID, result: 'launched', duration_ms: 1, num_turns: 1 });
+const text = (t: string) => ({
+  type: 'assistant', session_id: NATIVE_ID, parent_tool_use_id: null,
+  message: { role: 'assistant', content: [{ type: 'text', text: t }] },
+});
 
 test('stopping the last outstanding task releases the held process', async () => {
   await withRun(async ({ script, sent, done }) => {
@@ -346,6 +350,7 @@ test('quests: a new turn from the same folder joins the held process; its backgr
     assert.equal(first.script.released(), false, 'the held process stays');
     assert.equal(secondDone, false, 'the new turn is still running');
 
+    first.script.emit(text('Continuing.'));
     first.script.emit(result());
     await waitFor(() => sent.filter((message) => message.kind === 'complete').length === 2);
     await waitFor(() => secondDone);
@@ -398,10 +403,68 @@ test('quests: a message sent while the turn runs joins that turn; its tools keep
     assert.equal(sent.filter((message) => message.kind === 'complete').length, 0, 'the turn is not over');
 
     first.script.emit(ack('toolu_bash', 'ok', {}));
+    first.script.emit(text('Status is clean, and the logs too.'));
     first.script.emit(result());
     await waitFor(() => sent.filter((message) => message.kind === 'complete').length === 1);
     await settle();
     assert.equal(sent.filter((message) => message.kind === 'complete').length, 1, 'one complete for the turn and the message it took');
+    first.script.end();
+    await firstRun;
+    await secondRun;
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('quests: a result that closes the turn the message was pushed into does not complete the message; the next one does', async () => {
+  // Seen 2026-10-29 22:35: a message sent while a held process ran a follow-up turn (a watcher notification) got
+  // that turn's `result` as its own: the page beeped and cleared its banner, then the message's turn ran unseen.
+  const cwd = await mkdtemp(path.join(os.tmpdir(), 'claude-runtime-hold-'));
+  const first = createScriptedQuery();
+  const second = createScriptedQuery();
+  const sent: NormalizedMessage[] = [];
+  const writer = { send: (message: NormalizedMessage) => { sent.push(message); }, userId: null };
+  const sessions = new ClaudeSessionsProvider({ getLiveRunStartTime: () => null });
+  const context: Omit<ProviderRuntimeContext, 'createQuery'> = {
+    resolveProviderSessionId: () => null,
+    resolveResumeModel: async () => undefined,
+    getProviderModels: async () => CLAUDE_PREDEFINED_MODELS as never,
+    normalizeMessage: (raw, sessionId) => sessions.normalizeMessage(raw, sessionId),
+    isProviderInstalled: async () => true,
+  };
+  const completes = () => sent.filter((message) => message.kind === 'complete').length;
+
+  try {
+    const firstRun = queryClaudeSDK('watch the results', { sessionId: SESSION_ID, cwd }, writer as never, { ...context, createQuery: first.createQuery });
+    await settle();
+    first.script.emit(init());
+    first.script.emit(toolUse('toolu_monitor', 'Monitor', { command: 'tail -f results.log', description: 'watch', timeout_ms: 1000 }));
+    first.script.emit(taskStarted('m1', 'toolu_monitor', 'local_monitor'));
+    first.script.emit(ack('toolu_monitor', 'Monitor started', { status: 'async_launched', taskId: 'm1' }));
+    first.script.emit(result());
+    await waitFor(() => completes() === 1);
+
+    // The watcher reports: the CLI runs a follow-up turn, which is at its last text when the user's message lands.
+    first.script.emit(taskNotification('m1', 'toolu_monitor', 'completed'));
+    first.script.emit(text('The inrun result is in.'));
+    await waitFor(() => sent.some((message) => typeof message.content === 'string' && message.content.includes('inrun result')));
+    let secondDone = false;
+    const secondRun = queryClaudeSDK('argus must pass only if it can run', { sessionId: SESSION_ID, cwd }, writer as never, { ...context, createQuery: second.createQuery })
+      .then(() => { secondDone = true; });
+    await waitFor(() => first.script.read.length === 2);
+    first.script.emit(result());
+    await settle();
+    await settle();
+    assert.equal(completes(), 1, 'the follow-up turn\'s result is not the message\'s complete');
+    assert.equal(secondDone, false, 'the message\'s turn has not run yet');
+    assert.equal(first.script.released(), false, 'the process stays for the message\'s turn');
+
+    first.script.emit(toolUse('toolu_bash', 'Bash', { command: 'python hor.py rubrics status', description: 'rubrics' }));
+    first.script.emit(ack('toolu_bash', 'ok', {}));
+    first.script.emit(text('Argus passes only when it can run.'));
+    first.script.emit(result());
+    await waitFor(() => completes() === 2);
+    await waitFor(() => secondDone);
     first.script.end();
     await firstRun;
     await secondRun;
