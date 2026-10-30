@@ -27,6 +27,7 @@ import {
 } from '@/modules/chat/composer/PromptInput';
 import CommandMenu from '@/modules/chat/composer/CommandMenu';
 import ActivityIndicator from '@/modules/chat/composer/ActivityIndicator';
+import WorkersPanel from '@/modules/chat/work/WorkersPanel';
 import ComposerAttachment from '@/modules/chat/composer/ComposerAttachment';
 import VoiceInputButton from '@/modules/chat/composer/VoiceInputButton';
 import PermissionRequestsBanner from '@/modules/chat/composer/PermissionRequestsBanner';
@@ -278,7 +279,8 @@ export default function ChatComposer({
     <div className="chat-composer-shell relative flex-shrink-0 px-8 pb-4 pt-0">
       {!hasPendingPermissions && (
         <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-[calc(100%-4rem)] -translate-x-1/2 translate-y-px bg-transparent">
-          <ActivityIndicator activity={activity} onAbort={onAbortSession} isInputFocused={isInputFocused} sessionId={sessionId} />
+          <WorkersPanel sessionId={sessionId} />
+          <ActivityIndicator activity={activity} onAbort={onAbortSession} isInputFocused={isInputFocused} />
         </div>
       )}
 

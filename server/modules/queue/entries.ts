@@ -51,7 +51,7 @@ const kindOf = (t: Ticket): QueueKind => KINDS.find((k) => t.labels.includes(k))
 const time = (s: string | null | undefined): number => (s ? Date.parse(s) : 0);
 
 /** The queue state of a chat: its process first, else its closing line. */
-function stateOf(c: Chat): { state: QueueState; since: number } {
+export function stateOf(c: Chat): { state: QueueState; since: number } {
   const p = c.process;
   if (p?.status === 'waiting' && p.waitingFor === 'permission prompt') return { state: 'permission', since: p.statusUpdatedAt };
   if (p?.status === 'busy') return { state: 'running', since: p.statusUpdatedAt };

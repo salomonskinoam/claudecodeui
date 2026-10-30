@@ -2,28 +2,13 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Shimmer } from '@/shared/ui';
-import type { BackgroundTaskSummary, SessionActivity } from '@/shared/types';
-import { describeBackgroundTask, ownBackgroundTasks } from '@/modules/chat/utils/backgroundTasks';
-import { agentRef, openWorkTab, taskRef, type WorkKind } from '@/modules/chat/work/workTabs';
+import type { SessionActivity } from '@/shared/types';
 
 type ActivityIndicatorProps = {
   activity: SessionActivity | null;
   onAbort?: () => void;
   isInputFocused?: boolean;
-  /** The chat the work belongs to, for opening a task's tab. */
-  sessionId?: string | null;
 };
-
-/**
- * quests: the tab a task opens as. An agent: its transcript. A workflow: none (its agents are reported on the
- * workflow's card). Anything else (a backgrounded command, a watcher): its output file, found by its task id.
- */
-function workTarget(task: BackgroundTaskSummary, sessionId: string | null | undefined): { kind: WorkKind; ref: string } | null {
-  if (!sessionId) return null;
-  if (task.taskType === 'local_workflow') return null;
-  if (task.taskType === 'local_agent') return { kind: 'agent', ref: agentRef(sessionId, task.taskId) };
-  return { kind: 'task', ref: taskRef(sessionId, task.taskId) };
-}
 
 const ACTION_KEYS = [
   'claudeStatus.actions.thinking',
@@ -50,7 +35,7 @@ const EXIT_ANIMATION_MS = 220;
  * Rendered by chat's ChatComposer above the input so the user can see and
  * interrupt the in-flight turn without leaving the composer.
  */
-export default function ActivityIndicator({ activity, onAbort, isInputFocused = false, sessionId }: ActivityIndicatorProps) {
+export default function ActivityIndicator({ activity, onAbort, isInputFocused = false }: ActivityIndicatorProps) {
   const { t } = useTranslation('chat');
   const [renderedActivity, setRenderedActivity] = useState<SessionActivity | null>(activity);
   const [isExiting, setIsExiting] = useState(false);
@@ -83,19 +68,12 @@ export default function ActivityIndicator({ activity, onAbort, isInputFocused = 
     return () => clearInterval(timer);
   }, [startedAt]);
 
-  if (!renderedActivity) return null;
+  // quests: background-only work is the workers panel's (requirement 40): this indicator is the turn in flight.
+  if (!renderedActivity || renderedActivity.background) return null;
 
-  const isBackground = Boolean(renderedActivity.background);
   const actionWords = ACTION_KEYS.map((key, i) => t(key, { defaultValue: DEFAULT_ACTION_WORDS[i] }));
-  const label = isBackground
-    ? t('claudeStatus.backgroundWork', 'Background work')
-    : (renderedActivity.statusText || actionWords[Math.floor(elapsedSeconds / 4) % actionWords.length])
-      .replace(/\.+$/, '');
-  // quests: one chip per background task, each clickable when it has a tab to open (Noam, 29 Oct: "i want it for
-  // multi "parallel workers" as well, each one should be clickable").
-  const chips = isBackground
-    ? ownBackgroundTasks(renderedActivity.tasks ?? []).map((task) => ({ key: task.taskId, text: describeBackgroundTask(task, t), target: workTarget(task, sessionId) }))
-    : [];
+  const label = (renderedActivity.statusText || actionWords[Math.floor(elapsedSeconds / 4) % actionWords.length])
+    .replace(/\.+$/, '');
 
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
@@ -117,27 +95,8 @@ export default function ActivityIndicator({ activity, onAbort, isInputFocused = 
     >
       <div className="flex items-end justify-between gap-2">
         <div className={`${tabSurfaceClassName} min-w-0 max-w-full gap-2`}>
-          <span
-            className={`h-1.5 w-1.5 shrink-0 animate-pulse rounded-full ${
-              isBackground ? 'bg-purple-500 dark:bg-purple-400' : 'bg-primary'
-            }`}
-            aria-hidden
-          />
+          <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" aria-hidden />
           <Shimmer className="shrink-0 font-medium">{`${label}…`}</Shimmer>
-          {chips.map((chip) => chip.target ? (
-            <button
-              key={chip.key}
-              type="button"
-              data-quests-work-chip={chip.key}
-              title={`${chip.text} · open as a tab`}
-              onClick={() => openWorkTab(sessionId as string, chip.target!.kind, chip.target!.ref, chip.text)}
-              className="pointer-events-auto min-w-0 truncate rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              {chip.text}
-            </button>
-          ) : (
-            <span key={chip.key} className="min-w-0 truncate text-muted-foreground" title={chip.text}>{chip.text}</span>
-          ))}
           <span className="shrink-0 tabular-nums text-muted-foreground/60">{elapsedLabel}</span>
         </div>
 

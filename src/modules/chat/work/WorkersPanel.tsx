@@ -1,0 +1,124 @@
+import { memo, useEffect, useState } from 'react';
+
+import { authenticatedFetch } from '@/shared/api';
+import { formatTaskDuration } from '@/modules/chat/utils/backgroundTasks';
+import { openWorkTab, type WorkKind } from '@/modules/chat/work/workTabs';
+
+/**
+ * quests: the state of the main chat, apart from the states of its workers (requirement 40). Noam, 30 Oct:
+ * "i want a status separation between the state of the main chat and the state of sub workers, agents,
+ * programs, tools". Read from the server every 3 seconds, which reads the live processes, the transcripts and
+ * the task output files: a reload changes nothing.
+ */
+
+export type MainState = {
+  state: 'answering' | 'permission' | 'question' | 'done' | 'waiting' | 'blocker' | 'idle';
+  /** The current step while answering ("Bash: python hor.py status"). */
+  step: string | null;
+  /** The closing line's text for question, done, waiting and blocker. */
+  text: string | null;
+  /** Epoch ms the state began. */
+  since: number | null;
+};
+
+export type Worker = {
+  taskId: string;
+  kind: 'agent' | 'command' | 'watcher' | 'workflow';
+  name: string;
+  /** What it is on: an agent's last step, a command's or watcher's last output line. */
+  step: string | null;
+  startedAt: number | null;
+  /** When its transcript or output last grew; null when nothing of it is on disk. */
+  lastActivityAt: number | null;
+  tab: { kind: WorkKind; ref: string } | null;
+};
+
+export type WorkState = { main: MainState; workers: Worker[] };
+
+const MAIN_LABEL: Record<MainState['state'], string> = {
+  answering: 'Answering',
+  permission: 'On a permission prompt',
+  question: 'Waiting on you: question',
+  done: 'Waiting on you: Done',
+  waiting: 'Waiting for',
+  blocker: 'Blocked',
+  idle: 'Idle, no process',
+};
+
+const KIND_LABEL: Record<Worker['kind'], string> = { agent: 'Agent', command: 'Command', watcher: 'Watcher', workflow: 'Workflow' };
+
+/** "alive" when it wrote in the last 20 seconds, else "quiet for 12m". */
+function liveness(worker: Worker, now: number): { alive: boolean; text: string } {
+  if (worker.lastActivityAt === null) return { alive: false, text: 'nothing on disk' };
+  const quiet = now - worker.lastActivityAt;
+  return quiet < 20_000 ? { alive: true, text: 'alive' } : { alive: false, text: `quiet for ${formatTaskDuration(quiet)}` };
+}
+
+function WorkersPanel({ sessionId }: { sessionId: string | null }) {
+  const [state, setState] = useState<WorkState | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    setState(null);
+    if (!sessionId) return undefined;
+    let stopped = false;
+    const load = async () => {
+      const response = await authenticatedFetch(`/api/quests/work/state/${encodeURIComponent(sessionId)}`);
+      if (stopped || !response.ok) return;
+      try {
+        setState((await response.json()) as WorkState);
+      } catch {
+        /* an older server: the panel stays empty */
+      }
+    };
+    void load();
+    const poll = window.setInterval(() => void load(), 3000);
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      stopped = true;
+      window.clearInterval(poll);
+      window.clearInterval(tick);
+    };
+  }, [sessionId]);
+
+  if (!sessionId || !state || (state.main.state === 'idle' && state.workers.length === 0)) return null;
+  const { main, workers } = state;
+  const mainDetail = main.state === 'answering' ? main.step : main.text;
+
+  return (
+    <div className="pointer-events-auto mb-1 rounded-md border border-border/50 bg-card px-3 py-1.5 text-xs" data-quests-workers="panel">
+      <div className="flex items-center gap-2" data-quests-workers="main">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${main.state === 'answering' ? 'animate-pulse bg-primary' : main.state === 'permission' ? 'bg-blue-400' : 'bg-muted-foreground/50'}`} />
+        <span className="shrink-0 font-medium text-foreground">{MAIN_LABEL[main.state]}</span>
+        {mainDetail && <span className="min-w-0 truncate text-muted-foreground" title={mainDetail}>{mainDetail}</span>}
+        {main.since !== null && <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">{formatTaskDuration(Math.max(0, now - main.since))}</span>}
+      </div>
+      {workers.map((worker) => {
+        const life = liveness(worker, now);
+        return (
+          <div key={worker.taskId} className="mt-1 flex items-center gap-2 border-t border-border/30 pt-1" data-quests-workers="worker">
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${life.alive ? 'animate-pulse bg-purple-500 dark:bg-purple-400' : 'bg-muted-foreground/40'}`} />
+            <span className="shrink-0 font-medium text-foreground">{KIND_LABEL[worker.kind]}</span>
+            <span className="min-w-0 truncate" title={worker.name}>{worker.name}</span>
+            {worker.step && <span className="min-w-0 truncate text-muted-foreground/80" title={worker.step}>· {worker.step}</span>}
+            <span className={`ml-auto shrink-0 ${life.alive ? 'text-purple-500 dark:text-purple-300' : 'text-muted-foreground/70'}`}>{life.text}</span>
+            {worker.startedAt !== null && <span className="shrink-0 tabular-nums text-muted-foreground/60">{formatTaskDuration(Math.max(0, now - worker.startedAt))}</span>}
+            {worker.tab && (
+              <button
+                type="button"
+                title="Open as a tab"
+                data-quests-workers="open"
+                onClick={() => openWorkTab(sessionId, worker.tab!.kind, worker.tab!.ref, `${KIND_LABEL[worker.kind]}: ${worker.name}`)}
+                className="shrink-0 rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                tab
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default memo(WorkersPanel);

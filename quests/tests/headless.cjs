@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -552,6 +552,15 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       return out;
     });
     console.log(JSON.stringify({ empties: rows.length, sample: rows.slice(0, 8) }, null, 1));
+  }
+
+  if (check === 'workers') {
+    // The workers panel: the main line and one line per worker, as shown.
+    await page.locator('[data-quests-workers="panel"]').waitFor({ timeout: 15000 }).catch(() => undefined);
+    console.log(JSON.stringify({
+      main: await page.locator('[data-quests-workers="main"]').evaluateAll((ns) => ns.map((n) => n.textContent.replace(/\s+/g, ' ').trim())),
+      workers: await page.locator('[data-quests-workers="worker"]').evaluateAll((ns) => ns.map((n) => n.textContent.replace(/\s+/g, ' ').trim().slice(0, 140))),
+    }, null, 1));
   }
 
   if (check === 'subagents') {

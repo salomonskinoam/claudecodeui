@@ -41,6 +41,13 @@ import { createCompleteMessage, createNormalizedMessage } from '@/shared/utils.j
 import { describeToolCall } from '@/modules/providers/list/claude/describe-tool-call.js';
 
 const activeSessions = new Map();
+// quests: the last tool call of each page-run chat (the status frame's text), by app session id, for the
+// workers panel's main line (requirement 40).
+const lastSteps = new Map();
+function getClaudeSDKLastStep(sessionId) {
+  return lastSteps.get(sessionId) ?? null;
+}
+
 // Outstanding background tasks per live session, keyed like activeSessions. An
 // entry lives exactly as long as the map entry it shadows: cleared when the
 // session is removed, and reset when a newer run takes the key over.
@@ -1307,7 +1314,9 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       if (message.type === 'assistant') {
         const call = (message.message?.content ?? []).find((part) => part?.type === 'tool_use');
         if (call) {
-          ws.send(createNormalizedMessage({ kind: 'status', text: describeToolCall(String(call.name ?? 'Tool'), call.input), sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+          const stepText = describeToolCall(String(call.name ?? 'Tool'), call.input);
+          if (sessionKey()) lastSteps.set(sessionKey(), { text: stepText, at: Date.now() });
+          ws.send(createNormalizedMessage({ kind: 'status', text: stepText, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
         }
       }
 
@@ -1675,6 +1684,7 @@ export {
   abortClaudeSDKSession,
   canJoinClaudeSDKTurn,
   listClaudeSDKBackgroundWork,
+  getClaudeSDKLastStep,
   stopClaudeSDKTask,
   isClaudeSDKSessionActive,
   getClaudeSDKSessionStartTime,

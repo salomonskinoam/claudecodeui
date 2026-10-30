@@ -49,6 +49,7 @@ import {
 } from './modules/scheduled-messages/index.js';
 import { closeQueue, initializeQueue, processStates, queueRoutes } from './modules/queue/index.js';
 import { findTaskOutputFile, isTaskOutputFile, readOutputTail } from './modules/queue/work.js';
+import { readWorkState } from './modules/queue/work-state.js';
 import { readClaudeSubagentTab } from './modules/providers/list/claude/claude-sessions.provider.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
@@ -281,6 +282,16 @@ app.get('/api/quests/work/agent/:sessionId/:agentId', authenticateToken, async (
         return;
     }
     res.json(tab);
+});
+
+// quests: the state of the main chat and of each of its workers (requirement 40).
+app.get('/api/quests/work/state/:sessionId', authenticateToken, async (req: Request, res: Response) => {
+    const state = await readWorkState(String(req.params.sessionId));
+    if (!state) {
+        res.status(404).json({ error: 'no such chat' });
+        return;
+    }
+    res.json(state);
 });
 
 // A task's output by the chat's page session id and the task id (a backgrounded command, a watcher).

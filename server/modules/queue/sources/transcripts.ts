@@ -18,6 +18,69 @@ const TAIL_BYTES = 8 * 1024 * 1024;
 const titles = new Map<string, string>();
 export const getTitles = () => titles;
 
+/** A task the chat launched and that has not reported its end: a worker (requirement 40). */
+export type OpenTask = {
+  /** The id the reports name it by (an agent's id, a command's or watcher's task id); '' until its launch is acknowledged. */
+  taskId: string;
+  toolUseId: string;
+  kind: 'agent' | 'command' | 'watcher' | 'workflow';
+  name: string;
+  startedAt: string | null;
+};
+const openTasks = new Map<string, OpenTask[]>();
+export const getOpenTasks = (sid: string): OpenTask[] => openTasks.get(sid) ?? [];
+
+const TERMINAL = new Set(['completed', 'failed', 'stopped', 'killed']);
+
+/**
+ * The tasks still open: every launch (an Agent call, a backgrounded Bash, a Monitor, a Workflow) whose task got
+ * no report with an end status. A report names its task by `<task-id>` (an orphan summary names several), and
+ * a launch's acknowledgement (the tool result's toolUseResult) ties the tool call to that id.
+ */
+export function openTasksOf(lines: string[]): OpenTask[] {
+  const launches = new Map<string, OpenTask>();
+  const closed = new Set<string>();
+  const closedToolUse = new Set<string>();
+  for (const line of lines) {
+    if (line.includes('"tool_use"') && line.includes('"type":"assistant"')) {
+      const row = parse(line);
+      if (row?.type !== 'assistant' || row.isSidechain) continue;
+      for (const b of row.message?.content ?? []) {
+        if (b.type !== 'tool_use') continue;
+        const input = b.input ?? {};
+        const kind = b.name === 'Agent' && input.run_in_background !== false ? 'agent'
+          : b.name === 'Bash' && input.run_in_background === true ? 'command'
+            : b.name === 'Monitor' ? 'watcher' : b.name === 'Workflow' ? 'workflow' : null;
+        if (!kind) continue;
+        const name = String(input.description ?? input.command ?? input.prompt ?? '').split('\n', 1)[0].slice(0, 90);
+        launches.set(b.id, { taskId: '', toolUseId: b.id, kind, name, startedAt: row.timestamp ?? null });
+      }
+    } else if (line.includes('"toolUseResult"') && line.includes('"type":"user"')) {
+      const row = parse(line);
+      const result = row?.toolUseResult;
+      const toolUseId = Array.isArray(row?.message?.content) ? row.message.content.find((b: { type: string }) => b.type === 'tool_result')?.tool_use_id : undefined;
+      const id = result?.agentId ?? result?.backgroundTaskId ?? result?.taskId;
+      const launch = toolUseId ? launches.get(toolUseId) : undefined;
+      if (launch && typeof id === 'string') launch.taskId = id;
+      // A synchronous agent reports in its result at once: not a worker.
+      if (launch && launch.kind === 'agent' && result && result.isAsync !== true && result.status !== 'async_launched') closedToolUse.add(toolUseId);
+    } else if (line.includes('<task-notification>') && line.includes('"type":"user"')) {
+      const row = parse(line);
+      const text = typeof row?.message?.content === 'string' ? row.message.content
+        : Array.isArray(row?.message?.content) ? row.message.content.map((b: { text?: string }) => b.text ?? '').join('\n') : '';
+      for (const note of text.split('<task-notification>').slice(1)) {
+        const status = /<status>([a-z_]+)<\/status>/.exec(note)?.[1];
+        const ended = (status && TERMINAL.has(status)) || note.includes('Monitor expired');
+        if (!ended) continue;
+        for (const m of note.matchAll(/<task-id>([^<]+)<\/task-id>/g)) closed.add(m[1]);
+        const toolUse = /<tool-use-id>([^<]+)<\/tool-use-id>/.exec(note)?.[1];
+        if (toolUse) closedToolUse.add(toolUse);
+      }
+    }
+  }
+  return [...launches.values()].filter((t) => !closedToolUse.has(t.toolUseId) && !(t.taskId && closed.has(t.taskId)));
+}
+
 async function readTail(file: string, bytes: number): Promise<string[]> {
   const handle = await fs.open(file, 'r');
   try {
@@ -94,6 +157,7 @@ export async function noteTranscript(file: string): Promise<void> {
   const line = closingLine(lines);
   const name = titleOf(lines, 'custom-title', 'customTitle') ?? titleOf(lines, 'ai-title', 'aiTitle');
   if (name) titles.set(sid, name);
+  openTasks.set(sid, openTasksOf(lines));
   queueDb.setChat({
     provider_session_id: sid,
     line_kind: line.kind,
