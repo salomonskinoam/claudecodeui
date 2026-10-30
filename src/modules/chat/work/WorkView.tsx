@@ -9,7 +9,7 @@ import { createCachedDiffCalculator } from '@/modules/chat/utils/messageTransfor
 import { setWorkTitle } from '@/modules/chat/work/workTabs';
 
 type AgentTab = { activity: SubagentActivity[]; info: Omit<SubagentInfo, 'status'> & { lastAt?: string } };
-type OutputTab = { text: string; size: number; modifiedAt: number; truncated: boolean };
+type OutputTab = { text: string; size: number; modifiedAt: number; truncated: boolean; file?: string };
 
 /** Re-reads `url` every `everyMs`; a 404 says the thing is gone. */
 function usePolled<T>(url: string, everyMs: number) {
@@ -89,9 +89,9 @@ function AgentWork({ tabId, workRef }: { tabId: string; workRef: string }) {
   );
 }
 
-/** A backgrounded command's tab: the tail of its output file, re-read every 2 seconds, following the end. */
-function OutputWork({ workRef }: { workRef: string }) {
-  const { data, error } = usePolled<OutputTab>(`/api/quests/work/output/${workRef}`, 2000);
+/** A command's or watcher's tab: the tail of its output file, re-read every 2 seconds, following the end. */
+function OutputWork({ kind, workRef }: { kind: 'output' | 'task'; workRef: string }) {
+  const { data, error } = usePolled<OutputTab>(`/api/quests/work/${kind}/${workRef}`, 2000);
   const pane = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true);
   useEffect(() => {
@@ -111,7 +111,7 @@ function OutputWork({ workRef }: { workRef: string }) {
     >
       <div className="pb-8 pl-6 pr-6 pt-4">
         <div className="mb-3 text-xs text-muted-foreground">
-          /{workRef}
+          {data?.file ?? `/${workRef}`}
           {data && ` · ${data.size} bytes${data.truncated ? ', last 256 KB shown' : ''}`}
         </div>
         {error && <div className="text-sm text-muted-foreground">{error}</div>}
@@ -125,7 +125,9 @@ function OutputWork({ workRef }: { workRef: string }) {
 function WorkView({ tabId }: { tabId: string }) {
   const work = workOf(tabId);
   if (!work) return null;
-  return work.kind === 'agent' ? <AgentWork tabId={tabId} workRef={work.ref} /> : <OutputWork workRef={work.ref} />;
+  return work.kind === 'agent'
+    ? <AgentWork tabId={tabId} workRef={work.ref} />
+    : <OutputWork kind={work.kind === 'task' ? 'task' : 'output'} workRef={work.ref} />;
 }
 
 export default memo(WorkView);

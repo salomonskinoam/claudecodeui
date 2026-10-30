@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import { workOf, workTabId } from '@/shared/hooks/useSplitPane';
-import { agentRef, monitoredFileOf, outputFileOf, outputRef, setWorkTitle } from '@/modules/chat/work/workTabs';
+import { agentRef, monitoredFileOf, outputFileOf, outputRef, setWorkTitle, taskRef } from '@/modules/chat/work/workTabs';
 
 test('quests: a work tab id round-trips its kind and ref, slashes included', () => {
   const agent = workTabId('agent', agentRef('8ade61bb-1', 'a3f9'));
@@ -11,6 +11,7 @@ test('quests: a work tab id round-trips its kind and ref, slashes included', () 
   const file = '/tmp/claude-1000/-home-noam-src-noam-worlds/0fbea6ac-4450-4870-a6ab-d42aa8c20c96/tasks/bwy06286r.output';
   const output = workTabId('output', outputRef(file));
   assert.deepEqual(workOf(output), { kind: 'output', ref: file.slice(1) });
+  assert.deepEqual(workOf(workTabId('task', taskRef('8ade61bb-1', 'bplomq0l1'))), { kind: 'task', ref: '8ade61bb-1/bplomq0l1' });
   assert.equal(workOf('plan:x'), null);
   assert.equal(workOf('8ade61bb-1'), null);
 });

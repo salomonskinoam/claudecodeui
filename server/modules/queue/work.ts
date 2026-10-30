@@ -1,4 +1,6 @@
-import { promises as fsp } from 'node:fs';
+import { existsSync, promises as fsp, readdirSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 /**
  * quests: the work tabs' server side for backgrounded commands. Claude Code writes a backgrounded command's output
@@ -13,6 +15,27 @@ export const isTaskOutputFile = (file: string): boolean => TASK_OUTPUT_FILE.test
 const TAIL_BYTES = 256 * 1024;
 
 export type OutputTail = { text: string; size: number; modifiedAt: number; truncated: boolean };
+
+/**
+ * Where Claude Code writes a task's output: /tmp/claude-<uid>/<the process cwd as a folder name>/<provider
+ * session id>/tasks/<task id>.output, every task (a backgrounded command, a watcher, an agent). The cwd folder
+ * is not known here, so the folders under /tmp/claude-<uid> are searched. Null when no such file exists.
+ */
+export function findTaskOutputFile(providerSessionId: string, taskId: string): string | null {
+  if (!/^[0-9a-f-]{36}$/.test(providerSessionId) || !/^[A-Za-z0-9_-]+$/.test(taskId)) return null;
+  const root = path.join(os.tmpdir(), `claude-${os.userInfo().uid}`);
+  let folders: string[];
+  try {
+    folders = readdirSync(root);
+  } catch {
+    return null;
+  }
+  for (const folder of folders) {
+    const file = path.join(root, folder, providerSessionId, 'tasks', `${taskId}.output`);
+    if (existsSync(file)) return file;
+  }
+  return null;
+}
 
 /** The last 256 KB of the file, as it stands now. */
 export async function readOutputTail(file: string): Promise<OutputTail> {

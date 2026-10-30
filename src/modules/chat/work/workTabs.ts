@@ -10,7 +10,10 @@ import type { ChatMessage } from '@/shared/types';
  * and promote it into a "temporary tab"". Each parallel worker is its own tab.
  */
 
-export type WorkKind = 'agent' | 'output';
+export type WorkKind = 'agent' | 'output' | 'task';
+
+/** The ref of a task's tab (a backgrounded command, a watcher): the chat's page session id and the task id. */
+export const taskRef = (sessionId: string, taskId: string) => `${sessionId}/${taskId}`;
 
 /** The ref of an agent's tab: the chat's page session id and the agent's id (the route is /work/agent/<ref>). */
 export const agentRef = (sessionId: string, agentId: string) => `${sessionId}/${agentId}`;

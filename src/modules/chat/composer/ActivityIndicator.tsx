@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Shimmer } from '@/shared/ui';
 import type { BackgroundTaskSummary, SessionActivity } from '@/shared/types';
 import { describeBackgroundTask, ownBackgroundTasks } from '@/modules/chat/utils/backgroundTasks';
-import { agentRef, openWorkTab, outputRef, type WorkKind } from '@/modules/chat/work/workTabs';
+import { agentRef, openWorkTab, taskRef, type WorkKind } from '@/modules/chat/work/workTabs';
 
 type ActivityIndicatorProps = {
   activity: SessionActivity | null;
@@ -15,14 +15,14 @@ type ActivityIndicatorProps = {
 };
 
 /**
- * quests: the tab a task opens as. An agent: its transcript. A backgrounded command, or a watcher: its output
- * file, or the file it tails, when known. A workflow: none (its agents are reported on the workflow's card).
+ * quests: the tab a task opens as. An agent: its transcript. A workflow: none (its agents are reported on the
+ * workflow's card). Anything else (a backgrounded command, a watcher): its output file, found by its task id.
  */
 function workTarget(task: BackgroundTaskSummary, sessionId: string | null | undefined): { kind: WorkKind; ref: string } | null {
   if (!sessionId) return null;
-  if (task.outputFile) return { kind: 'output', ref: outputRef(task.outputFile) };
-  if (task.taskType === 'local_bash' || task.taskType === 'local_workflow') return null;
-  return { kind: 'agent', ref: agentRef(sessionId, task.taskId) };
+  if (task.taskType === 'local_workflow') return null;
+  if (task.taskType === 'local_agent') return { kind: 'agent', ref: agentRef(sessionId, task.taskId) };
+  return { kind: 'task', ref: taskRef(sessionId, task.taskId) };
 }
 
 const ACTION_KEYS = [

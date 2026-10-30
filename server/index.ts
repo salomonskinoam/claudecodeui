@@ -48,7 +48,7 @@ import {
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
 import { closeQueue, initializeQueue, processStates, queueRoutes } from './modules/queue/index.js';
-import { isTaskOutputFile, readOutputTail } from './modules/queue/work.js';
+import { findTaskOutputFile, isTaskOutputFile, readOutputTail } from './modules/queue/work.js';
 import { readClaudeSubagentTab } from './modules/providers/list/claude/claude-sessions.provider.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
@@ -281,6 +281,17 @@ app.get('/api/quests/work/agent/:sessionId/:agentId', authenticateToken, async (
         return;
     }
     res.json(tab);
+});
+
+// A task's output by the chat's page session id and the task id (a backgrounded command, a watcher).
+app.get('/api/quests/work/task/:sessionId/:taskId', authenticateToken, async (req: Request, res: Response) => {
+    const row = sessionsDb.getSessionById(String(req.params.sessionId));
+    const file = row ? findTaskOutputFile(row.provider_session_id ?? row.session_id, String(req.params.taskId)) : null;
+    if (!file) {
+        res.status(404).json({ error: 'no output file for this task' });
+        return;
+    }
+    res.json({ file, ...(await readOutputTail(file)) });
 });
 
 app.get('/api/quests/work/output/*', authenticateToken, async (req: Request, res: Response) => {

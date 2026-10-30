@@ -14,18 +14,17 @@ import {
 } from '@/modules/chat/utils/backgroundTasks';
 import { parseToolPayload } from '@/modules/chat/utils/messageTransforms';
 import { parseWorkflowMeta } from '@/modules/chat/utils/workflowScriptMeta';
-import { agentRef, monitoredFileOf, openWorkTab, outputFileOf, outputRef, type WorkKind } from '@/modules/chat/work/workTabs';
+import { agentRef, openWorkTab, taskRef, type WorkKind } from '@/modules/chat/work/workTabs';
 
-/** quests: the tab a running launch opens as: an agent's transcript, or a backgrounded command's output file. */
+/** quests: the tab a running launch opens as: an agent's transcript, or a command's or watcher's output file. */
 function workTargetOf(message: ChatMessage, sessionId: string | null): { kind: WorkKind; ref: string } | null {
-  if (!sessionId) return null;
-  if (message.toolName === 'Bash' || message.toolName === 'Monitor') {
-    const file = outputFileOf(message) ?? monitoredFileOf(message);
-    return file ? { kind: 'output', ref: outputRef(file) } : null;
+  if (!sessionId || message.toolName === 'Workflow') return null;
+  if (message.toolName === 'Agent' || message.isSubagentContainer) {
+    const agentId = message.subagent?.id ?? readBackgroundTaskId(message);
+    return agentId ? { kind: 'agent', ref: agentRef(sessionId, agentId) } : null;
   }
-  if (message.toolName === 'Workflow') return null;
-  const agentId = message.subagent?.id ?? readBackgroundTaskId(message);
-  return agentId ? { kind: 'agent', ref: agentRef(sessionId, agentId) } : null;
+  const taskId = readBackgroundTaskId(message);
+  return taskId ? { kind: 'task', ref: taskRef(sessionId, taskId) } : null;
 }
 
 type BackgroundTasksStripProps = {

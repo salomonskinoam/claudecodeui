@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -529,6 +529,29 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       banner: await page.locator('.chat-activity-tab').evaluateAll((ns) => ns.map((n) => n.textContent.replace(/\s+/g, ' ').trim().slice(0, 160))),
       agents: await page.locator('[data-quests-subagent="figures"]').evaluateAll((ns) => ns.slice(-5).map((n) => `${n.parentElement.querySelector('[data-quests-subagent="step"]')?.textContent ?? ''} | ${n.textContent.trim()}`)),
     }, null, 1));
+  }
+
+  if (check === 'empties') {
+    // Rows that render nothing but a separator: which messages they are (read off the React fiber of each row).
+    // WAIT_MS (default 4000) lets a live chat stream rows first: the empties come with the live stream.
+    await page.waitForTimeout(Number(process.env.WAIT_MS || 4000));
+    const rows = await page.locator('.chat-messages-pane').evaluate((pane) => {
+      const out = [];
+      for (const row of pane.querySelectorAll('.chat-messages-pane > div > div > [data-message-timestamp]')) {
+        if (row.textContent.trim() !== '') continue;
+        const key = Object.keys(row).find((k) => k.startsWith('__reactFiber'));
+        let fiber = key ? row[key] : null;
+        let message = null;
+        for (let i = 0; fiber && i < 12 && !message; i += 1) {
+          const m = fiber.memoizedProps && fiber.memoizedProps.message;
+          if (m && typeof m === 'object' && 'type' in m) message = m;
+          fiber = fiber.child || fiber.return;
+        }
+        out.push({ ts: row.getAttribute('data-message-timestamp'), height: row.getBoundingClientRect().height, type: message?.type, tool: message?.toolName, notif: Boolean(message?.isTaskNotification), thinking: Boolean(message?.isThinking), content: String(message?.content ?? '').slice(0, 60) });
+      }
+      return out;
+    });
+    console.log(JSON.stringify({ empties: rows.length, sample: rows.slice(0, 8) }, null, 1));
   }
 
   if (check === 'subagents') {
