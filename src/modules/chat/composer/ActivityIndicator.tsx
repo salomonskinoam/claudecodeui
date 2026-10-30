@@ -1,16 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 
 import { Shimmer } from '@/shared/ui';
 import type { BackgroundTaskSummary, SessionActivity } from '@/shared/types';
 import { describeBackgroundTask, ownBackgroundTasks } from '@/modules/chat/utils/backgroundTasks';
+import { agentRef, openWorkTab, outputRef, type WorkKind } from '@/modules/chat/work/workTabs';
 
 type ActivityIndicatorProps = {
   activity: SessionActivity | null;
   onAbort?: () => void;
   isInputFocused?: boolean;
+  /** The chat the work belongs to, for opening a task's tab. */
+  sessionId?: string | null;
 };
+
+/**
+ * quests: the tab a task opens as. An agent: its transcript. A backgrounded command: its output file, when the
+ * launch named it. A workflow: none (its agents are reported on the workflow's card).
+ */
+function workTarget(task: BackgroundTaskSummary, sessionId: string | null | undefined): { kind: WorkKind; ref: string } | null {
+  if (!sessionId) return null;
+  if (task.taskType === 'local_bash') return task.outputFile ? { kind: 'output', ref: outputRef(task.outputFile) } : null;
+  if (task.taskType === 'local_workflow') return null;
+  return { kind: 'agent', ref: agentRef(sessionId, task.taskId) };
+}
 
 const ACTION_KEYS = [
   'claudeStatus.actions.thinking',
@@ -22,14 +35,6 @@ const ACTION_KEYS = [
 ];
 const DEFAULT_ACTION_WORDS = ['Thinking', 'Processing', 'Analyzing', 'Working', 'Computing', 'Reasoning'];
 const EXIT_ANIMATION_MS = 220;
-
-/** What the background work is: the one task by kind and name, or how many when there are several. */
-function describeBackgroundTasks(allTasks: BackgroundTaskSummary[], t: TFunction): string {
-  const tasks = ownBackgroundTasks(allTasks);
-  return tasks.length === 1
-    ? describeBackgroundTask(tasks[0], t)
-    : t('claudeStatus.backgroundTask.count', { count: tasks.length, defaultValue: '{{count}} tasks' });
-}
 
 /**
  * Minimal response-in-progress indicator, in the spirit of the inline status
@@ -45,7 +50,7 @@ function describeBackgroundTasks(allTasks: BackgroundTaskSummary[], t: TFunction
  * Rendered by chat's ChatComposer above the input so the user can see and
  * interrupt the in-flight turn without leaving the composer.
  */
-export default function ActivityIndicator({ activity, onAbort, isInputFocused = false }: ActivityIndicatorProps) {
+export default function ActivityIndicator({ activity, onAbort, isInputFocused = false, sessionId }: ActivityIndicatorProps) {
   const { t } = useTranslation('chat');
   const [renderedActivity, setRenderedActivity] = useState<SessionActivity | null>(activity);
   const [isExiting, setIsExiting] = useState(false);
@@ -86,7 +91,11 @@ export default function ActivityIndicator({ activity, onAbort, isInputFocused = 
     ? t('claudeStatus.backgroundWork', 'Background work')
     : (renderedActivity.statusText || actionWords[Math.floor(elapsedSeconds / 4) % actionWords.length])
       .replace(/\.+$/, '');
-  const detail = isBackground ? describeBackgroundTasks(renderedActivity.tasks ?? [], t) : '';
+  // quests: one chip per background task, each clickable when it has a tab to open (Noam, 29 Oct: "i want it for
+  // multi "parallel workers" as well, each one should be clickable").
+  const chips = isBackground
+    ? ownBackgroundTasks(renderedActivity.tasks ?? []).map((task) => ({ key: task.taskId, text: describeBackgroundTask(task, t), target: workTarget(task, sessionId) }))
+    : [];
 
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
@@ -115,9 +124,20 @@ export default function ActivityIndicator({ activity, onAbort, isInputFocused = 
             aria-hidden
           />
           <Shimmer className="shrink-0 font-medium">{`${label}…`}</Shimmer>
-          {detail && (
-            <span className="min-w-0 truncate text-muted-foreground" title={detail}>{detail}</span>
-          )}
+          {chips.map((chip) => chip.target ? (
+            <button
+              key={chip.key}
+              type="button"
+              data-quests-work-chip={chip.key}
+              title={`${chip.text} · open as a tab`}
+              onClick={() => openWorkTab(sessionId as string, chip.target!.kind, chip.target!.ref, chip.text)}
+              className="pointer-events-auto min-w-0 truncate rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {chip.text}
+            </button>
+          ) : (
+            <span key={chip.key} className="min-w-0 truncate text-muted-foreground" title={chip.text}>{chip.text}</span>
+          ))}
           <span className="shrink-0 tabular-nums text-muted-foreground/60">{elapsedLabel}</span>
         </div>
 

@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react';
-import { Bot, ChevronRight, CircleAlert, CircleCheck, CircleDashed } from 'lucide-react';
+import { Bot, ChevronRight, CircleAlert, CircleCheck, CircleDashed, SquareArrowOutUpRight } from 'lucide-react';
 
 import type { DiffLine, LiveTaskStatus, Project, SubagentActivity, SubagentInfo, ToolResult } from '@/shared/types';
 import { cn } from '@/shared/utils';
@@ -7,6 +7,7 @@ import { SubagentTimeline } from '@/modules/chat/tools/SubagentTimeline';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MarkdownContent } from '@/modules/chat/tools/ContentRenderers/MarkdownContent';
 import { formatTaskDuration, resolveBackgroundTaskStatus } from '@/modules/chat/utils/backgroundTasks';
+import { agentRef, openWorkTab, sessionIdFromUrl } from '@/modules/chat/work/workTabs';
 
 type SubagentPanelProps = {
   /** Raw tool input of the call that spawned the agent, used for the prompt. */
@@ -130,14 +131,20 @@ export const SubagentPanel = memo(({
     ? [`${tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : tokens} tokens`, `${toolsUsed} ${toolsUsed === 1 ? 'tool' : 'tools'}`, formatTaskDuration(elapsedMs)].join(' · ')
     : '';
   const lastStep = status === 'running' ? taskStatus?.summary ?? subagent?.lastStep ?? '' : '';
+  // quests: the agent opens as its own tab (its transcript, live), beside the chat.
+  const agentId = subagent?.id ?? taskStatus?.taskId ?? (toolResult?.toolUseResult as { agentId?: unknown } | undefined)?.agentId;
+  const openTab = typeof agentId === 'string' && agentId && !isExporting
+    ? () => { const sid = sessionIdFromUrl(); if (sid) openWorkTab(sid, 'agent', agentRef(sid, agentId), `Agent: ${description || label || 'agent'}`); }
+    : null;
 
   return (
     <div className="my-1 border-l-2 border-l-purple-500 py-0.5 pl-3 dark:border-l-purple-400">
+      <div className="flex items-center gap-1">
       <button
         type="button"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((previous) => !previous)}
-        className="flex w-full select-none items-center gap-1.5 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
+        className="flex w-full min-w-0 select-none items-center gap-1.5 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
         <ChevronRight className={cn('h-3 w-3 flex-shrink-0 transition-transform duration-150', isOpen && 'rotate-90')} />
         <Bot className="h-3.5 w-3.5 flex-shrink-0 text-purple-500 dark:text-purple-400" />
@@ -180,6 +187,18 @@ export const SubagentPanel = memo(({
           )}
         </span>
       </button>
+      {openTab && (
+        <button
+          type="button"
+          data-quests-work="open-agent"
+          title="Open this agent as a tab"
+          onClick={openTab}
+          className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+        >
+          <SquareArrowOutUpRight className="h-3 w-3" />
+        </button>
+      )}
+      </div>
 
       {showTimeline && (
         <div className="mt-1.5 space-y-2 pl-[18px]">

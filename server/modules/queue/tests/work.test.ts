@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { promises as fsp } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { test } from 'node:test';
+
+import { isTaskOutputFile, readOutputTail } from '../work.js';
+
+test('quests: only a task output file under /tmp/claude-<uid> is served', () => {
+  assert.equal(isTaskOutputFile('/tmp/claude-1000/-home-noam-src-noam-worlds/0fbea6ac-4450-4870-a6ab-d42aa8c20c96/tasks/bwy06286r.output'), true);
+  assert.equal(isTaskOutputFile('/tmp/claude-1000/-home-noam/../../etc/passwd'), false);
+  assert.equal(isTaskOutputFile('/home/noam/.claude/plans/x.md'), false);
+  assert.equal(isTaskOutputFile('/tmp/claude-1000/-home-noam/0fbea6ac-4450-4870-a6ab-d42aa8c20c96/tasks/x.output/../y.output'), false);
+});
+
+test('quests: the tail of the output file, whole when small', async () => {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'quests-work-'));
+  const file = path.join(dir, 'a.output');
+  await fsp.writeFile(file, 'line one\nline two\n');
+  const tail = await readOutputTail(file);
+  assert.equal(tail.text, 'line one\nline two\n');
+  assert.equal(tail.truncated, false);
+  assert.equal(tail.size, 18);
+  await fsp.rm(dir, { recursive: true });
+});

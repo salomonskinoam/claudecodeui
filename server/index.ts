@@ -48,6 +48,8 @@ import {
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
 import { closeQueue, initializeQueue, processStates, queueRoutes } from './modules/queue/index.js';
+import { isTaskOutputFile, readOutputTail } from './modules/queue/work.js';
+import { readClaudeSubagentTab } from './modules/providers/list/claude/claude-sessions.provider.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -258,6 +260,40 @@ app.get('/api/quests/plan/:name', authenticateToken, async (req: Request, res: R
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
             res.status(404).json({ error: 'no such plan' });
+            return;
+        }
+        throw error;
+    }
+});
+
+// quests: the work tabs. An agent's transcript (its whole timeline and figures), and the tail of a backgrounded
+// command's output file (Claude Code writes it under /tmp/claude-<uid>/<cwd>/<session id>/tasks/<task id>.output
+// and names it in the tool result). Both read-only, re-read by the tab while it is open.
+app.get('/api/quests/work/agent/:sessionId/:agentId', authenticateToken, async (req: Request, res: Response) => {
+    const agentId = String(req.params.agentId);
+    if (!/^[A-Za-z0-9_-]+$/.test(agentId)) {
+        res.status(400).json({ error: 'bad agent id' });
+        return;
+    }
+    const tab = await readClaudeSubagentTab(String(req.params.sessionId), agentId);
+    if (!tab) {
+        res.status(404).json({ error: 'no such agent' });
+        return;
+    }
+    res.json(tab);
+});
+
+app.get('/api/quests/work/output/*', authenticateToken, async (req: Request, res: Response) => {
+    const file = `/${String(req.params[0])}`;
+    if (!isTaskOutputFile(file)) {
+        res.status(400).json({ error: 'not a task output file' });
+        return;
+    }
+    try {
+        res.json(await readOutputTail(file));
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            res.status(404).json({ error: 'no such output file' });
             return;
         }
         throw error;

@@ -999,6 +999,11 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       return;
     }
   }
+  // quests: a second process on one chat is a defect (seen 2026-10-29 22:11 on "oct_28 all catalogue samples");
+  // this line names why the held process was passed over, so the next time it happens the cause is in the log.
+  if (held) {
+    console.warn(`[quests] held process of ${sessionKey()} not taken (status ${held.status}, beginTurn ${Boolean(held.beginTurn)}, cwd ${options.cwd}): a new process starts`);
+  }
 
   // A new turn supersedes any earlier one still holding this session's process
   // open, so held runs cannot stack up across a conversation.
@@ -1191,6 +1196,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     const heldOptions = { cwd: options.cwd, model: resolvedModel || options.model, permissionMode: sdkOptions.permissionMode };
     const beginTurn = async (messages, newWs, next) => {
       if (heldPrompt.isReleased() || (next.cwd && heldOptions.cwd && next.cwd !== heldOptions.cwd)) {
+        console.warn(`[quests] held process of ${sessionKey()} refuses the turn: released ${heldPrompt.isReleased()}, cwd ${heldOptions.cwd} vs ${next.cwd}`);
         return false;
       }
       try {
@@ -1222,6 +1228,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         assistantBudgetSent = false;
         resolveTurn = () => resolve(true);
         if (!heldPrompt.push(messages)) {
+          console.warn(`[quests] held process of ${sessionKey()} was released before the push`);
           resolveTurn = null;
           resolve(false);
         }

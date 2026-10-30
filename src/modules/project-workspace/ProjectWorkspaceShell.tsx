@@ -8,7 +8,7 @@ import { useProjectCommandState, useProjectSidebarState } from '@/modules/projec
 import PaneTabs from '@/modules/project-workspace/PaneTabs';
 import SplitDropZone, { type SplitSide } from '@/modules/project-workspace/SplitDropZone';
 import { useTabDragging } from '@/modules/project-workspace/tabDrag';
-import { PlanView } from '@/modules/chat';
+import { PlanView, WorkView, registerWorkNavigate, useWorkTitles } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
 import { noteShownChat, reportPageTabs } from '@/modules/queue';
 import { api } from '@/shared/api';
@@ -28,6 +28,8 @@ import {
   planNameOf,
   planTabId,
   selectRightTab,
+  workOf,
+  workTabId,
   swapIntoLeft,
   usePanes,
 } from '@/shared/hooks/useSplitPane';
@@ -40,9 +42,17 @@ function ProjectWorkspaceShell({
   navigate,
 }: ProjectWorkspaceShellProps) {
   // quests: chat tabs per pane and the split screen (see useSplitPane).
-  const { sessionId, planName } = useParams<{ sessionId?: string; planName?: string }>();
-  // A plan tab (route /plan/:planName) shows a plan file in place of a chat.
-  const urlTab = sessionId ?? (planName ? planTabId(planName) : NEW_CHAT_TAB);
+  const params = useParams<{ sessionId?: string; planName?: string; kind?: string; '*'?: string }>();
+  const { sessionId, planName } = params;
+  // A plan tab (route /plan/:planName) shows a plan file in place of a chat; a work tab (route /work/:kind/*) an
+  // agent or a backgrounded command's output.
+  const workTab = params.kind && params['*'] ? workTabId(params.kind, params['*']) : null;
+  const urlTab = sessionId ?? workTab ?? (planName ? planTabId(planName) : NEW_CHAT_TAB);
+  useEffect(() => {
+    registerWorkNavigate(navigate);
+    return () => registerWorkNavigate(null);
+  }, [navigate]);
+  const workTitles = useWorkTitles();
   const panes = usePanes();
   const { projects } = useProjectSidebarState().sidebarSharedProps;
   const showTabs = !isEmbedded && !isMobile;
@@ -72,7 +82,7 @@ function ProjectWorkspaceShell({
   const askedNames = useRef(new Set<string>());
   useEffect(() => {
     for (const id of [...panes.left, ...panes.right]) {
-      if (id === NEW_CHAT_TAB || planNameOf(id) || askedNames.current.has(id) || loadedName(id)) continue;
+      if (id === NEW_CHAT_TAB || planNameOf(id) || workOf(id) || askedNames.current.has(id) || loadedName(id)) continue;
       askedNames.current.add(id);
       void api.sessionDetails(id).then((r) => r.json()).then((json) => {
         const name = json?.data?.summary;
@@ -88,8 +98,12 @@ function ProjectWorkspaceShell({
     if (planNameOf(id)) {
       return `Plan: ${planNameOf(id)}`;
     }
+    const work = workOf(id);
+    if (work) {
+      return workTitles[id] ?? (work.kind === 'agent' ? 'Agent' : 'Command');
+    }
     return loadedName(id) ?? fetchedNames[id] ?? `chat ${id.slice(0, 8)}`;
-  }, [loadedName, fetchedNames]);
+  }, [loadedName, fetchedNames, workTitles]);
 
   // Status dots (useLiveChats): the chats on screen are each pane's active tab; showing a chat marks it seen.
   useEffect(() => {
@@ -103,7 +117,7 @@ function ProjectWorkspaceShell({
   }, [showTabs, sessionId]);
   // quests priority queue: the chats open as tabs rank at the top of the queue (the user chose to open them).
   useEffect(() => {
-    if (showTabs) reportPageTabs([...panes.left, ...panes.right].filter((id) => id !== NEW_CHAT_TAB && !planNameOf(id)));
+    if (showTabs) reportPageTabs([...panes.left, ...panes.right].filter((id) => id !== NEW_CHAT_TAB && !planNameOf(id) && !workOf(id)));
   }, [showTabs, panes.left, panes.right]);
   const dots = useChatDots();
   const dotOf = useCallback((id: string): ChatDot | null => dots[id] ?? null, [dots]);
@@ -158,7 +172,8 @@ function ProjectWorkspaceShell({
   const leftActive = urlTab;
   const showLeftTab = useCallback((id: string) => {
     const plan = planNameOf(id);
-    navigate(id === NEW_CHAT_TAB ? '/' : plan ? `/plan/${plan}` : `/session/${id}`);
+    const work = workOf(id);
+    navigate(id === NEW_CHAT_TAB ? '/' : plan ? `/plan/${plan}` : work ? `/work/${work.kind}/${work.ref}` : `/session/${id}`);
   }, [navigate]);
   const closeLeft = useCallback((id: string) => {
     if (id === leftActive) {
@@ -230,7 +245,9 @@ function ProjectWorkspaceShell({
           )}
           {/* The chat view fills the height left under the tab row, so its bottom stays on screen. */}
           <div className="relative flex min-h-0 flex-1 flex-col">
-            {planName ? (
+            {workTab ? (
+              <WorkView tabId={workTab} />
+            ) : planName ? (
               <PlanView planName={planName} />
             ) : (
               <ProjectMainRegion
@@ -274,7 +291,9 @@ function ProjectWorkspaceShell({
               onDropTab={dropTabRight}
               onNewChat={newChat}
             />
-            {planNameOf(panes.rightActive) ? (
+            {workOf(panes.rightActive) ? (
+              <WorkView tabId={panes.rightActive} />
+            ) : planNameOf(panes.rightActive) ? (
               <PlanView planName={planNameOf(panes.rightActive) as string} />
             ) : panes.rightActive === sessionId ? (
               // Two copies of the app writing one chat would clash, so the right pane steps aside.

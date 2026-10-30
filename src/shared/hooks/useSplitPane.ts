@@ -131,6 +131,13 @@ export const moveTab = (id: string, toPane: 'left' | 'right', beforeId: string |
 export const planTabId = (planName: string) => `plan:${planName}`;
 /** The plan name of a plan tab id, else null. */
 export const planNameOf = (tabId: string): string | null => (tabId.startsWith('plan:') ? tabId.slice(5) : null);
+/** quests: a work tab's id, `work:<kind>:<ref>`: an agent (`agent`, ref `<session id>/<agent id>`) or a backgrounded command's output (`output`, ref its file without the leading slash). */
+export const workTabId = (kind: string, ref: string) => `work:${kind}:${ref}`;
+/** The kind and ref of a work tab id, else null. */
+export const workOf = (tabId: string): { kind: string; ref: string } | null => {
+  const match = /^work:([a-z]+):(.+)$/.exec(tabId);
+  return match ? { kind: match[1], ref: match[2] } : null;
+};
 
 /**
  * Opens a tab right after `afterId` in a pane (at the end when `afterId` is not there), like an editor opening

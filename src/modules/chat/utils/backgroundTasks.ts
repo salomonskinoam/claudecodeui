@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 
 import type { BackgroundTaskStatus, BackgroundTaskSummary, ChatMessage, WorkflowAgentProgress } from '@/shared/types';
+import { outputFileOf } from '@/modules/chat/work/workTabs';
 
 /**
  * Settles one background task's status from its two sources.
@@ -81,12 +82,14 @@ export function collectRunningBackgroundTasks(messages: ChatMessage[]): Backgrou
     }
     const live = message.taskStatus;
     const workflowName = live?.workflowName ?? message.workflow?.name;
+    const outputFile = outputFileOf(message);
     tasks.push({
       taskId,
       toolUseId: message.toolId,
       taskType: live?.taskType ?? TASK_TYPE_BY_TOOL[message.toolName ?? ''] ?? 'local_agent',
       description: live?.description ?? message.subagent?.description ?? '',
       ...(workflowName ? { workflowName } : {}),
+      ...(outputFile ? { outputFile } : {}),
       // The call is the launch: the SDK's start event follows it within the
       // same second.
       startedAt: new Date(message.timestamp).getTime(),

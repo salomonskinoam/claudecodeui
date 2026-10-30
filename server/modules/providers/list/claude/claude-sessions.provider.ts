@@ -273,6 +273,41 @@ function subagentStats(transcript: ClaudeSubagentTranscript): Pick<SubagentInfo,
 }
 
 /**
+ * quests: one agent for its work tab: its whole timeline, its figures, its description, and when its transcript
+ * last grew. Null when the chat or the agent has no transcript.
+ */
+export async function readClaudeSubagentTab(
+  sessionId: string,
+  agentId: string,
+): Promise<{ activity: SubagentActivity[]; info: Omit<SubagentInfo, 'status'> & { lastAt?: string } } | null> {
+  const row = sessionsDb.getSessionById(sessionId);
+  if (!row?.jsonl_path) {
+    return null;
+  }
+  const located = await findClaudeSubagentTranscript(path.dirname(row.jsonl_path), row.provider_session_id ?? sessionId, agentId);
+  if (!located) {
+    return null;
+  }
+  const [transcript, meta] = await Promise.all([
+    readClaudeSubagentTranscript(located.transcriptPath),
+    readClaudeSubagentMeta(located.metaPath),
+  ]);
+  return {
+    activity: transcript.activity.map(truncateSubagentActivity),
+    info: {
+      id: agentId,
+      name: meta.agentType,
+      type: meta.agentType,
+      description: meta.description,
+      model: transcript.model,
+      activityCount: transcript.activity.length,
+      lastAt: transcript.lastAt,
+      ...subagentStats(transcript),
+    },
+  };
+}
+
+/**
  * quests: the subagent transcripts of a session, by the id of the Agent call that spawned each (its sidecar
  * `.meta.json` carries `toolUseId`). Read once per history load, only while an Agent call is still running.
  */

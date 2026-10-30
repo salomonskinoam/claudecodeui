@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -457,6 +457,32 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       if (all.includes('first done') && all.includes('second done')) break;
     }
     console.log(JSON.stringify({ during, samples, rows: await texts() }, null, 1));
+  }
+
+  if (check === 'worktab') {
+    // The last agent call's "open as a tab" icon: a work tab opens right after the chat's tab, the address is
+    // /work/agent/<session>/<agent>, and the tab shows the agent view (its timeline once the server answers).
+    const icon = page.locator('[data-quests-work="open-agent"]').last();
+    await icon.waitFor({ timeout: 20000 }).catch(() => undefined);
+    const counts = { agentIcons: await page.locator('[data-quests-work="open-agent"]').count(), stripIcons: await page.locator('[data-quests-work^="open-"]').count(), chips: await page.locator('[data-quests-work-chip]').count(), rows: await page.locator('[data-message-timestamp]').count() };
+    console.log(JSON.stringify(counts));
+    if (!counts.agentIcons) { await browser.close(); return; }
+    // The agent's row usually sits inside a folded tool group (kept mounted, hidden), where a DOM click is not
+    // delivered; the check calls the row's React handler, as a click on the unfolded row would.
+    await icon.evaluate((n) => {
+      const key = Object.keys(n).find((k) => k.startsWith('__reactProps'));
+      n[key].onClick({ preventDefault() {}, stopPropagation() {} });
+    });
+    await page.waitForTimeout(4000);
+    const tabs = await page.locator('[data-quests-tabs="row"] [title]').evaluateAll((ns) => ns.map((n) => (n.getAttribute('title') || '').slice(0, 40)));
+    console.log(JSON.stringify({
+      url: await page.evaluate(() => location.pathname),
+      view: await page.locator('[data-quests-work]').first().getAttribute('data-quests-work').catch(() => null),
+      text: (await page.locator('[data-quests-work="agent"]').textContent().catch(() => '')).slice(0, 160),
+      tabs,
+      titles: await page.evaluate(() => localStorage.getItem('quests-work-titles')),
+      panes: await page.evaluate(() => localStorage.getItem('quests-panes')),
+    }));
   }
 
   if (check === 'subagents') {

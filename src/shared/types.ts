@@ -173,6 +173,8 @@ export type BackgroundTaskSummary = {
   taskType: string;
   description: string;
   workflowName?: string;
+  /** quests: a backgrounded command's output file, for its work tab. */
+  outputFile?: string;
   /** When the task started (epoch ms). The activity indicator counts from the earliest. */
   startedAt: number;
   /**
@@ -657,6 +659,8 @@ export type LiveTaskStatus = {
   description?: string;
   summary?: string;
   usage?: TaskUsage;
+  /** quests: a backgrounded command's output file, for its work tab. */
+  outputFile?: string;
   /** A workflow's only: where each agent the run spawned stands, from its latest progress event. */
   agents?: WorkflowAgentProgress[];
 };

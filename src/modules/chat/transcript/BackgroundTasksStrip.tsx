@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { X } from 'lucide-react';
+import { SquareArrowOutUpRight, X } from 'lucide-react';
 
 import type { BackgroundTaskSummary, ChatMessage } from '@/shared/types';
 import {
@@ -14,6 +14,19 @@ import {
 } from '@/modules/chat/utils/backgroundTasks';
 import { parseToolPayload } from '@/modules/chat/utils/messageTransforms';
 import { parseWorkflowMeta } from '@/modules/chat/utils/workflowScriptMeta';
+import { agentRef, openWorkTab, outputFileOf, outputRef, type WorkKind } from '@/modules/chat/work/workTabs';
+
+/** quests: the tab a running launch opens as: an agent's transcript, or a backgrounded command's output file. */
+function workTargetOf(message: ChatMessage, sessionId: string | null): { kind: WorkKind; ref: string } | null {
+  if (!sessionId) return null;
+  if (message.toolName === 'Bash') {
+    const file = outputFileOf(message);
+    return file ? { kind: 'output', ref: outputRef(file) } : null;
+  }
+  if (message.toolName === 'Workflow') return null;
+  const agentId = message.subagent?.id ?? readBackgroundTaskId(message);
+  return agentId ? { kind: 'agent', ref: agentRef(sessionId, agentId) } : null;
+}
 
 type BackgroundTasksStripProps = {
   /** Every loaded row of the session, not the visible window: a task launched pages ago is still running. */
@@ -127,6 +140,7 @@ export const BackgroundTasksStrip = memo(({ messages, tasks, sessionId, sendMess
         const { kind, name, progress } = describeTask(message, t);
         const taskId = readBackgroundTaskId(message);
         const title = [kind, name, progress].filter(Boolean).join(' · ');
+        const target = workTargetOf(message, sessionId);
         return (
           <span key={message.toolId} className="flex min-w-0 max-w-full items-center">
             <button
@@ -140,6 +154,18 @@ export const BackgroundTasksStrip = memo(({ messages, tasks, sessionId, sendMess
               {name && <span className="min-w-0 truncate">{name}</span>}
               {progress && <span className="min-w-0 truncate text-muted-foreground/70">· {progress}</span>}
             </button>
+            {sessionId && target && (
+              <button
+                type="button"
+                data-quests-work={`open-${target.kind}`}
+                onClick={() => openWorkTab(sessionId, target.kind, target.ref, `${kind}: ${name}`)}
+                aria-label="Open as a tab"
+                title="Open as a tab"
+                className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+              >
+                <SquareArrowOutUpRight className="h-3 w-3" />
+              </button>
+            )}
             {sessionId && taskId && (
               <button
                 type="button"

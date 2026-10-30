@@ -94,7 +94,8 @@ describe('a background agent card at the moment it launches', () => {
       toolUseResult: { isAsync: true, status: 'async_launched', agentId: 'a1' },
     };
 
-    expect(render(launch, undefined, { status: 'running', usage: { totalTokens: 1, toolUses: 3, durationMs: 1 } })).toContain('running');
+    // quests: while it runs the header shows its figures (the live summary) in place of the word.
+    expect(render(launch, undefined, { status: 'running', usage: { totalTokens: 1, toolUses: 3, durationMs: 1 } })).toContain('3 tools');
     expect(render(launch, undefined, { status: 'completed', summary: 'Agent "Survey the repo" finished' })).toContain('done');
     expect(render(launch, undefined, { status: 'failed' })).toContain('failed');
     expect(render(launch, undefined, { status: 'stopped' })).toContain('no result');

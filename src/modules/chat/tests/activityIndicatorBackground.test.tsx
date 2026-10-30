@@ -45,7 +45,7 @@ test('a background-only session names its workflow, counts from its start and of
   assert.ok(container.querySelector('.bg-purple-500'), 'the dot is the cards\' purple, not the primary colour');
 });
 
-test('an agent and a command are named by what they were asked to do; several tasks by their count', () => {
+test('an agent and a command are named by what they were asked to do; several tasks each by name (quests)', () => {
   const agent = render(
     <ActivityIndicator activity={backgroundActivity([task({ taskType: 'local_agent', description: 'Survey the repo', workflowName: undefined })])} />,
   );
@@ -61,7 +61,8 @@ test('an agent and a command are named by what they were asked to do; several ta
   const several = render(
     <ActivityIndicator activity={backgroundActivity([task(), task({ taskId: 'b5xsbzu5k', toolUseId: 'toolu_bash_1', taskType: 'local_bash' })])} />,
   );
-  assert.match(several.container.textContent ?? '', /2 tasks/);
+  assert.match(several.container.textContent ?? '', /Workflow frontend-architecture-audit/);
+  assert.match(several.container.textContent ?? '', /Command/);
   several.unmount();
 
   // A workflow agent's own backgrounded command is listed (it can be stopped)
@@ -70,7 +71,7 @@ test('an agent and a command are named by what they were asked to do; several ta
     <ActivityIndicator activity={backgroundActivity([task(), task({ taskId: 'b5xsbzu5k', toolUseId: 'toolu_bash_1', taskType: 'local_bash', nested: true })])} />,
   );
   assert.match(nested.container.textContent ?? '', /Workflow frontend-architecture-audit/);
-  assert.doesNotMatch(nested.container.textContent ?? '', /2 tasks/);
+  assert.doesNotMatch(nested.container.textContent ?? '', /Command/);
 });
 
 test('a response in flight still shows the Stop button and the primary dot', () => {
