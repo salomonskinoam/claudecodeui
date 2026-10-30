@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -561,6 +561,26 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       main: await page.locator('[data-quests-workers="main"]').evaluateAll((ns) => ns.map((n) => n.textContent.replace(/\s+/g, ' ').trim())),
       workers: await page.locator('[data-quests-workers="worker"]').evaluateAll((ns) => ns.map((n) => n.textContent.replace(/\s+/g, ' ').trim().slice(0, 140))),
     }, null, 1));
+  }
+
+  if (check === 'tailrows') {
+    // The last rows of the transcript as drawn: height, text head, and the message behind each (off the React fiber).
+    await page.waitForTimeout(Number(process.env.WAIT_MS || 3000));
+    const rows = await page.locator('.chat-messages-pane').evaluate((pane) => {
+      const all = [...pane.querySelectorAll('[data-message-timestamp]')].filter((r) => !r.parentElement.closest('[data-message-timestamp]'));
+      return all.slice(-10).map((row) => {
+        const key = Object.keys(row).find((k) => k.startsWith('__reactFiber'));
+        let fiber = key ? row[key] : null;
+        let message = null;
+        for (let i = 0; fiber && i < 14 && !message; i += 1) {
+          const m = fiber.memoizedProps && (fiber.memoizedProps.message || (fiber.memoizedProps.group && fiber.memoizedProps.group.messages && fiber.memoizedProps.group.messages[0]));
+          if (m && typeof m === 'object' && 'type' in m) message = m;
+          fiber = fiber.child || fiber.return;
+        }
+        return { ts: row.getAttribute('data-message-timestamp')?.slice(11, 19), h: Math.round(row.getBoundingClientRect().height), text: row.textContent.replace(/\s+/g, ' ').trim().slice(0, 60), type: message?.type, tool: message?.toolName, group: row.className.includes('tool') };
+      });
+    });
+    console.log(JSON.stringify(rows, null, 0).replace(/\},\{/g, '},\n{'));
   }
 
   if (check === 'subagents') {

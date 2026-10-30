@@ -473,6 +473,23 @@ test('quests: a result that closes the turn the message was pushed into does not
   }
 });
 
+test('quests: a watcher (Monitor, no task events) keeps the hold even when the turn saw a finished agent\'s task events', async () => {
+  // 2026-10-30: the tracker saw an agent start and finish, judged nothing outstanding, and the process was let
+  // go while its Monitor lived on; the next message could not join it and started a second process.
+  await withRun(async ({ script }) => {
+    script.emit(init());
+    script.emit(toolUse('toolu_monitor', 'Monitor', { command: 'tail -f results.log', description: 'results', timeout_ms: 1800000 }));
+    script.emit(ack('toolu_monitor', 'Monitor started', { taskId: 'bjktzjlxp', timeoutMs: 1800000 }));
+    script.emit(toolUse('toolu_agent', 'Agent', { prompt: 'Return the word FOUR', subagent_type: 'general-purpose' }));
+    script.emit(taskStarted('a1', 'toolu_agent', 'local_agent'));
+    script.emit(taskNotification('a1', 'toolu_agent', 'completed'));
+    script.emit(ack('toolu_agent', 'FOUR', { status: 'completed', agentId: 'a1' }));
+    script.emit(result());
+    await settle();
+    assert.equal(script.released(), false, 'the watcher keeps the process held');
+  });
+});
+
 test('a turn whose tool emits no task events still holds on the static rule', async () => {
   await withRun(async ({ script }) => {
     script.emit(init());

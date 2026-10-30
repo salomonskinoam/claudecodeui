@@ -607,6 +607,17 @@ function extractCumulativeTokenBudget(sdkMessage) {
 // reports back in a later turn.
 const DEFERRED_WORK_TOOLS = new Set(['Monitor', 'ScheduleWakeup', 'CronCreate', 'TaskCreate', 'Workflow']);
 
+// quests: the deferred tools that emit no task events at all. The tracker never sees their work, so a turn that
+// also saw task events (an agent's) must not hand the hold decision to the tracker alone: on 2026-10-30 the
+// catalogue chat's process was let go (stdin closed) while its Monitor watcher lived on, the process stayed
+// alive and in the map, and every later message started a second process ("[quests] held process ... refuses
+// the turn: released true").
+const EVENTLESS_WORK_TOOLS = new Set(['Monitor', 'ScheduleWakeup', 'CronCreate', 'TaskCreate']);
+export function launchesEventlessWork(sdkMessage) {
+  const content = sdkMessage?.message?.content;
+  return Array.isArray(content) && content.some((block) => block?.type === 'tool_use' && EVENTLESS_WORK_TOOLS.has(block.name));
+}
+
 /**
  * Detects tool calls that keep working after the turn's `result` arrives.
  *
@@ -978,6 +989,8 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   // Set when a turn starts background work, cleared when the next `result`
   // arrives — only turns with work still outstanding hold their process open.
   let backgroundWorkPending = false;
+  // quests: a Monitor, ScheduleWakeup, CronCreate or TaskCreate was called this turn: work the tracker cannot see.
+  let eventlessWorkPending = false;
   // Set when the stream reports a task starting during this turn. Task events
   // are the exact word on what is still running, so when the turn produced
   // any, the tracker decides the hold; `startsBackgroundWork` is the fallback
@@ -1323,6 +1336,9 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       if (startsBackgroundWork(message)) {
         backgroundWorkPending = true;
       }
+      if (launchesEventlessWork(message)) {
+        eventlessWorkPending = true;
+      }
       if (message.type === 'assistant') {
         pushedAwaitingAssistant = false;
       }
@@ -1400,8 +1416,9 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // `startsBackgroundWork`, but the CLI runs it in the foreground and
         // it has settled before this `result` — holding for it kept a process
         // alive for the full ceiling with nothing outstanding.
-        const holdForTurn = sawTaskEventThisTurn ? stillOutstanding : backgroundWorkPending || stillOutstanding;
+        const holdForTurn = stillOutstanding || eventlessWorkPending || (!sawTaskEventThisTurn && backgroundWorkPending);
         backgroundWorkPending = false;
+        eventlessWorkPending = false;
         sawTaskEventThisTurn = false;
         if (holdForTurn) {
           heldForBackgroundWork = true;
