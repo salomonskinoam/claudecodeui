@@ -7,6 +7,7 @@ import { getChats } from '@/modules/queue/chats.js';
 import { stateOf } from '@/modules/queue/entries.js';
 import { getOpenTasks, type OpenTask } from '@/modules/queue/sources/transcripts.js';
 import { findTaskOutputFile } from '@/modules/queue/work.js';
+import { chatRunRegistry } from '@/modules/websocket/index.js';
 
 /**
  * quests: the state of the main chat apart from the states of its workers (requirement 40), read from what is
@@ -97,11 +98,19 @@ export async function readWorkState(appSessionId: string): Promise<WorkState | n
   const chat = getChats().get(sid);
   const queueState = chat ? stateOf(chat) : { state: 'none' as const, since: 0 };
   const step = getClaudeSDKLastStep(appSessionId);
+  // A chat the page runs: its turn is in flight when this server has a run going for it. The registry's "busy"
+  // is not the word for such a process: it stayed "busy" between turns (the catalogue chat, 19:45, ten minutes
+  // after its reply). A chat run elsewhere (Cursor, a terminal) has only the registry.
+  const run = chatRunRegistry.getRun(appSessionId);
+  const pageRun = chat?.process?.entrypoint === 'sdk-ts';
+  const answering = pageRun ? run?.status === 'running' : queueState.state === 'running';
+  const lineState = chat?.closingLine ? (({ question: 'question', done: 'done', 'waiting for': 'waiting', blocker: 'blocker' } as const)[chat.closingLine.kind] ?? 'idle') : 'idle';
+  const state: MainState['state'] = queueState.state === 'permission' ? 'permission' : answering ? 'answering' : lineState;
   const main: MainState = {
-    state: queueState.state === 'running' ? 'answering' : queueState.state === 'none' || queueState.state === 'unclaimed' ? 'idle' : queueState.state,
-    step: queueState.state === 'running' ? step?.text ?? null : null,
-    text: chat?.closingLine && queueState.state !== 'running' && queueState.state !== 'permission' ? chat.closingLine.text : null,
-    since: queueState.since || null,
+    state,
+    step: state === 'answering' ? step?.text ?? null : null,
+    text: state !== 'answering' && state !== 'permission' ? chat?.closingLine?.text ?? null : null,
+    since: state === 'answering' ? (pageRun ? run?.startedAt ?? null : queueState.since || null) : state === 'permission' ? queueState.since || null : chat?.closingLine?.at ? Date.parse(chat.closingLine.at) : null,
   };
   // A worker lives inside the chat's process: no live process, no worker, and a task launched before the
   // current process started died with the process that launched it (Noam, 30 Oct: "only live ones should be
