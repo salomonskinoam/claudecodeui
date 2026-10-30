@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -483,6 +483,42 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       titles: await page.evaluate(() => localStorage.getItem('quests-work-titles')),
       panes: await page.evaluate(() => localStorage.getItem('quests-panes')),
     }));
+  }
+
+  if (check === 'dupes') {
+    // Rows shown twice: every row's timestamp attribute and text head, and the groups with the same text.
+    const rows = await page.locator('[data-message-timestamp]').evaluateAll((ns) => ns.map((n) => ({ ts: n.getAttribute('data-message-timestamp'), key: n.getAttribute('data-message-key') || n.id || '', text: n.textContent.replace(/\s+/g, ' ').trim().slice(0, 70) })));
+    const byText = new Map();
+    for (const r of rows) byText.set(r.text, [...(byText.get(r.text) || []), r]);
+    const dupes = [...byText.values()].filter((g) => g.length > 1);
+    console.log(JSON.stringify({ rows: rows.length, distinctTexts: byText.size, dupeGroups: dupes.length, sample: dupes.slice(0, 4) }, null, 1));
+  }
+
+  if (check === 'folds') {
+    // Repeated replies fold: the fold lines (count and time range), the replies shown, and what one click opens.
+    const read = async () => ({
+      folds: await page.locator('[data-quests-fold]').evaluateAll((ns) => ns.map((n) => n.textContent.trim().slice(0, 80))),
+      replies: await page.locator('.chat-message.assistant, [data-message-timestamp] .prose').count(),
+      rows: await page.locator('.chat-messages-pane > div > div > [data-message-timestamp]').count(),
+      tails: await page.locator('[data-message-timestamp] .prose').evaluateAll((ns) => ns.slice(-6).map((n) => n.textContent.replace(/\s+/g, ' ').trim().slice(-110))),
+    });
+    const before = await read();
+    await page.locator('[data-quests-fold] button').last().click().catch(() => undefined);
+    await page.waitForTimeout(1500);
+    const after = await read();
+    console.log(JSON.stringify({ before, after }, null, 1));
+  }
+
+  if (check === 'peek') {
+    // The pane's own message objects (the last 16), read off the React fiber: what the fold rule sees.
+    const rows = await page.locator('.chat-messages-pane').evaluate((pane) => {
+      const key = Object.keys(pane).find((k) => k.startsWith('__reactFiber'));
+      let fiber = key ? pane[key] : null;
+      while (fiber && !(fiber.memoizedProps && Array.isArray(fiber.memoizedProps.visibleMessages))) fiber = fiber.return;
+      const messages = fiber ? fiber.memoizedProps.visibleMessages : [];
+      return messages.slice(-16).map((m) => [m.timestamp?.slice(11, 19), m.type, m.isToolUse ? `tool:${m.toolName}` : '', m.isThinking ? 'thinking' : '', typeof m.content, String(m.content ?? '').replace(/\s+/g, ' ').slice(0, 60), String(m.content ?? '').replace(/\s+/g, ' ').slice(-50)].join(' | '));
+    });
+    console.log(rows.join('\n'));
   }
 
   if (check === 'subagents') {

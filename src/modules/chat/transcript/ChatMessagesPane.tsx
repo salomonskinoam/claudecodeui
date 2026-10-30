@@ -11,6 +11,7 @@ import type { BackgroundTaskSummary,
   ProviderModelsDefinition } from '@/shared/types';
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
 import { groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
+import { foldRepeatedReplies, type ReplyFold } from '@/modules/chat/utils/repeatedReplies';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelectionEmptyState';
@@ -265,6 +266,31 @@ function ChatMessagesPane({
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
     [visibleMessages, showThinking],
   );
+  // quests: replies that repeat are folded (see repeatedReplies.ts); a fold opens on click and stays open.
+  const replyFolds = useMemo(() => foldRepeatedReplies(visibleMessages), [visibleMessages]);
+  const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set());
+  const foldOf = useCallback((item: ChatMessage | { messages: ChatMessage[] }): ReplyFold | null => {
+    const message = 'messages' in item ? item.messages[0] : item;
+    const fold = replyFolds.get(message);
+    return fold && !openFolds.has(fold.id) ? fold : null;
+  }, [replyFolds, openFolds]);
+  const foldLine = (fold: ReplyFold) => {
+    const at = (iso: string) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+    return (
+      <div key={`fold-${fold.id}`} className="my-2 flex items-center gap-2 text-xs text-muted-foreground" data-quests-fold={fold.id}>
+        <span className="h-px flex-1 bg-border/60" />
+        <button
+          type="button"
+          className="rounded px-2 py-0.5 hover:bg-muted hover:text-foreground"
+          onClick={() => setOpenFolds((open) => new Set(open).add(fold.id))}
+          title="The replies said the same as the one below; click to show them"
+        >
+          {fold.count} {fold.count === 1 ? 'reply' : 'replies'} with the same state folded, {at(fold.from)} to {at(fold.to)} · show
+        </button>
+        <span className="h-px flex-1 bg-border/60" />
+      </div>
+    );
+  };
 
   // Stable, deterministic keys for the messages rendered this pass.
   //
@@ -454,6 +480,11 @@ function ChatMessagesPane({
               // initial scroll-to-bottom measures real heights; older rows
               // start as placeholders and mount when scrolled toward.
               const initiallyNearViewport = index >= rowCount - INITIAL_MOUNTED_TAIL_ROWS;
+
+              const fold = foldOf(item);
+              if (fold) {
+                return fold.first ? foldLine(fold) : null;
+              }
 
               if (isToolGroupItem(item)) {
                 const groupPrevMessage = prevMessage;
