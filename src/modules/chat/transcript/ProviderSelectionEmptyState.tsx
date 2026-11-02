@@ -25,6 +25,7 @@ import {
 import ModelGroupList, { type ModelGroup } from "@/modules/chat/composer/ModelGroupList";
 import ModelLibraryPanel from "@/modules/chat/modals/ModelLibraryPanel";
 import { writeSelectedProvider } from '@/shared/selectedProvider';
+import { openNextInQueue } from '@/modules/queue';
 
 const PROVIDER_META: { id: LLMProvider; name: string }[] = [
   { id: "claude", name: "Anthropic" },
@@ -178,6 +179,15 @@ export default function ProviderSelectionEmptyState({
             <p className="mt-1 text-[13px] text-muted-foreground">
               {t("providerSelection.description")}
             </p>
+            {/* quests: the same as the composer's Next, from the empty screen (Noam, 2 Nov). */}
+            <button
+              type="button"
+              data-quests-next-from-queue
+              onClick={() => openNextInQueue()}
+              className="mt-3 rounded-sm border border-[#454647] px-3 py-1 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e]"
+            >
+              Next from queue
+            </button>
           </div>
 
           <Dialog open={dialogOpen} onOpenChange={setPickerOpen}>

@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -604,6 +604,23 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
     console.log(JSON.stringify({ items: text.split('\n').filter(Boolean), closed: (await page.locator('[data-quests-tab-menu]').count()) === 0 }));
+  }
+
+  if (check === 'lasttab') {
+    // Closing every tab leaves the new chat screen with its "Next from queue" button, and the "New chat" tab.
+    // The browser profile is fresh, so the only tab is <sessionId>.
+    for (let i = 0; i < 6; i += 1) {
+      const close = page.locator('[data-quests-tabs="row"] [title="Close tab"]').first();
+      if ((await close.count()) === 0) break;
+      await close.evaluate((n) => n.click());
+      await page.waitForTimeout(800);
+    }
+    console.log(JSON.stringify({
+      url: await page.evaluate(() => location.pathname),
+      tabs: await page.locator('[data-quests-tabs="row"] [title]').evaluateAll((ns) => ns.map((n) => n.getAttribute('title'))),
+      nextButton: await page.locator('[data-quests-next-from-queue]').count(),
+      chatRows: await page.locator('[data-message-timestamp]').count(),
+    }));
   }
 
   if (check === 'subagents') {

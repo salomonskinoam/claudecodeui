@@ -178,12 +178,16 @@ function ProjectWorkspaceShell({
   const closeLeft = useCallback((id: string) => {
     if (id === leftActive) {
       const next = neighbor(panes.left, id);
+      // The last tab closed: the new chat screen, not the chat that was just closed (Noam, 2 Nov: "when closing
+      // all tabs, some chat remains in view, but it's not clear which one").
       if (next) {
         showLeftTab(next);
+      } else {
+        newChat();
       }
     }
     closeLeftTab(id);
-  }, [leftActive, panes.left, showLeftTab]);
+  }, [leftActive, panes.left, showLeftTab, newChat]);
 
   // Drag and drop of tabs (PaneTabs). Into the left pane: the tab is shown there. Out of the left pane: its next
   // tab is shown (or the new chat). A new chat never moves to the right pane, which shows existing chats only.
