@@ -38,7 +38,7 @@ export type Worker = {
 export type WorkState = { main: MainState; workers: Worker[] };
 
 const MAIN_LABEL: Record<MainState['state'], string> = {
-  answering: 'Answering',
+  answering: 'Thinking',
   permission: 'On a permission prompt',
   question: 'Waiting on you: question',
   done: 'Waiting on you: Done',
@@ -126,11 +126,15 @@ function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
   // A worker quiet for half an hour is not live, whatever the server still lists (Noam, 30 Oct: "350 minutes
   // idle is not live is it"); the Monitor tool itself gives up after 30 minutes.
   const workers = (state?.workers ?? []).filter((w) => now - (w.lastActivityAt ?? w.startedAt ?? now) < 30 * 60_000);
+  // In flight: "Running a tool" with the tool while one runs (the status frame), "Thinking" between tools (the
+  // 'thinking' marker, or no frame yet). Never the server's last step, which may be an older turn's.
+  const liveStep = inFlight?.statusText && inFlight.statusText !== 'thinking' ? inFlight.statusText : null;
   const main: MainState = inFlight
-    ? { state: 'answering', step: inFlight.statusText ?? state?.main.step ?? null, text: null, since: inFlight.startedAt }
+    ? { state: 'answering', step: liveStep, text: null, since: inFlight.startedAt }
     : state!.main;
   if (main.state === 'idle' && workers.length === 0) return null;
   const mainDetail = main.state === 'answering' ? main.step : main.text;
+  const mainLabel = main.state === 'answering' && main.step ? 'Running a tool' : MAIN_LABEL[main.state];
 
   return (
     <div className="pointer-events-auto mb-1 rounded-md border border-border/50 bg-card px-3 py-1.5 text-xs" data-quests-workers="panel">
@@ -138,10 +142,10 @@ function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${main.state === 'answering' ? 'animate-pulse bg-primary' : main.state === 'permission' ? 'bg-blue-400' : 'bg-muted-foreground/50'}`} />
         <span className="shrink-0 text-muted-foreground/70">Chat</span>
         {main.state === 'answering'
-          ? <Shimmer className="shrink-0 font-medium">{`${MAIN_LABEL[main.state]}…`}</Shimmer>
-          : <span className="shrink-0 font-medium text-foreground">{MAIN_LABEL[main.state]}</span>}
+          ? <Shimmer className="shrink-0 font-medium">{`${mainLabel}…`}</Shimmer>
+          : <span className="shrink-0 font-medium text-foreground">{mainLabel}</span>}
         {mainDetail && <span className="min-w-0 truncate text-muted-foreground" title={mainDetail}>{mainDetail}</span>}
-        {inFlight && stepText && <span className="shrink-0 tabular-nums text-muted-foreground/70">for {formatTaskDuration(Math.max(0, now - stepRef.current.since))}</span>}
+        {inFlight && <span className="shrink-0 tabular-nums text-muted-foreground/70">for {formatTaskDuration(Math.max(0, now - stepRef.current.since))}</span>}
         {main.since !== null && <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">{main.state === 'answering' ? 'turn ' : ''}{formatTaskDuration(Math.max(0, now - main.since))}</span>}
         {workers.length === 0 && main.state !== 'idle' && <span className="shrink-0 text-muted-foreground/50">no workers</span>}
         {inFlight?.canInterrupt && onAbort && (

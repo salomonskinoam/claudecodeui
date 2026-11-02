@@ -1331,6 +1331,14 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
           if (sessionKey()) lastSteps.set(sessionKey(), { text: stepText, at: Date.now() });
           ws.send(createNormalizedMessage({ kind: 'status', text: stepText, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
         }
+        // quests: a tool result is in: the model is thinking again, so the row stops naming the tool (Noam,
+        // 2 Nov: "so is it answering or calling a tool? can be clearer"). 'thinking' is the marker the page reads.
+        const resultIn = message.type === 'user' && Array.isArray(message.message?.content)
+          && message.message.content.some((block) => block?.type === 'tool_result');
+        if (resultIn) {
+          if (sessionKey()) lastSteps.set(sessionKey(), { text: 'thinking', at: Date.now() });
+          ws.send(createNormalizedMessage({ kind: 'status', text: 'thinking', sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+        }
       }
 
       if (startsBackgroundWork(message)) {

@@ -108,7 +108,7 @@ export async function readWorkState(appSessionId: string): Promise<WorkState | n
   const state: MainState['state'] = queueState.state === 'permission' ? 'permission' : answering ? 'answering' : lineState;
   const main: MainState = {
     state,
-    step: state === 'answering' ? step?.text ?? null : null,
+    step: state === 'answering' && step?.text && step.text !== 'thinking' ? step.text : null,
     text: state !== 'answering' && state !== 'permission' ? chat?.closingLine?.text ?? null : null,
     since: state === 'answering' ? (pageRun ? run?.startedAt ?? null : queueState.since || null) : state === 'permission' ? queueState.since || null : chat?.closingLine?.at ? Date.parse(chat.closingLine.at) : null,
   };

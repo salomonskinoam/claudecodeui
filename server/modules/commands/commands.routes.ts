@@ -165,6 +165,42 @@ async function scanCommandsDirectory(dir, baseDir, namespace) {
 }
 
 /**
+ * quests: the skills a chat can invoke by name (`/<name>`): every `<dir>/skills/<name>/SKILL.md`, with the
+ * description of its frontmatter. Claude Code lists them with the commands; the page did not, so /finalize-chat
+ * (a user skill) was missing from the menu (Noam, 2 Nov).
+ */
+async function scanSkillsDirectory(dir, namespace) {
+  const skills = [];
+  let entries;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code !== "ENOENT" && err.code !== "EACCES") {
+      console.error(`Error scanning skills directory ${dir}:`, err.message);
+    }
+    return skills;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const fullPath = path.join(dir, entry.name, "SKILL.md");
+    try {
+      const { data: frontmatter } = parseFrontMatter(await fs.readFile(fullPath, "utf8"));
+      skills.push({
+        name: "/" + entry.name,
+        path: fullPath,
+        relativePath: path.join(entry.name, "SKILL.md"),
+        description: String(frontmatter.description || "").split("\n")[0].slice(0, 160),
+        namespace,
+        metadata: frontmatter,
+      });
+    } catch {
+      // A folder without a SKILL.md is not a skill.
+    }
+  }
+  return skills;
+}
+
+/**
  * Built-in commands that are always available
  */
 const builtInCommands = [
@@ -468,6 +504,12 @@ router.post("/list", async (req, res) => {
       "user",
     );
     allCommands.push(...userCommands);
+
+    // quests: the skills, project then user, as Claude Code offers them.
+    if (projectPath) {
+      allCommands.push(...(await scanSkillsDirectory(path.join(projectPath, ".claude", "skills"), "project")));
+    }
+    allCommands.push(...(await scanSkillsDirectory(path.join(homeDir, ".claude", "skills"), "user")));
 
     // Separate built-in and custom commands
     const customCommands = allCommands.filter(
