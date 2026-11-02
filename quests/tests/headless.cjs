@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -581,6 +581,18 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       });
     });
     console.log(JSON.stringify(rows, null, 0).replace(/\},\{/g, '},\n{'));
+  }
+
+  if (check === 'dismissdialog') {
+    // The trash icon's popup must show its question, then Cancel closes it. Nothing is hidden.
+    const line = page.locator('[data-quests-queue="list"] [data-queue-key]').first();
+    await line.hover();
+    await page.locator('[data-quests-line="dismiss"]').first().evaluate((n) => n.click());
+    await page.waitForTimeout(800);
+    const text = await page.locator('[data-quests-queue="dismiss"]').innerText().catch(() => '');
+    await page.locator('[data-quests-queue="dismiss"] button', { hasText: 'Cancel' }).click().catch(() => undefined);
+    await page.waitForTimeout(500);
+    console.log(JSON.stringify({ text: text.replace(/\s+/g, ' ').slice(0, 200), closed: (await page.locator('[data-quests-queue="dismiss"]').count()) === 0 }));
   }
 
   if (check === 'subagents') {

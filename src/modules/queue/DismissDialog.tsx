@@ -20,7 +20,9 @@ export default function DismissDialog({ entry, onDone }: { entry: QueueEntry; on
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onDone(); }}>
       <DialogContent className="max-w-md bg-[#1E1F22] text-[#cccccc]" data-quests-queue="dismiss">
-        <DialogTitle>Hide "{entry.chatName ?? entry.title}" until it replies again?</DialogTitle>
+        {/* The shared DialogTitle is screen-reader only by default: made visible here (Noam, 2 Nov: the popup showed two buttons and no question). */}
+        <DialogTitle className="not-sr-only text-[14px] font-medium">Hide "{entry.chatName ?? entry.title}" until it replies again?</DialogTitle>
+        <p className="mt-1 text-[12px] text-[#7f8081]">Its next reply brings it back. Archive still shows it.</p>
         <div className="mt-3 flex gap-2">
           <button type="button" className={btn} disabled={busy} onClick={yes}>Yes</button>
           <button type="button" className={btn} disabled={busy} onClick={onDone}>Cancel</button>

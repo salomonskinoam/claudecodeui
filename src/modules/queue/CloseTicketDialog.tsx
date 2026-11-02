@@ -27,7 +27,7 @@ export default function CloseTicketDialog({ entry, entries, onDone }: CloseTicke
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onDone(); }}>
       <DialogContent className="max-w-lg bg-[#1E1F22] text-[#cccccc]">
-        <DialogTitle>Close ticket #{entry.number}?</DialogTitle>
+        <DialogTitle className="not-sr-only text-[14px] font-medium">Close ticket #{entry.number}?</DialogTitle>
         <p className="text-[13px]">{entry.title}</p>
         {blockers.length > 0 && (
           <div className="text-[13px]">
