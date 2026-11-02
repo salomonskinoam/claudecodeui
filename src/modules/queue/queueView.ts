@@ -59,7 +59,9 @@ export function useQueueView(): QueueView {
   if (current === 'archive') return { mode: current, lines: all, live: [], unclaimed: [] };
   return {
     mode: current,
-    lines: all.filter((e) => e.waitsForMe || isChat(e, shown)),
+    // The chat on screen stays listed, unless its reply was dismissed: then it leaves the list and the forest
+    // while its tab stays open (Noam, 2 Nov: "the chat tab is open, should remain open and leave the queue").
+    lines: all.filter((e) => e.waitsForMe || (isChat(e, shown) && !e.dismissed)),
     live: all.filter((e) => e.live),
     unclaimed: all.filter((e) => e.state === 'unclaimed'),
   };
