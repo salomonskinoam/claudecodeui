@@ -8,6 +8,7 @@ import { ClaudeSessionsProvider } from '@/modules/providers/list/claude/claude-s
 import { CLAUDE_PREDEFINED_MODELS } from '@/modules/providers/list/claude/claude-models.provider.js';
 import {
   canJoinClaudeSDKTurn,
+  isClaudeSDKTurnInFlight,
   listClaudeSDKBackgroundWork,
   queryClaudeSDK,
   stopClaudeSDKTask,
@@ -487,6 +488,28 @@ test('quests: a watcher (Monitor, no task events) keeps the hold even when the t
     script.emit(result());
     await settle();
     assert.equal(script.released(), false, 'the watcher keeps the process held');
+  });
+});
+
+test('quests: a follow-up turn the CLI runs on its own shows as thinking and ends with its own complete', async () => {
+  // A held process gets a task's report and answers it in a turn of its own, with no run of this server: the
+  // page must see that turn (Noam, 2 Nov: "i want to see the model finishing a turn ALWAYS").
+  await withRun(async ({ script, sent }) => {
+    script.emit(init());
+    script.emit(toolUse('toolu_agent', 'Agent', { prompt: 'sleep 90', subagent_type: 'general-purpose', run_in_background: true }));
+    script.emit(taskStarted('a1', 'toolu_agent', 'local_agent'));
+    script.emit(ack('toolu_agent', 'Async agent launched successfully.', { status: 'async_launched', agentId: 'a1' }));
+    script.emit(result());
+    await waitFor(() => sent.filter((m) => m.kind === 'complete').length === 1);
+    assert.equal(isClaudeSDKTurnInFlight(SESSION_ID), false);
+
+    script.emit(taskNotification('a1', 'toolu_agent', 'completed'));
+    script.emit(text('The agent is done; here is its result.'));
+    await waitFor(() => sent.some((m) => m.kind === 'status' && m.text === 'thinking'));
+    assert.equal(isClaudeSDKTurnInFlight(SESSION_ID), true, 'the follow-up turn is in flight');
+    script.emit(result());
+    await waitFor(() => sent.filter((m) => m.kind === 'complete').length === 2);
+    assert.equal(isClaudeSDKTurnInFlight(SESSION_ID), false);
   });
 });
 

@@ -14,4 +14,4 @@ export { initializeSessionsWatcher } from './services/sessions-watcher.service.j
 export { closeSessionsWatcher } from './services/sessions-watcher.service.js';
 // quests: for the workers panel (server/modules/queue/work-state.ts).
 export { describeToolCall } from './list/claude/describe-tool-call.js';
-export { getClaudeSDKLastStep } from './list/claude/claude-runtime.provider.js';
+export { getClaudeSDKLastStep, isClaudeSDKTurnInFlight } from './list/claude/claude-runtime.provider.js';

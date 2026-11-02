@@ -47,6 +47,14 @@ const lastSteps = new Map();
 function getClaudeSDKLastStep(sessionId) {
   return lastSteps.get(sessionId) ?? null;
 }
+// quests: the turns the CLI runs on its own (a task's report, a message from another session, a scheduled
+// wake-up) start with no run of this server; this set says a turn is in flight for a session, from its first
+// message to its `result`, whoever started it. The workers panel reads it (Noam, 2 Nov: "i want to see the model
+// finishing a turn ALWAYS").
+const turnsInFlight = new Set();
+function isClaudeSDKTurnInFlight(sessionId) {
+  return turnsInFlight.has(sessionId);
+}
 
 // Outstanding background tasks per live session, keyed like activeSessions. An
 // entry lives exactly as long as the map entry it shadows: cleared when the
@@ -1323,6 +1331,16 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         ws.send(createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget: tokenBudgetData, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
       }
 
+      // quests: a follow-up turn the CLI started on its own (after this run's turn reported complete): the page is
+      // told the chat is thinking, so the turn shows and ends with its own `complete` below.
+      if ((message.type === 'assistant' || message.type === 'user') && sessionKey() && !turnsInFlight.has(sessionKey())) {
+        turnsInFlight.add(sessionKey());
+        if (turnCompleteSent) {
+          lastSteps.set(sessionKey(), { text: 'thinking', at: Date.now() });
+          ws.send(createNormalizedMessage({ kind: 'status', text: 'thinking', sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+        }
+      }
+
       // quests: the running banner says what the chat is doing, its last tool call, as the agent summary does.
       if (message.type === 'assistant') {
         const call = (message.message?.content ?? []).find((part) => part?.type === 'tool_use');
@@ -1381,6 +1399,11 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // The turn is done as far as the client is concerned.
         const abortPending = sessionKey() ? abortedSessionIds.has(sessionKey()) : false;
         const stillOutstanding = backgroundWork.hasOutstanding(sessionKey());
+        if (sessionKey()) turnsInFlight.delete(sessionKey());
+        if (turnCompleteSent && !abortPending) {
+          // quests: a follow-up turn the CLI ran on its own ends like any turn: the page gets its `complete`.
+          ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }));
+        }
         if (!turnCompleteSent && !abortPending) {
           turnCompleteSent = true;
           ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }));
@@ -1710,6 +1733,7 @@ export {
   canJoinClaudeSDKTurn,
   listClaudeSDKBackgroundWork,
   getClaudeSDKLastStep,
+  isClaudeSDKTurnInFlight,
   stopClaudeSDKTask,
   isClaudeSDKSessionActive,
   getClaudeSDKSessionStartTime,

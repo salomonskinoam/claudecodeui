@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import path from 'node:path';
 
 import { sessionsDb } from '@/modules/database/index.js';
-import { describeToolCall, getClaudeSDKLastStep } from '@/modules/providers/index.js';
+import { describeToolCall, getClaudeSDKLastStep, isClaudeSDKTurnInFlight } from '@/modules/providers/index.js';
 import { getChats } from '@/modules/queue/chats.js';
 import { stateOf } from '@/modules/queue/entries.js';
 import { getOpenTasks, type OpenTask } from '@/modules/queue/sources/transcripts.js';
@@ -103,7 +103,9 @@ export async function readWorkState(appSessionId: string): Promise<WorkState | n
   // after its reply). A chat run elsewhere (Cursor, a terminal) has only the registry.
   const run = chatRunRegistry.getRun(appSessionId);
   const pageRun = chat?.process?.entrypoint === 'sdk-ts';
-  const answering = pageRun ? run?.status === 'running' : queueState.state === 'running';
+  // A page-run chat answers while this server runs a turn for it, or while the CLI runs one on its own (a
+  // task's report, a message from another session): the runtime sees every turn's messages and its result.
+  const answering = pageRun ? run?.status === 'running' || isClaudeSDKTurnInFlight(appSessionId) : queueState.state === 'running';
   const lineState = chat?.closingLine ? (({ question: 'question', done: 'done', 'waiting for': 'waiting', blocker: 'blocker' } as const)[chat.closingLine.kind] ?? 'idle') : 'idle';
   const state: MainState['state'] = queueState.state === 'permission' ? 'permission' : answering ? 'answering' : lineState;
   const main: MainState = {
