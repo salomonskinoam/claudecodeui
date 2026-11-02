@@ -116,7 +116,14 @@ function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
     };
   }, [sessionId]);
 
-  const inFlight = activity && !activity.background ? activity : null;
+  // The server's word on the turn (its run registry) is the truth; the page's own activity map only adds the
+  // live step while the server agrees, or for the first seconds after a send, before the server has answered.
+  // A stale local entry (a complete that never reached this page) can no longer show as a turn in flight
+  // (Noam, 2 Nov: "I JUST wrote the "it seems stuck" message. and it shows 27+ min").
+  const local = activity && !activity.background ? activity : null;
+  const serverAnswering = state?.main.state === 'answering';
+  const justSent = local !== null && now - local.startedAt < 15_000;
+  const inFlight = local && (serverAnswering || justSent || !state) ? local : null;
   // When the current step began: the moment its text changed (Noam, 30 Oct, through another chat: "nothing says
   // which time is the whole turn and which is the running command, nor whether it is stuck").
   const stepRef = useRef<{ text: string | null; since: number }>({ text: null, since: Date.now() });

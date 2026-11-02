@@ -46,6 +46,25 @@ const projectionCache = new WeakMap<NormalizedMessage, CachedMessageProjection>(
  * Fields are extracted independently so the block renders as an assistant
  * notification plus, when present, the agent's markdown result.
  */
+/**
+ * quests: a message another session or an agent sent into this chat, which Claude Code hands to the model as a
+ * user row ("Another Claude session sent a message: <agent-message from=...>" or a cross-session message). It is
+ * not something Noam typed, so it shows as a note with the sender, and its body as the model's input, never as his
+ * message (Noam, 2 Nov: "it seems like a user message and not a chat message happened last. something is not right").
+ */
+function parseInjectedMessage(content: string): { summary: string; body: string } | null {
+  const head = content.trimStart();
+  if (!head.startsWith('Another Claude session sent a message') && !head.startsWith('<agent-message') && !head.startsWith('<cross-session-message')) {
+    return null;
+  }
+  const from = /from(?:-name)?="([^"]+)"/.exec(head)?.[1] ?? 'another session';
+  const kind = head.includes('[Subagent hand-back]') ? 'an agent\'s report' : 'a message from another session';
+  const open = head.indexOf('>', head.indexOf('<agent-message') >= 0 ? head.indexOf('<agent-message') : head.indexOf('<cross-session-message'));
+  const close = Math.max(head.lastIndexOf('</agent-message>'), head.lastIndexOf('</cross-session-message>'));
+  const body = open >= 0 && close > open ? head.slice(open + 1, close).trim() : head;
+  return { summary: `Delivered to the chat: ${kind} (${from})`, body };
+}
+
 function parseTaskNotification(content: string): ParsedTaskNotification | null {
   if (!content.trimStart().startsWith('<task-notification>')) {
     return null;
@@ -404,6 +423,12 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
         if (!content.trim() && !images && !files) break;
 
         if (msg.role === 'user') {
+          const injected = parseInjectedMessage(content);
+          if (injected) {
+            converted.push({ type: 'assistant', content: injected.summary, timestamp: msg.timestamp, isTaskNotification: true, taskNotificationStatus: 'completed', ...sharedMetadata });
+            converted.push({ type: 'assistant', content: formatUsageLimitText(injected.body), timestamp: msg.timestamp, ...sharedMetadata });
+            break;
+          }
           // Parse task notifications
           const taskNotif = parseTaskNotification(content);
           if (taskNotif) {
