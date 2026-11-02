@@ -3,7 +3,7 @@ import type { DragEvent } from 'react';
 
 import { type ChatDot, CHAT_DOT_STYLE } from '@/shared/hooks/useLiveChats';
 import { cn } from '@/shared/utils';
-import { KindSign, useChatLook } from '@/modules/queue';
+import { KindSign, TabContextMenu, useChatLook } from '@/modules/queue';
 import { TAB_DRAG_TYPE } from '@/modules/project-workspace/tabDrag';
 
 type PaneTabsProps = {
@@ -27,6 +27,8 @@ type PaneTabsProps = {
  * chat is in the priority queue wears its family's color, its kind's sign and the shared hover.
  */
 function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf, onDropTab, onNewChat }: PaneTabsProps) {
+  // quests: a right-click on a tab opens the chat's options of its list line (pin, send to the end, hide, Cursor, close the ticket).
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   // Where a dragged tab would land: before this id, or null for the end of the row; undefined while no drag.
   const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined);
   const lookOf = useChatLook();
@@ -107,6 +109,7 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
             onMouseLeave={look?.onMouseLeave}
             onClick={() => onSelect(id)}
             onAuxClick={(event) => event.button === 1 && onClose(id)}
+            onContextMenu={(event) => { event.preventDefault(); setMenu({ id, x: event.clientX, y: event.clientY }); }}
           >
             {dot && (
               <span
@@ -152,6 +155,9 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
         >
           ×
         </button>
+      )}
+      {menu && (
+        <TabContextMenu sessionId={menu.id} x={menu.x} y={menu.y} onClose={() => setMenu(null)} onCloseTab={() => onClose(menu.id)} />
       )}
     </div>
   );
