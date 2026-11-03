@@ -9,6 +9,7 @@ import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
 import { i18n } from '@/modules/i18n';
+import { useTextScale } from '@/shared/hooks/useTextScale';
 
 const DEPLOYMENT_ASSET_DIRECTORIES = new Set(['assets', 'static', 'icons', 'images']);
 
@@ -108,6 +109,8 @@ function detectRouterBasename() {
 /** Rendered by main.tsx; mounts the shared providers, the auth gate and the project workspace routes. */
 export default function App() {
   const routerBasename = detectRouterBasename();
+  // quests: the text size by pinch, Ctrl+wheel, Ctrl+= and Ctrl+- (requirement 46).
+  useTextScale();
 
   return (
     <I18nextProvider i18n={i18n}>
