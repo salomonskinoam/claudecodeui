@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 
 import { authenticatedFetch } from '@/shared/api';
 import { isEmbedded } from '@/shared/hooks/useSplitPane';
-import type { Queue } from '@/modules/queue/types';
+import type { Queue, TicketGroup } from '@/modules/queue/types';
 
 /**
  * quests priority queue: the page's copy of the queue. Polled every two seconds by the main page (the split-screen
@@ -11,7 +11,7 @@ import type { Queue } from '@/modules/queue/types';
  */
 
 const POLL_MS = 2000;
-const EMPTY: Queue = { entries: [], order: [], latch: null, view: [] };
+const EMPTY: Queue = { entries: [], order: [], latch: null, view: [], ticketGroups: [] };
 
 let queue: Queue = EMPTY;
 const listeners = new Set<() => void>();
@@ -55,6 +55,8 @@ export const dragQueue = (key: string, beforeKey: string | null) => request('PUT
 export const setQueueLatch = (key: string | null) => request('PUT', '/latch', { key });
 /** The pause icon: put the entry's chat on hold until it replies again. */
 export const dismissQueueEntry = (key: string) => request('PUT', '/dismiss', { key });
+/** Noam's groups of unclaimed tickets: the whole list. */
+export const setTicketGroups = (groups: TicketGroup[]) => request('PUT', '/groups', { groups });
 /** The archive icon: the entry goes to the "Archived" drawer, or leaves it. */
 export const setQueueArchived = (key: string, archived: boolean) => request('PUT', '/archive', { key, archived });
 /** The slashed eye: the entry goes to the end of the queue. */

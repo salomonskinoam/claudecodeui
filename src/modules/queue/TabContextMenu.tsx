@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import CloseTicketDialog from '@/modules/queue/CloseTicketDialog';
-import DismissDialog from '@/modules/queue/DismissDialog';
 import RenameDialog from '@/modules/queue/RenameDialog';
-import { sendQueueEntryToEnd, setQueueArchived, setQueueLatch, useQueue } from '@/modules/queue/queueStore';
+import { dismissQueueEntry, sendQueueEntryToEnd, setQueueArchived, setQueueLatch, useQueue } from '@/modules/queue/queueStore';
 import { entryOfChat } from '@/modules/queue/types';
 
 type TabContextMenuProps = {
@@ -25,7 +24,7 @@ const item = 'block w-full px-3 py-1 text-left text-[13px] text-[#cccccc] hover:
 export default function TabContextMenu({ sessionId, x, y, onClose, onCloseTab }: TabContextMenuProps) {
   const queue = useQueue();
   const entry = entryOfChat(queue.entries, sessionId);
-  const [dialog, setDialog] = useState<'hide' | 'ticket' | 'rename' | null>(null);
+  const [dialog, setDialog] = useState<'ticket' | 'rename' | null>(null);
 
   useEffect(() => {
     if (dialog) return undefined;
@@ -39,7 +38,6 @@ export default function TabContextMenu({ sessionId, x, y, onClose, onCloseTab }:
     };
   }, [dialog, onClose]);
 
-  if (dialog === 'hide' && entry) return <DismissDialog entry={entry} onDone={onClose} />;
   if (dialog === 'rename' && entry?.sessionId) return <RenameDialog sessionId={entry.sessionId} current={entry.chatName ?? entry.title} onDone={onClose} />;
   if (dialog === 'ticket' && entry) return <CloseTicketDialog entry={entry} entries={queue.entries} onDone={onClose} />;
 
@@ -56,7 +54,7 @@ export default function TabContextMenu({ sessionId, x, y, onClose, onCloseTab }:
           {entry.sessionId && <button type="button" className={item} data-quests-menu="rename" onClick={() => setDialog('rename')}>Rename…</button>}
           <button type="button" className={item} onClick={() => { void setQueueLatch(latched ? null : entry.key); onClose(); }}>{latched ? 'Unpin' : 'Pin on top'}</button>
           <button type="button" className={item} onClick={() => { void sendQueueEntryToEnd(entry.key); onClose(); }}>Send to the end of the queue</button>
-          <button type="button" className={item} onClick={() => setDialog('hide')}>Put on hold until it replies again</button>
+          <button type="button" className={item} onClick={() => { void dismissQueueEntry(entry.key); onClose(); }}>Put on hold until it replies again</button>
           <button type="button" className={item} onClick={() => { void setQueueArchived(entry.key, !entry.archived); onClose(); }}>{entry.archived ? 'Take out of the archive' : 'Archive'}</button>
           {entry.providerSessionId && (
             <a className={item} href={`cursor://anthropic.claude-code/open?session=${entry.providerSessionId}`} onClick={onClose}>Open in Cursor</a>

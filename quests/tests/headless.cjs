@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -42,7 +42,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   await page.addInitScript((t) => localStorage.setItem('auth-token', t), token);
   // The list's default (focus) shows only the chats that wait for the user; every check but `focus` reads the
   // whole list, so they open the page in archive mode.
-  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), ['focus', 'hold', 'archived', 'dragunclaimed'].includes(check) ? 'focus' : 'archive');
+  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), ['focus', 'hold', 'archived', 'dragunclaimed', 'ticketgroups'].includes(check) ? 'focus' : 'archive');
   page.on('pageerror', (error) => console.log('page error:', (error.stack || error.message).slice(0, 700)));
   await page.goto(check === 'plan' ? 'http://127.0.0.1:3001/' : `http://127.0.0.1:3001/session/${sessionId}`);
   await page.waitForTimeout(6000);
@@ -709,6 +709,23 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await put('/order', { order: before.order });
   }
 
+  if (check === 'ticketgroups') {
+    // The Tickets-Unclaimed drawer shows Noam's groups as headers with their counts, each ticket under its group,
+    // the ungrouped last, and a "+ group" line. Nothing is changed.
+    const q = await apiQueue();
+    await page.locator('[data-quests-group="Tickets-Unclaimed"]').click();
+    await page.waitForTimeout(400);
+    const drawer = page.locator('[data-quests-group="Tickets-Unclaimed"]').locator('xpath=..');
+    const headers = await drawer.locator('[data-quests-ticket-group]').evaluateAll((ns) => ns.map((n) => [n.dataset.questsTicketGroup, Number(n.dataset.questsTicketGroupCount)]));
+    const shown = await drawer.locator('[data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+    const numbers = shown.map((k) => Number(k.slice(7)));
+    const expected = q.ticketGroups.map((g) => [g.name, g.tickets.filter((t) => numbers.includes(t)).length]);
+    const inSome = new Set(q.ticketGroups.flatMap((g) => g.tickets));
+    const ungrouped = numbers.filter((n) => !inSome.has(n)).length;
+    if (expected.length && ungrouped) expected.push(['', ungrouped]);
+    console.log(JSON.stringify({ headers, asExpected: JSON.stringify(headers) === JSON.stringify(expected), tickets: shown.length, addLine: await drawer.locator('[data-quests-ticket-group-add]').count() }));
+  }
+
   if (check === 'archived') {
     // The "Archived" drawer lists exactly the archived entries of the queue, newest first, and none of them is
     // among the other lines; a click opens it. Nothing is archived here.
@@ -722,18 +739,6 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(400);
     const members = await drawer.locator('xpath=..').locator('[data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
     console.log(JSON.stringify({ label, archived: archived.length, members: members.length, same: JSON.stringify(members) === JSON.stringify(archived), leaked: before.filter((k) => archived.includes(k)).length }));
-  }
-
-  if (check === 'dismissdialog') {
-    // The trash icon's popup must show its question, then Cancel closes it. Nothing is hidden.
-    const line = page.locator('[data-quests-queue="list"] [data-queue-key]').first();
-    await line.hover();
-    await page.locator('[data-quests-line="dismiss"]').first().evaluate((n) => n.click());
-    await page.waitForTimeout(800);
-    const text = await page.locator('[data-quests-queue="dismiss"]').innerText().catch(() => '');
-    await page.locator('[data-quests-queue="dismiss"] button', { hasText: 'Cancel' }).click().catch(() => undefined);
-    await page.waitForTimeout(500);
-    console.log(JSON.stringify({ text: text.replace(/\s+/g, ' ').slice(0, 200), closed: (await page.locator('[data-quests-queue="dismiss"]').count()) === 0 }));
   }
 
   if (check === 'tabmenu') {
@@ -810,7 +815,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // The default list: "Pending chats" open (the chats that wait for the user plus the chat on screen), then
     // "Active chats (n)", "On hold (n)", "Tickets-Unclaimed (n)" and "Archived (n)" collapsed; a click opens a
     // drawer; the active chats running come last; the DONE button sits in the composer and is disabled while
-    // something is typed; the pause opens its popup; Cancel closes it.
+    // something is typed.
     const q = await apiQueue();
     const view = q.view.map((k) => q.entries.find((e) => e.key === k));
     const mine = q.entries.find((e) => e.sessionId === sessionId)?.key;
@@ -839,17 +844,11 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const doneWhileTyped = await done.isEnabled();
     await box.fill('');
     await page.waitForTimeout(300);
-    await page.locator(`[data-queue-key="${shown[0]}"]`).hover();
-    await page.locator(`[data-queue-key="${shown[0]}"] [data-quests-line="dismiss"]`).click();
-    await page.waitForTimeout(400);
-    const popup = await page.locator('[data-quests-queue="dismiss"]').isVisible();
-    await page.locator('[data-quests-queue="dismiss"] button', { hasText: 'Cancel' }).click();
-    await page.waitForTimeout(300);
     console.log(JSON.stringify({
       linesAsExpected: JSON.stringify(shown) === JSON.stringify(expected), lines: shown.length, pending, active, unclaimed,
       activeChats: activeKeys.length, expectedActive: view.filter((e) => e.live && !e.waitsForMe && !e.dismissed && !e.archived && e.key !== mine).length, runningLast,
       openedUnclaimed: opened - shown.length, expectedUnclaimed: view.filter((e) => e.state === 'unclaimed' && !e.archived && !e.dismissed).length,
-      doneEnabled, doneWhileTyped, dismissPopup: popup, viewLines: view.length,
+      doneEnabled, doneWhileTyped, viewLines: view.length,
     }));
   }
 

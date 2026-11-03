@@ -26,7 +26,7 @@ type QueueLineProps = {
   drag: Record<string, unknown>;
   onOpen: (event: MouseEvent) => void;
   onCloseTicket: () => void;
-  /** The pause icon: put the chat on hold until it replies again (asks first). */
+  /** The pause icon: put the chat on hold until it replies again (no question asked). */
   onDismiss: () => void;
   /** The slashed eye: the entry goes to the end of the queue (no question asked). */
   onSendToEnd: () => void;

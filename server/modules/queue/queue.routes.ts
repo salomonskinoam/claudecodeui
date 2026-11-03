@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 
-import { archiveEntry, dismissEntry, dragTo, getQueue, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
+import { archiveEntry, dismissEntry, dragTo, getQueue, replaceTicketGroups, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
 import { closeTicket, getTickets, type CloseChoice } from '@/modules/queue/sources/tickets.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -54,6 +54,11 @@ router.put('/archive', asyncHandler(async (req: Request, res: Response) => {
   const { key, archived } = req.body ?? {};
   if (typeof key !== 'string' || typeof archived !== 'boolean') throw bad('key and archived are required.');
   res.json(createApiSuccessResponse(archiveEntry(key, archived)));
+}));
+
+// Noam's groups of unclaimed tickets: the whole list replaces the stored one.
+router.put('/groups', asyncHandler(async (req: Request, res: Response) => {
+  res.json(createApiSuccessResponse(replaceTicketGroups(req.body?.groups)));
 }));
 
 // The ticket page: one open ticket's title, labels and text (Noam, 3 Nov: "i want to see the ticket body in the

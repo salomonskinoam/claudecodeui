@@ -47,7 +47,10 @@ export type QueueEntry = {
   startFolder: string | null;
 };
 
-export type Queue = { entries: QueueEntry[]; order: string[]; latch: string | null; view: string[] };
+/** One of Noam's groups inside the Tickets-Unclaimed drawer: his name, the ticket numbers. */
+export type TicketGroup = { name: string; tickets: number[] };
+
+export type Queue = { entries: QueueEntry[]; order: string[]; latch: string | null; view: string[]; ticketGroups: TicketGroup[] };
 
 /**
  * The entry of a chat, by either of its ids: the page's (most tabs) or Claude Code's (a tab opened from a Cursor

@@ -6,10 +6,11 @@ import { readLatch, readOrder, writeLatch, writeOrder } from '@/modules/queue/or
 import { drag, lift, repair, view } from '@/modules/queue/queue-order.js';
 import { setPageTabs } from '@/modules/queue/sources/page-tabs.js';
 import { noteTranscriptOnce } from '@/modules/queue/sources/transcripts.js';
+import { getTicketGroups, setTicketGroups, type TicketGroup } from '@/modules/queue/ticket-groups.js';
 
 /** quests priority queue: what the page asks of the queue. Each call answers with the whole queue. */
 
-export type Queue = { entries: QueueEntry[]; order: string[]; latch: string | null; view: string[] };
+export type Queue = { entries: QueueEntry[]; order: string[]; latch: string | null; view: string[]; ticketGroups: TicketGroup[] };
 
 export function getQueue(): Queue {
   const entries = buildEntries();
@@ -17,7 +18,13 @@ export function getQueue(): Queue {
   writeOrder(order);
   const stored = readLatch();
   const latch = stored && entries.some((e) => e.key === stored) ? stored : null;
-  return { entries, order, latch, view: view(order, latch, entries) };
+  return { entries, order, latch, view: view(order, latch, entries), ticketGroups: getTicketGroups() };
+}
+
+/** Noam's groups of unclaimed tickets, the whole list. */
+export function replaceTicketGroups(groups: unknown): Queue {
+  setTicketGroups(groups);
+  return getQueue();
 }
 
 export function setOrder(order: string[]): Queue {
