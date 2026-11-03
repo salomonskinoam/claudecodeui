@@ -7,7 +7,8 @@ import { foldRuns, isReply, replyState, rowIdOf, segmentTurns, starterOf, type S
  * thing the page draws. Pure functions over a plain object, so the store and the tests drive the same code.
  *
  * The rules, each named by the invariant in the plan:
- *  I1  Grow only: nothing here removes a row.
+ *  I1  Grow only: nothing here removes a row. One exception, at load: `dropStreamTwins` removes a streamed copy
+ *      that was never confirmed and stands beside the same reply (a duplicate drawn by a bug, never a source).
  *  I2  Order is permanent: older history goes before the first row as a block, everything else after the last.
  *  I3  One row per id: `alias` maps every id ever seen (the row's, a local echo's, a transcript copy's) to its row.
  *  I4  A confirmation changes content only; a copy that would change the row's kind is refused.
@@ -185,7 +186,8 @@ function confirmRow(l: Ledger, i: number, incoming: NormalizedMessage, fromRead 
  *  - a typed echo: the oldest pending or failed user row with the same words and attachment counts, stamped no
  *    earlier than a minute before the echo was typed (a message queued behind a long tool call is written to the
  *    transcript minutes after Enter, so there is no upper bound);
- *  - a streamed or live reply: an assistant text row with the same words within the same window;
+ *  - a streamed or live reply: an assistant text row with the same words within the same window, or a reply still
+ *    streaming whose words so far open the copy's;
  *  - a tool call or result: the row with the same tool id.
  */
 function matchByText(l: Ledger, m: NormalizedMessage): number {
@@ -214,7 +216,9 @@ function matchByText(l: Ledger, m: NormalizedMessage): number {
   for (let i = l.rows.length - 1; i >= 0; i -= 1) {
     const row = l.rows[i];
     if (row.source !== 'stream' && row.source !== 'live') continue;
-    if (!isAssistantText(row) || normalizeText(row.content) !== text) continue;
+    if (!isAssistantText(row) && row.kind !== 'stream_delta') continue;
+    const rowText = normalizeText(row.content);
+    if (!(rowText === text || (row.kind === 'stream_delta' && rowText !== '' && text.startsWith(rowText)))) continue;
     if (stamp && stamp < (timeOf(row) || row.enteredAt || 0) - CONFIRM_CLOCK_SKEW_MS) continue;
     // Already confirmed by another copy: its alias points at a transcript id.
     if (Object.keys(l.alias).some((id) => id !== row.id && l.alias[id] === row.id && !id.startsWith('local_'))) continue;
@@ -524,6 +528,29 @@ export function setOpen(l: Ledger, key: string, open: boolean): boolean {
   if (Boolean(l.open[key]) === open) return false;
   if (open) l.open = { ...l.open, [key]: true };
   else { const { [key]: _gone, ...rest } = l.open; l.open = rest; }
+  return true;
+}
+
+/**
+ * The one removal (I1's exception), at load: a streamed copy that no transcript or live id ever confirmed, standing
+ * right beside an assistant row with the same words, is the duplicate of that row (drawn by the bug of 3 Nov,
+ * a reply landing before its pieces' end) and is dropped. A confirmed streamed row has another id aliased to it
+ * and is never touched; a row with different words is never touched.
+ */
+export function dropStreamTwins(l: Ledger): boolean {
+  const confirmed = new Set(Object.entries(l.alias).filter(([id, target]) => id !== target).map(([, target]) => target));
+  const twin = (i: number): boolean => {
+    const row = l.rows[i];
+    if (row.source !== 'stream' || !isAssistantText(row) || confirmed.has(row.id)) return false;
+    const text = normalizeText(row.content);
+    if (!text) return false;
+    return [l.rows[i - 1], l.rows[i + 1]].some((other) => other && other.id !== row.id && isAssistantText(other) && normalizeText(other.content) === text);
+  };
+  const kept = l.rows.filter((_, i) => !twin(i));
+  if (kept.length === l.rows.length) return false;
+  const gone = new Set(l.rows.filter((_, i) => twin(i)).map((row) => row.id));
+  l.rows = kept;
+  l.alias = Object.fromEntries(Object.entries(l.alias).filter(([id, target]) => !gone.has(id) && !gone.has(target)));
   return true;
 }
 

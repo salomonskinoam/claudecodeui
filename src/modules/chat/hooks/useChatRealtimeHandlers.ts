@@ -255,6 +255,10 @@ export function useChatRealtimeHandlers({
         && msg.kind !== 'permission_resolved'
         && msg.kind !== 'permission_cancelled';
 
+      // The whole reply can land before its last piece's end (a short reply: the pieces wait in the 100 ms
+      // buffer, the reply arrives, then the end creates the streamed row AFTER it: drawn twice, Noam 3 Nov). The
+      // pieces are closed first, so the reply confirms the streamed row instead of standing beside it.
+      if (sid && msg.kind === 'text' && msg.role === 'assistant' && streamBySession.current.has(sid)) endStream(sid);
       if (sid && shouldPersist) {
         sessionStore.appendRealtime(sid, msg as unknown as NormalizedMessage);
       }

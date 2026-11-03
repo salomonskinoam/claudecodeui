@@ -4,7 +4,7 @@ import { test } from 'vitest';
 
 import type { NormalizedMessage } from '@/shared/types';
 import {
-  appendLive, appendLocal, appendRead, appendStreamDelta, createLedger, cut, endStream, markUndelivered, mergeLedgers, setOpen,
+  appendLive, appendLocal, appendRead, appendStreamDelta, createLedger, cut, dropStreamTwins, endStream, markUndelivered, mergeLedgers, setOpen,
   type Ledger,
 } from '@/modules/chat/ledger/chatLedger';
 
@@ -223,4 +223,29 @@ test('15. a live tool call and its later transcript copy are one row, paired by 
   latest(l, [...HISTORY, row('h7', 'assistant', '', 20, { kind: 'tool_use', toolId: 'toolu_7', toolName: 'Read', toolInput: { file_path: 'a' } })], 21);
   assert.equal(l.rows.filter((r) => r.kind === 'tool_use').length, 1);
   assert.equal(l.alias.h7, 'live-t');
+});
+
+test('16. a whole reply landing while its pieces still stream confirms the streamed row; an old twin is dropped at load', () => {
+  // The reply arrives while the streamed row still holds a prefix: the reply confirms it, one row.
+  const l = loaded();
+  appendStreamDelta(l, 'This ', 'claude', T0 + 20_000);
+  appendLive(l, row('c1', 'assistant', 'This chat', 21), T0 + 21_000);
+  endStream(l, T0 + 21_500);
+  assert.equal(l.rows.filter((r) => r.content === 'This chat').length, 1);
+  assert.equal(l.rows.at(-1)!.kind, 'text');
+  assert.equal(l.alias.c1, l.rows.at(-1)!.id);
+  // A ledger saved by the bug (the reply first, the streamed row created after it): the twin goes at load, the
+  // reply stays, and a confirmed streamed row elsewhere is never touched.
+  const bad = loaded();
+  appendLive(bad, row('c2', 'assistant', 'Short reply', 30), T0 + 30_000);
+  appendStreamDelta(bad, 'Short reply', 'claude', T0 + 30_100);
+  endStream(bad, T0 + 30_200);
+  appendStreamDelta(bad, 'Another', 'claude', T0 + 31_000);
+  endStream(bad, T0 + 31_100);
+  appendLive(bad, row('c3', 'assistant', 'Another', 31), T0 + 31_200);
+  assert.equal(bad.rows.filter((r) => r.content === 'Short reply').length, 2);
+  assert.equal(dropStreamTwins(bad), true);
+  assert.deepEqual(texts(bad).slice(-2), ['Short reply', 'Another']);
+  assert.equal(bad.rows.at(-2)!.id, 'c2');
+  assert.equal(dropStreamTwins(bad), false);
 });

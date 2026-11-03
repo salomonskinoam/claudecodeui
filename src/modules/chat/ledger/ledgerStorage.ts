@@ -1,5 +1,5 @@
 import type { Ledger } from '@/modules/chat/ledger/chatLedger';
-import { mergeLedgers } from '@/modules/chat/ledger/chatLedger';
+import { dropStreamTwins, mergeLedgers } from '@/modules/chat/ledger/chatLedger';
 
 /**
  * quests: the ledger persisted per viewer (requirement 52): IndexedDB, one record per chat, so a reload draws the
@@ -49,7 +49,9 @@ export async function loadLedger(sessionId: string): Promise<Ledger | null> {
       const record = await done(db.transaction(STORE, 'readonly').objectStore(STORE).get(sessionId)) as StoredLedger | undefined;
       if (!record || record.v !== 1) return null;
       const { savedAt: _savedAt, ...ledger } = record;
-      return { ...ledger, queued: [] };
+      const loaded: Ledger = { ...ledger, queued: [] };
+      dropStreamTwins(loaded);
+      return loaded;
     } finally {
       db.close();
     }
