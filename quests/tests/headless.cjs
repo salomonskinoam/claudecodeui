@@ -805,21 +805,35 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'textscale') {
-    // Ctrl+= twice, Ctrl+wheel down once, Ctrl+0: the root font size follows, the browser zoom is not touched.
-    const size = () => page.evaluate(() => [document.documentElement.style.fontSize, document.documentElement.dataset.questsTextScale]);
+    // Ctrl+= twice, Ctrl+wheel down once, Ctrl+0: the chat's text follows (--quests-chat-scale, the computed
+    // size of a transcript row), the sidebar's text and the page's root size do not, the label shows the size.
+    const size = () => page.evaluate(() => {
+      const row = document.querySelector('.chat-messages-pane .chat-message p, .chat-messages-pane .chat-message');
+      const line = document.querySelector('[data-quests-queue="list"] [data-queue-key]');
+      const toast = document.querySelector('[data-quests-text-size]');
+      return {
+        scale: document.documentElement.dataset.questsTextScale,
+        root: document.documentElement.style.fontSize,
+        chatPx: row ? Number.parseFloat(getComputedStyle(row).fontSize) : null,
+        sidebarPx: line ? Number.parseFloat(getComputedStyle(line).fontSize) : null,
+        toast: toast && toast.classList.contains('is-shown') ? toast.textContent : null,
+      };
+    });
     const start = await size();
     await page.keyboard.press('Control+Equal');
     await page.keyboard.press('Control+Equal');
+    await page.waitForTimeout(100);
     const up = await size();
     await page.mouse.move(600, 400);
     await page.keyboard.down('Control');
-    await page.mouse.wheel(0, 120);
+    await page.mouse.wheel(0, 300);
     await page.keyboard.up('Control');
     await page.waitForTimeout(200);
     const down = await size();
     await page.keyboard.press('Control+Digit0');
+    await page.waitForTimeout(1500);
     const reset = await size();
-    console.log(JSON.stringify({ start, up, down, reset }));
+    console.log(JSON.stringify({ start, up, down, reset, chatGrew: up.chatPx > start.chatPx, sidebarSame: up.sidebarPx === start.sidebarPx, rootUntouched: !up.root, toastGone: reset.toast === null }));
   }
 
   if (check === 'renamebutton') {

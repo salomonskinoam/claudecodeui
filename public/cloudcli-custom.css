@@ -29,17 +29,21 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
 
 /* Text size. --base is the size of normal text; every other text size follows it.
    Only font sizes change: spacing, icons and layout stay as they are. The slider in cloudcli-custom.js sets --base.
-   19.75px is Cursor's chat text size (claudeCodeUiPatch.chatHistoryFontSize). */
-:root { --base: 19.75px; }
-.text-base { font-size: var(--base) !important; line-height: 1.5 !important; }
-.text-lg   { font-size: calc(var(--base) * 1.125) !important; line-height: 1.5 !important; }
-.text-sm, .prose-sm { font-size: calc(var(--base) * .875) !important; line-height: 1.5 !important; }
-.text-xs   { font-size: calc(var(--base) * .75) !important; line-height: 1.4 !important; }
-.text-\[14px\] { font-size: calc(var(--base) * .875) !important; }
-.text-\[13px\] { font-size: calc(var(--base) * .8125) !important; }
-.text-\[12px\] { font-size: calc(var(--base) * .75) !important; }
-.text-\[11px\] { font-size: calc(var(--base) * .6875) !important; }
-.text-\[10px\] { font-size: calc(var(--base) * .625) !important; }
+   19.75px is Cursor's chat text size (claudeCodeUiPatch.chatHistoryFontSize).
+   --base-eff is what the rules read: --base everywhere, and inside the transcript --base times --quests-chat-scale,
+   the pinch and Ctrl+= scale of src/shared/hooks/useTextScale.ts (Noam, 3 Nov: "only the text to change size in
+   the chat, not the menus"). */
+:root { --base: 19.75px; --base-eff: var(--base); }
+.chat-messages-pane { --base-eff: calc(var(--base) * var(--quests-chat-scale, 1)); font-size: var(--base-eff); }
+.text-base { font-size: var(--base-eff) !important; line-height: 1.5 !important; }
+.text-lg   { font-size: calc(var(--base-eff) * 1.125) !important; line-height: 1.5 !important; }
+.text-sm, .prose-sm { font-size: calc(var(--base-eff) * .875) !important; line-height: 1.5 !important; }
+.text-xs   { font-size: calc(var(--base-eff) * .75) !important; line-height: 1.4 !important; }
+.text-\[14px\] { font-size: calc(var(--base-eff) * .875) !important; }
+.text-\[13px\] { font-size: calc(var(--base-eff) * .8125) !important; }
+.text-\[12px\] { font-size: calc(var(--base-eff) * .75) !important; }
+.text-\[11px\] { font-size: calc(var(--base-eff) * .6875) !important; }
+.text-\[10px\] { font-size: calc(var(--base-eff) * .625) !important; }
 
 /* Sidebar: "New Session" fades into the background; the open chat takes the button's old blue. */
 .border-l.pl-3 button.bg-primary.w-full {

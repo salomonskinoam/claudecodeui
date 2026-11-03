@@ -568,6 +568,27 @@
     contain: layout style paint;
   }
 
+  /* quests: the label "Text 120 %" shown for a second after the chat's text size changes (useTextScale.ts). */
+  .quests-text-size-toast {
+    position: fixed;
+    right: 24px;
+    bottom: 110px;
+    z-index: 60;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(30, 31, 34, 0.92);
+    border: 1px solid #454647;
+    color: #fff;
+    font-size: 13px;
+    line-height: 18px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+  }
+  .quests-text-size-toast.is-shown {
+    opacity: 1;
+  }
+
   .chat-composer-shell {
     contain: layout style;
   }
