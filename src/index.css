@@ -568,19 +568,21 @@
     contain: layout style paint;
   }
 
-  /* quests: the label "Text 120 %" shown for a second after the chat's text size changes (useTextScale.ts). */
+  /* quests: the label "20.25 px" in the lower middle of the screen for a second after the chat's text size changes
+     (useTextScale.ts; Noam, 3 Nov: "a short popup mid lower screen with the font size displayed"). */
   .quests-text-size-toast {
     position: fixed;
-    right: 24px;
-    bottom: 110px;
+    left: 50%;
+    bottom: 140px;
+    transform: translateX(-50%);
     z-index: 60;
-    padding: 4px 10px;
-    border-radius: 4px;
-    background: rgba(30, 31, 34, 0.92);
+    padding: 8px 18px;
+    border-radius: 6px;
+    background: rgba(30, 31, 34, 0.94);
     border: 1px solid #454647;
     color: #fff;
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 18px;
+    line-height: 24px;
     pointer-events: none;
     opacity: 0;
     transition: opacity 150ms ease-out;

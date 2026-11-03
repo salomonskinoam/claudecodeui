@@ -805,8 +805,8 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'textscale') {
-    // Ctrl+= twice, Ctrl+wheel down once, Ctrl+0: the chat's text follows (--quests-chat-scale, the computed
-    // size of a transcript row), the sidebar's text and the page's root size do not, the label shows the size.
+    // Ctrl+= twice (+1 px), Ctrl+wheel down three notches (-1.5 px), Ctrl+0: the chat's text follows (the computed
+    // size of a transcript row), the sidebar's text and the page's root size do not, the label shows the size in px.
     const size = () => page.evaluate(() => {
       const row = document.querySelector('.chat-messages-pane .chat-message p, .chat-messages-pane .chat-message');
       const line = document.querySelector('[data-quests-queue="list"] [data-queue-key]');
@@ -833,7 +833,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.keyboard.press('Control+Digit0');
     await page.waitForTimeout(1500);
     const reset = await size();
-    console.log(JSON.stringify({ start, up, down, reset, chatGrew: up.chatPx > start.chatPx, sidebarSame: up.sidebarPx === start.sidebarPx, rootUntouched: !up.root, toastGone: reset.toast === null }));
+    console.log(JSON.stringify({ start, up, down, reset, upBy: Math.round((up.chatPx - start.chatPx) * 100) / 100, downBy: Math.round((down.chatPx - up.chatPx) * 100) / 100, sidebarSame: up.sidebarPx === start.sidebarPx, rootUntouched: !up.root, toastGone: reset.toast === null }));
   }
 
   if (check === 'renamebutton') {
