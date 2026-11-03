@@ -55,8 +55,9 @@ code, pre, kbd, .font-mono { font-family: "Droid Sans Mono", monospace !importan
 /* Tool calls collapse to a 1px line, clickable over 7px; open, the same line on top closes it again.
    A tool call is a group (.chat-message.tool) or an assistant message without the plain-text block
    (div[dir=auto]); anything with an input field (a question waiting for an answer) never collapses.
-   Pure CSS, so a row is collapsed from its first render and the scroll height never jumps; cloudcli-custom.js
-   only adds qt-open to the ones you open. ponytail: matches the app's markup, re-check after an upstream merge. */
+   Pure CSS, so a row is collapsed from its first render and the scroll height never jumps; the chat pane adds
+   qt-open to the ones you open (row state by row id, src/modules/chat/ledger/rowOpen.ts). ponytail: matches the
+   app's markup, re-check after an upstream merge. */
 :is(.chat-message.tool, .chat-message.assistant:not(:has(> .w-full > .w-full > div[dir="auto"]))):not(:has(input, textarea)):not(.qt-open) {
   height: 7px !important; min-height: 0 !important; overflow: hidden !important;
   padding: 0 !important; margin: 2px 0 !important; cursor: pointer;

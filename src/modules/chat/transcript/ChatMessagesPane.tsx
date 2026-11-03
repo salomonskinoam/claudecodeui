@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import type { Dispatch, MouseEvent, RefObject, SetStateAction } from 'react';
 
 import type { BackgroundTaskSummary,
   ChatMessage,
@@ -11,7 +11,8 @@ import type { BackgroundTaskSummary,
   ProviderModelsDefinition } from '@/shared/types';
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
 import { groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
-import { foldRepeatedReplies, type ReplyFold } from '@/modules/chat/utils/repeatedReplies';
+import { foldRepeatedReplies, rowIdOf, type ReplyFold } from '@/modules/chat/utils/repeatedReplies';
+import { isRowOpen, setRowOpen, useRowOpenVersion } from '@/modules/chat/ledger/rowOpen';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelectionEmptyState';
@@ -84,6 +85,24 @@ type ChatMessagesPaneProps = {
   /** Fetches the whole transcript for an export, which otherwise only sees the loaded page. */
   onLoadFullTranscript?: () => Promise<ChatMessage[]>;
 };
+
+/**
+ * quests: a collapsed tool line (cloudcli-custom.css, the same selector). A click on the 7 px line opens it, a
+ * click on the line of an open one closes it; a click inside an open one works as usual. The state is the row's
+ * own, by id (rowOpen.ts), so React's re-renders draw it back and a remount keeps it.
+ */
+const TOOL_LINE = ':is(.chat-message.tool, .chat-message.assistant:not(:has(> .w-full > .w-full > div[dir="auto"]))):not(:has(input, textarea))';
+function onToolLineClick(event: MouseEvent<HTMLDivElement>): void {
+  const el = (event.target as HTMLElement).closest?.('.chat-message');
+  if (!(el instanceof HTMLElement) || !el.matches(TOOL_LINE)) return;
+  const rowId = el.dataset.rowId;
+  if (!rowId) return;
+  const open = isRowOpen(rowId);
+  if (open && event.clientY - el.getBoundingClientRect().top > 7) return;
+  setRowOpen(rowId, !open);
+  event.preventDefault();
+  event.stopPropagation();
+}
 
 /**
  * Keys for the rows inside a collapsed tool group. They only have to be unique
@@ -272,15 +291,17 @@ function ChatMessagesPane({
   const replyFolds = useMemo(() => foldRepeatedReplies(chatMessages, seenReplies.current), [chatMessages]);
   useEffect(() => {
     for (const m of visibleMessages) {
-      if (m.timestamp && !replyFolds.has(m) && m.type === 'assistant' && !m.isToolUse) seenReplies.current.add(m.timestamp);
+      if (!replyFolds.has(m) && m.type === 'assistant' && !m.isToolUse) seenReplies.current.add(rowIdOf(m));
     }
   }, [visibleMessages, replyFolds]);
-  const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set());
+  // An opened fold is row state by id (rowOpen.ts), like every open state; this re-renders on any change.
+  const openVersion = useRowOpenVersion();
   const foldOf = useCallback((item: ChatMessage | { messages: ChatMessage[] }): ReplyFold | null => {
-    const message = 'messages' in item ? item.messages[0] : item;
+    const message = 'messages' in item ? (item as { messages: ChatMessage[] }).messages[0] : (item as ChatMessage);
     const fold = replyFolds.get(message);
-    return fold && !openFolds.has(fold.id) ? fold : null;
-  }, [replyFolds, openFolds]);
+    return fold && !isRowOpen(`fold:${fold.id}`) ? fold : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replyFolds, openVersion]);
   const foldLine = (fold: ReplyFold) => {
     const at = (iso: string) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
     return (
@@ -289,7 +310,7 @@ function ChatMessagesPane({
         <button
           type="button"
           className="rounded px-2 py-0.5 hover:bg-muted hover:text-foreground"
-          onClick={() => setOpenFolds((open) => new Set(open).add(fold.id))}
+          onClick={() => setRowOpen(`fold:${fold.id}`, true)}
           title="The replies said the same as the one below; click to show them"
         >
           {fold.count} {fold.count === 1 ? 'reply' : 'replies'} with the same state folded, {at(fold.from)} to {at(fold.to)} · show
@@ -402,6 +423,7 @@ function ChatMessagesPane({
       {/* quests: the top padding sits here, not on the scrolling container, so the pinned message sticks flush under the tab row. */}
       <div
         ref={contentRef}
+        onClickCapture={onToolLineClick}
         className={`w-full space-y-3 pl-12 pr-8 pt-4 sm:space-y-4 ${hasActivityIndicator ? 'pb-14' : 'pb-4'}`}
       >
       {(isLoadingSessionMessages || isProcessing) && chatMessages.length === 0 ? (
@@ -502,6 +524,7 @@ function ChatMessagesPane({
                     key={`tool-group-${getMessageKey(item.messages[0])}`}
                     lazyRows={lazyRows}
                     timestamp={item.timestamp}
+                    rowId={`tool-group:${item.messages[0]?.id ?? ''}`}
                     initiallyNearViewport={initiallyNearViewport}
                   >
                     <ToolGroupContainer
@@ -529,6 +552,7 @@ function ChatMessagesPane({
                   key={getMessageKey(item)}
                   lazyRows={lazyRows}
                   timestamp={item.timestamp}
+                  rowId={item.id}
                   initiallyNearViewport={initiallyNearViewport}
                 >
                   <MessageComponent

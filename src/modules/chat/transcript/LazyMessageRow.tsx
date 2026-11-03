@@ -28,6 +28,8 @@ type LazyMessageRowProps = {
   lazyRows: LazyRowObserver | null;
   /** Mirrors the row's own `data-message-timestamp`, present even while unmounted. */
   timestamp: ChatMessage['timestamp'] | undefined;
+  /** quests: mirrors the row's `data-row-id`, the scroll anchor's key (requirement 52). */
+  rowId?: string;
   /**
    * Rows near the tail render their content on first commit so the initial
    * scroll-to-bottom measures real heights; everything older starts as a
@@ -40,6 +42,7 @@ type LazyMessageRowProps = {
 export default function LazyMessageRow({
   lazyRows,
   timestamp,
+  rowId,
   initiallyNearViewport,
   children,
 }: LazyMessageRowProps) {
@@ -78,6 +81,7 @@ export default function LazyMessageRow({
     <div
       ref={elementRef}
       data-message-timestamp={timestamp || undefined}
+      data-row-id={rowId || undefined}
       style={isMounted ? undefined : { height: measuredHeight ?? ESTIMATED_ROW_HEIGHT_PX }}
     >
       {isMounted ? children : null}

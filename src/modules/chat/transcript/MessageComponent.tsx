@@ -1,5 +1,6 @@
-import { memo, useMemo, useRef, useState } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { formatClosingLines } from '@/modules/chat/utils/closingLines';
+import { useRowOpen } from '@/modules/chat/ledger/rowOpen';
 import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
@@ -48,8 +49,12 @@ const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
  * transcript entry — user turn, assistant turn, or a tool call and its result.
  */
 const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onForkFromMessage }: MessageComponentProps) => {
-  // quests: a report handed into the chat is closed by default, its frame opens it (Noam, 2 Nov).
-  const [reportOpen, setReportOpen] = useState(false);
+  // quests: a report handed into the chat is closed by default, its frame opens it (Noam, 2 Nov). Both open
+  // states are kept by row id, outside the component (requirement 52): a re-render or remount changes nothing.
+  const rowId = message.id ?? String(message.timestamp ?? '');
+  const [reportOpen, toggleReport] = useRowOpen(`report:${rowId}`);
+  // A collapsed tool line (cloudcli-custom.css): the pane's click handler flips this key.
+  const [toolOpen] = useRowOpen(rowId);
   const { t } = useTranslation('chat');
   const isGrouped = prevMessage && prevMessage.type === message.type &&
     ((prevMessage.type === 'assistant') ||
@@ -97,7 +102,9 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
     <div
       ref={messageRef}
       data-message-timestamp={message.timestamp || undefined}
-      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''}`}
+      data-row-id={message.id || undefined}
+      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} ${toolOpen ? 'qt-open' : ''} ${message.superseded ? 'quests-superseded' : ''}`}
+      title={message.superseded ? 'Replaced by an edit' : undefined}
     >
       {message.type === 'user' ? (
         /* User turn on the right: claude.ai-style attachment cards above the bubble */
@@ -148,6 +155,8 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   {shouldShowUserCopyControl && (
                     <MessageCopyControl content={userCopyContent} messageType="user" />
                   )}
+                  {/* quests: a typed message the transcript never confirmed (requirement 52, point 3). */}
+                  {message.delivery === 'failed' && <span className="text-red-400" data-quests-delivery="failed">not delivered ·</span>}
                   <span>{formattedTime}</span>
                 </div>
               </div>
@@ -189,13 +198,40 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
             </details>
           )}
         </div>
+      ) : message.noteKind ? (
+        /* quests: a one-line note from Claude Code or the ledger, never the chat's prose */
+        <div className="w-full">
+          <div className="flex items-center gap-2 py-0.5" data-quests-note={message.noteKind}>
+            <span className="inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400 dark:bg-gray-500" />
+            <span className="text-xs text-gray-500 dark:text-gray-400">{message.content}</span>
+          </div>
+        </div>
       ) : message.isTaskNotification ? (
-        /* Compact task notification on the left */
+        /* Compact task notification on the left; its result, when it has one, in the report frame under it, closed */
         <div className="w-full">
           <div className="flex items-center gap-2 py-0.5">
             <span className={`inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full ${message.taskNotificationStatus === 'completed' ? 'bg-green-400 dark:bg-green-500' : 'bg-amber-400 dark:bg-amber-500'}`} />
             <span className="text-xs text-gray-500 dark:text-gray-400">{message.content}</span>
           </div>
+          {message.reportBody && (
+            <div className={`w-full rounded-sm border border-purple-500/40 border-l-2 border-l-purple-500 bg-purple-500/5 px-3 py-1 ${reportOpen ? 'quests-report-open' : 'quests-report-closed'}`}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-1 py-0.5 text-left text-[11px] uppercase tracking-wide text-purple-400 hover:text-purple-300"
+                data-quests-report="the task"
+                aria-expanded={reportOpen}
+                onClick={toggleReport}
+              >
+                <span className="inline-block w-3">{reportOpen ? '▾' : '▸'}</span>
+                The task's report
+              </button>
+              <div dir="auto" className="text-sm text-gray-700 dark:text-gray-300">
+                <Markdown className="prose prose-sm prose-gray max-w-none font-serif dark:prose-invert">
+                  {message.reportBody}
+                </Markdown>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Claude/Error/Tool messages on the left */
@@ -211,7 +247,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               className="flex w-full items-center gap-1 py-0.5 text-left text-[11px] uppercase tracking-wide text-purple-400 hover:text-purple-300"
               data-quests-report={message.agentReportFrom}
               aria-expanded={reportOpen}
-              onClick={() => setReportOpen((open) => !open)}
+              onClick={toggleReport}
             >
               <span className="inline-block w-3">{reportOpen ? '▾' : '▸'}</span>
               Handed to the chat by {message.agentReportFrom}
@@ -227,6 +263,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                  the background-tasks strip scrolls to. */
               <div id={`tool-result-${message.toolId}`} className="scroll-mt-4">
                 <WorkflowPanel
+                  toolId={message.toolId}
                   toolInput={message.toolInput}
                   toolResult={message.toolResult}
                   workflow={message.workflow}
@@ -241,6 +278,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                  result — so it never goes through the tool input/result pair. */
               <div id={`tool-result-${message.toolId}`} className="scroll-mt-4">
                 <SubagentPanel
+                  toolId={message.toolId}
                   toolInput={message.toolInput}
                   toolResult={message.toolResult}
                   subagent={message.subagent}

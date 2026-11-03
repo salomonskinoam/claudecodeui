@@ -107,7 +107,7 @@ test('preserves existing UI objects when an older message is prepended', () => {
   assert.strictEqual(withOlderHistory[2], initial[1]);
 });
 
-test('preserves both UI objects produced by an unchanged task notification', () => {
+test('a task notification is one row, its result inside it, with the record id', () => {
   const notification = message('task-notification', {
     role: 'user',
     content: [
@@ -120,15 +120,16 @@ test('preserves both UI objects produced by an unchanged task notification', () 
   });
 
   const initial = normalizedToChatMessages([notification]);
-  assert.equal(initial.length, 2);
+  assert.equal(initial.length, 1);
 
   const unrelated = message('unrelated', { content: 'A later message' });
   const updated = normalizedToChatMessages([notification, unrelated]);
 
   assert.strictEqual(updated[0], initial[0]);
-  assert.strictEqual(updated[1], initial[1]);
   assert.equal(updated[0]?.isTaskNotification, true);
-  assert.equal(updated[1]?.content, 'Detailed result');
+  assert.equal(updated[0]?.reportBody, 'Detailed result');
+  assert.equal(updated[0]?.id, 'task-notification');
+  assert.equal(updated[1]?.id, 'unrelated');
 });
 
 test('folds the live task events of a background launch onto the tool row that launched it', () => {

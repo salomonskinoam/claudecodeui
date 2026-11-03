@@ -13,23 +13,6 @@
   try { set(+localStorage.getItem('quests-font-base') || 19.75); } catch {}
   window.addEventListener('storage', e => { if (e.key === 'quests-font-base' && e.newValue) set(e.newValue); });
 
-  // Tool calls collapse in CSS (cloudcli-custom.css, same selector as TOOL below); a click opens or closes one
-  // by adding qt-open. React rewrites className on re-render, so the opened ones are kept here and re-marked.
-  const TOOL = ':is(.chat-message.tool, .chat-message.assistant:not(:has(> .w-full > .w-full > div[dir="auto"]))):not(:has(input, textarea))';
-  const opened = new Set();
-  new MutationObserver(() => {
-    for (const el of opened) {
-      if (!el.isConnected) opened.delete(el);
-      else if (!el.classList.contains('qt-open')) el.classList.add('qt-open');
-    }
-  }).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'] });
-
-  document.addEventListener('click', e => {
-    const el = e.target.closest?.('.chat-message');
-    if (!el || !el.matches(TOOL)) return;
-    const open = opened.has(el);
-    if (open && e.clientY - el.getBoundingClientRect().top > 7) return;  // a click inside an open tool works as usual
-    if (open) { opened.delete(el); el.classList.remove('qt-open'); } else { opened.add(el); el.classList.add('qt-open'); }
-    e.preventDefault(); e.stopPropagation();
-  }, true);
+  // Tool calls collapse in CSS (cloudcli-custom.css); which ones are open is row state the chat pane keeps by
+  // row id (src/modules/chat/ledger/rowOpen.ts) and draws as the qt-open class.
 })();

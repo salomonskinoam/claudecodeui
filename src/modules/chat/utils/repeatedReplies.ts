@@ -4,10 +4,10 @@ import type { ChatMessage } from '@/shared/types';
  * quests: replies that repeat are folded (requirement 39). The specification, word for word the requirement, so the
  * code can be rebuilt from it:
  *
- * Folding, specified so it can be rebuilt from the text alone. A ROW is one entry of the transcript as the page holds it: type (user or assistant), flags isToolUse, isThinking, isTaskNotification (a task's report), agentReportFrom (text handed in; "the stop hook" or an agent's id), content (text), timestamp.
- * Step 1, turns. A row is a STARTER when it is a report, or handed in, or a user row that is not a tool result. Its kind: "report" for a report row, or a user row whose text starts with "<task-notification>" or "<system-reminder>"; "hook" for a handed-in row from "the stop hook", or a user row whose text starts with "Stop hook feedback"; "agent" for any other handed-in row; "typed" for any other user row. A TURN is a starter row and every row after it up to the next starter, excluded. Rows before the first starter form a turn of kind "none". The turn's REPLY is its last row that is assistant text: type assistant, not a tool call, not thinking, not a report, not handed in, non-empty text. A turn may have no reply.
+ * Folding, specified so it can be rebuilt from the text alone. A ROW is one entry of the transcript as the page holds it: id, type (user or assistant), flags isToolUse, isThinking, isTaskNotification (a task's report), agentReportFrom (text handed in; "the stop hook" or an agent's id), noteKind (a note: "interrupt" for an interrupted turn, "tools" for a tools-loaded notice, "gap" for a gap in what the page saw), content (text), timestamp.
+ * Step 1, turns. A row is a STARTER when it is a report, or handed in, or an "interrupt" note, or a user row that is not a tool result. Its kind: "report" for a report row, or a user row whose text starts with "<task-notification>" or "<system-reminder>"; "hook" for a handed-in row from "the stop hook", or a user row whose text starts with "Stop hook feedback"; "agent" for any other handed-in row; "typed" for an "interrupt" note or any other user row. A "tools" or "gap" note starts nothing. A TURN is a starter row and every row after it up to the next starter, excluded. Rows before the first starter form a turn of kind "none". The turn's REPLY is its last row that is assistant text: type assistant, not a tool call, not thinking, not a report, not handed in, not a note, non-empty text. A turn may have no reply.
  * Step 2, the state of a reply. Split the text into lines, remove "**", collapse whitespace, drop empty lines. REQUIRED = the last line starting with "Required from you:" (case ignored). If there is none, the state is the whole text with whitespace collapsed. Else LAST = the final line, KIND = its opening words if they are one of "waiting for", "question", "blocker", "done" (case ignored), else empty; the state is lowercase(REQUIRED) + " | " + ("waiting for" when KIND is "waiting for", else lowercase(LAST)).
- * Step 3, the folds. Walk the turns in order with a RUN (a list of turns) and its state. A "hook" turn is skipped: it neither joins nor closes the run. A "report" turn with a reply: S = the reply's state; if the run is not empty and S differs from the run's state, close the run; then add the turn and set the run's state to S. Any other turn (typed, agent, none, or a report without a reply) closes the run. At the end, close the run. CLOSE: LAST = the run's last turn; HIDDEN = the run's turns except LAST and except those whose reply timestamp is in SEEN. If HIDDEN is not empty: one fold, id = the first hidden reply's timestamp, count = the number of hidden turns, from and to = the first and last hidden replies' timestamps; every row of every hidden turn, from its starter row to its last row, is hidden, and the first row of the first hidden turn draws the fold line "count replies with the same state folded, from to to · show". Then empty the run. SEEN = the timestamps of assistant non-tool rows this page has drawn unfolded; a fold opened by click stays open for the page's life. The folds are computed over the whole transcript held by the page, never over the visible window alone.
+ * Step 3, the folds. Walk the turns in order with a RUN (a list of turns) and its state. A "hook" turn is skipped: it neither joins nor closes the run. A "report" turn with a reply: S = the reply's state; if the run is not empty and S differs from the run's state, close the run; then add the turn and set the run's state to S. Any other turn (typed, agent, none, or a report without a reply) closes the run. At the end, close the run. CLOSE: LAST = the run's last turn; HIDDEN = the run's turns except LAST and except those whose reply id is in SEEN. If HIDDEN is not empty: one fold, id = the first hidden reply's id, count = the number of hidden turns, from and to = the first and last hidden replies' timestamps; every row of every hidden turn, from its starter row to its last row, is hidden, and the first row of the first hidden turn draws the fold line "count replies with the same state folded, from to to · show". Then empty the run. SEEN = the ids of assistant non-tool rows this page has drawn unfolded; a fold opened by click stays open for the page's life. The folds are computed over the whole transcript held by the page, never over the visible window alone.
  */
 
 export type StarterKind = 'typed' | 'report' | 'hook' | 'agent' | 'none';
@@ -23,7 +23,7 @@ export type Turn = {
 };
 
 export type ReplyFold = {
-  /** The run's id: the timestamp of its first folded reply. */
+  /** The run's id: the id of its first folded reply. */
   id: string;
   /** How many replies are folded. */
   count: number;
@@ -38,6 +38,7 @@ const normalize = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
 /** Step 1a: what kind of row starts a turn, or 'none' for a row that starts nothing. */
 export function starterOf(m: ChatMessage): StarterKind {
+  if (m.noteKind) return m.noteKind === 'interrupt' ? 'typed' : 'none';
   if (m.isTaskNotification) return 'report';
   if (m.agentReportFrom) return m.agentReportFrom === 'the stop hook' ? 'hook' : 'agent';
   if (m.type !== 'user' || m.isToolUse || typeof m.content !== 'string') return 'none';
@@ -49,7 +50,7 @@ export function starterOf(m: ChatMessage): StarterKind {
 
 /** Step 1b: a reply row: the chat's own text, not a tool call, not a note, not something handed in. */
 export const isReply = (m: ChatMessage): boolean =>
-  m.type === 'assistant' && !m.isToolUse && !m.isThinking && !m.isTaskNotification && !m.agentReportFrom
+  m.type === 'assistant' && !m.isToolUse && !m.isThinking && !m.isTaskNotification && !m.agentReportFrom && !m.noteKind
   && typeof m.content === 'string' && m.content.trim() !== '';
 
 /** Step 1: the transcript as turns. */
@@ -81,13 +82,17 @@ export function replyState(text: string): string {
   return `${required.toLowerCase()} | ${kind === 'waiting for' ? kind : last.toLowerCase()}`;
 }
 
+/** A row's id, for `seen` and the fold id; a row without one (a test fixture) is known by its timestamp. */
+export const rowIdOf = (m: ChatMessage): string => m.id ?? String(m.timestamp ?? '');
+
 /**
- * Step 3: the folds. `seen` holds the timestamps of replies Noam has already had on screen on this page: a turn
- * with such a reply never folds later.
+ * Step 3: the folds. `seen` holds the ids of replies Noam has already had on screen on this page: a turn with
+ * such a reply never folds later.
  */
 export function foldRuns(messages: ChatMessage[], turns: Turn[], seen: ReadonlySet<string> = new Set()): Map<ChatMessage, ReplyFold> {
   const folds = new Map<ChatMessage, ReplyFold>();
-  const stamp = (turn: Turn) => messages[turn.reply].timestamp ?? String(turn.reply);
+  const stamp = (turn: Turn) => rowIdOf(messages[turn.reply]);
+  const at = (turn: Turn) => String(messages[turn.reply].timestamp ?? '');
   // The runs: consecutive report-started turns with a reply and one state. Any other turn ends the run.
   let run: Turn[] = [];
   let state: string | null = null;
@@ -98,8 +103,8 @@ export function foldRuns(messages: ChatMessage[], turns: Turn[], seen: ReadonlyS
       const fold: Omit<ReplyFold, 'first'> = {
         id: stamp(hidden[0]),
         count: hidden.length,
-        from: stamp(hidden[0]),
-        to: stamp(hidden[hidden.length - 1]),
+        from: at(hidden[0]),
+        to: at(hidden[hidden.length - 1]),
       };
       let first = true;
       for (const t of hidden) {

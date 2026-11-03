@@ -5,11 +5,13 @@ import { test } from 'vitest';
 import { foldRepeatedReplies, replyState, segmentTurns, starterOf } from '@/modules/chat/utils/repeatedReplies';
 import type { ChatMessage } from '@/shared/types';
 
-const reply = (ts: string, text: string): ChatMessage => ({ type: 'assistant', content: text, timestamp: ts } as ChatMessage);
-const typed = (ts: string, text: string): ChatMessage => ({ type: 'user', content: text, timestamp: ts } as ChatMessage);
-const tool = (ts: string): ChatMessage => ({ type: 'assistant', isToolUse: true, toolName: 'Bash', toolId: ts, timestamp: ts } as ChatMessage);
-const report = (ts: string): ChatMessage => ({ type: 'assistant', content: 'Monitor event: "proof runs results"', timestamp: ts, isTaskNotification: true } as ChatMessage);
-const hook = (ts: string): ChatMessage => ({ type: 'assistant', agentReportFrom: 'the stop hook', content: 'no closing line', timestamp: ts } as ChatMessage);
+// Each row's id is its timestamp here, so a fold id reads as the time of its first folded reply.
+const reply = (ts: string, text: string): ChatMessage => ({ id: ts, type: 'assistant', content: text, timestamp: ts } as ChatMessage);
+const typed = (ts: string, text: string): ChatMessage => ({ id: ts, type: 'user', content: text, timestamp: ts } as ChatMessage);
+const tool = (ts: string): ChatMessage => ({ id: ts, type: 'assistant', isToolUse: true, toolName: 'Bash', toolId: ts, timestamp: ts } as ChatMessage);
+const report = (ts: string): ChatMessage => ({ id: ts, type: 'assistant', content: 'Monitor event: "proof runs results"', timestamp: ts, isTaskNotification: true } as ChatMessage);
+const hook = (ts: string): ChatMessage => ({ id: ts, type: 'assistant', agentReportFrom: 'the stop hook', content: 'no closing line', timestamp: ts } as ChatMessage);
+const note = (ts: string, noteKind: 'interrupt' | 'tools'): ChatMessage => ({ id: ts, type: 'assistant', content: 'note', timestamp: ts, noteKind } as ChatMessage);
 
 const STATE = 'Running: 6 evaluation runs, with a watcher.\nRequired from you: nothing.\nwaiting for the other 6 runs.';
 const STATE2 = 'Running:\n- 6 more runs on shared datasets;\n- the detached watcher.\nRequired from you: nothing.\nwaiting for the remaining run results.';
@@ -21,6 +23,8 @@ test('step 1: starters and turns', () => {
   assert.equal(starterOf({ type: 'assistant', agentReportFrom: 'agent a1', content: 'x' } as ChatMessage), 'agent');
   assert.equal(starterOf(reply('t', 'x')), 'none');
   assert.equal(starterOf(tool('t')), 'none');
+  assert.equal(starterOf(note('t', 'interrupt')), 'typed');
+  assert.equal(starterOf(note('t', 'tools')), 'none');
   const turns = segmentTurns([typed('t0', 'go'), tool('t1'), reply('t2', 'done'), report('t3'), reply('t4', 'again'), hook('t5'), reply('t6', 'lines')]);
   assert.deepEqual(turns.map((t) => [t.starter, t.start, t.end, t.reply]), [['typed', 0, 3, 2], ['report', 3, 5, 4], ['hook', 5, 7, 6]]);
 });

@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,DiffStats,Project,ToolGroupItem } from '@/shared/types';
@@ -7,6 +7,7 @@ import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { DiffStatsBadge } from '@/modules/chat/tools/DiffStatsBadge';
 import { parseToolPayload, summarizeDiff } from '@/modules/chat/utils/messageTransforms';
+import { useRowOpen } from '@/modules/chat/ledger/rowOpen';
 
 type ToolGroupContainerProps = {
   group: ToolGroupItem;
@@ -90,7 +91,8 @@ function ToolGroupContainer({
   // Collapsed on screen, always open in an export: the whole point of the
   // group row is to hide detail the reader can ask for, and an exported file
   // has no way to ask.
-  const [isExpanded, setIsExpanded] = useState(false);
+  // quests: keyed by the group's first row, so the state outlives a re-render or a remount (requirement 52).
+  const [isExpanded, toggleExpanded] = useRowOpen(`group:${group.messages[0]?.id ?? group.timestamp}`);
   const showChildren = isExpanded || isExporting;
   const config = getToolConfig(group.toolName).input;
   const label = config.label || group.toolName;
@@ -114,11 +116,11 @@ function ToolGroupContainer({
   }, [group.messages, getMessageKey]);
 
   return (
-    <div className="chat-message tool" data-message-timestamp={group.timestamp || undefined}>
+    <div className="chat-message tool" data-message-timestamp={group.timestamp || undefined} data-row-id={`tool-group:${group.messages[0]?.id ?? group.timestamp}`}>
       <button
         type="button"
         className={`group flex w-full items-center gap-2 border-l-2 ${borderClass} rounded-r-md bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/40 dark:bg-muted/10 dark:hover:bg-muted/20`}
-        onClick={() => setIsExpanded((current) => !current)}
+        onClick={toggleExpanded}
         aria-expanded={isExpanded}
       >
         <ChevronRight

@@ -363,6 +363,11 @@ export type SubagentInfo = {
 
 /** One rendered entry in a chat transcript — user turn, assistant turn, tool call and result, local command output, or subagent container — and the shape the chat message list and message components consume. */
 export type ChatMessage = {
+  /**
+   * quests: the row's id, the transcript's id of the record behind it (requirement 52). Set on every row the
+   * projection makes; the React key, the scroll anchor and every per-row open state are keyed by it.
+   */
+  id?: string;
   type: string;
   content?: string;
   displayText?: string;
@@ -419,6 +424,16 @@ export type ChatMessage = {
   /** quests: the row is a report handed into the chat by an agent or another session (its id or name): drawn in its own frame, never as the chat's prose. */
   agentReportFrom?: string;
   taskNotificationStatus?: string;
+  /** quests: a task notification's `<result>`, drawn inside the report's frame under its summary line, closed by default. */
+  reportBody?: string;
+  /** quests: a one-line note from Claude Code itself ("Tools loaded", an interrupted turn) or from the ledger (a gap in what the page saw). */
+  noteKind?: 'interrupt' | 'tools' | 'gap';
+  /** quests: the fold this row was appended into (requirement 39), set once at append, never later. */
+  foldId?: string;
+  /** quests: a typed message not yet in the transcript (`pending`), or one that never got there (`failed`, drawn "not delivered"). */
+  delivery?: 'pending' | 'failed';
+  /** quests: the row was replaced by an edit of an earlier message; it stays drawn, dimmed. */
+  superseded?: boolean;
   /** Stored memory this reply drew on, shown as a footnote beneath it. */
   memoryCitations?: MemoryCitation[];
   /** Lifecycle the provider reported for this tool call, when it reports one; otherwise the status is inferred from whether a result has arrived. */

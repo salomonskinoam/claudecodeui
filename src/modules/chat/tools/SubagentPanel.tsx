@@ -5,11 +5,14 @@ import type { DiffLine, LiveTaskStatus, Project, SubagentActivity, SubagentInfo,
 import { cn } from '@/shared/utils';
 import { SubagentTimeline } from '@/modules/chat/tools/SubagentTimeline';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
+import { useRowOpen } from '@/modules/chat/ledger/rowOpen';
 import { MarkdownContent } from '@/modules/chat/tools/ContentRenderers/MarkdownContent';
 import { formatTaskDuration, resolveBackgroundTaskStatus } from '@/modules/chat/utils/backgroundTasks';
 import { agentRef, openWorkTab, sessionIdFromUrl } from '@/modules/chat/work/workTabs';
 
 type SubagentPanelProps = {
+  /** quests: the id of the tool call this card stands for; its open state is kept under `card:<id>` (requirement 52). */
+  toolId?: string;
   /** Raw tool input of the call that spawned the agent, used for the prompt. */
   toolInput: unknown;
   toolResult?: ToolResult | null;
@@ -77,6 +80,7 @@ const STATUS_STYLES: Record<SubagentInfo['status'], string> = {
 export const SubagentPanel = memo(({
   toolInput,
   toolResult,
+  toolId,
   subagent,
   taskStatus,
   activity,
@@ -87,7 +91,7 @@ export const SubagentPanel = memo(({
   // Collapsed by default: an agent is a summary of work, and its detail is
   // only wanted on demand.
   const isExporting = useIsExportingTranscript();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, toggleOpen] = useRowOpen(`card:${toolId ?? subagent?.id ?? ''}`);
   const showTimeline = isOpen || isExporting;
 
   const parsedInput = useMemo(() => parseToolInput(toolInput), [toolInput]);
@@ -143,7 +147,7 @@ export const SubagentPanel = memo(({
       <button
         type="button"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((previous) => !previous)}
+        onClick={toggleOpen}
         className="flex w-full min-w-0 select-none items-center gap-1.5 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
         <ChevronRight className={cn('h-3 w-3 flex-shrink-0 transition-transform duration-150', isOpen && 'rotate-90')} />

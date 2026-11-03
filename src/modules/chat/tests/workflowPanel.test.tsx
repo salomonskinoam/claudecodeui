@@ -6,6 +6,7 @@ import '@/modules/i18n';
 import { TranscriptSessionContext } from '@/modules/chat/context/TranscriptSessionContext';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import { UiPreferencesProvider } from '@/shared/context/UiPreferencesContext';
+import { resetRowOpen } from '@/modules/chat/ledger/rowOpen';
 import type { LiveTaskStatus, SubagentActivity, ToolResult, WorkflowAgentProgress, WorkflowInfo } from '@/shared/types';
 
 // What the agent-activity route answers with, keyed by agent id; a missing
@@ -95,6 +96,8 @@ const liveAgents: WorkflowAgentProgress[] = [
 ];
 
 afterEach(() => {
+  // The cards' open state is page-wide, by id; the tests reuse ids, so each starts closed.
+  resetRowOpen();
   agentActivityByAgentId.clear();
   workflowAgentActivity.mockClear();
   vi.useRealTimers();

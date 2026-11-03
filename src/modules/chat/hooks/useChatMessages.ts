@@ -52,11 +52,11 @@ const projectionCache = new WeakMap<NormalizedMessage, CachedMessageProjection>(
  * not something Noam typed, so it shows as a note with the sender, and its body as the model's input, never as his
  * message (Noam, 2 Nov: "it seems like a user message and not a chat message happened last. something is not right").
  */
-function parseInjectedMessage(content: string): { from: string; body: string } | { note: string } | null {
+function parseInjectedMessage(content: string): { from: string; body: string } | { note: string; noteKind: 'tools' | 'interrupt' } | null {
   const head = content.trimStart();
   // Claude Code's own notices to the model, one line each.
-  if (/^Tools? loaded\b/.test(head)) return { note: head.split('\n', 1)[0].slice(0, 120) };
-  if (head.startsWith('[Request interrupted by user')) return { note: 'The turn was interrupted.' };
+  if (/^Tools? loaded\b/.test(head)) return { note: head.split('\n', 1)[0].slice(0, 120), noteKind: 'tools' };
+  if (head.startsWith('[Request interrupted by user')) return { note: 'The turn was interrupted.', noteKind: 'interrupt' };
   // A hook's feedback (the stop hook sends a reply back): the hook's words, handed to the model, not Noam's.
   if (head.startsWith('Stop hook feedback')) return { from: 'the stop hook', body: head.replace(/^Stop hook feedback:?\s*/, '') };
   if (!head.startsWith('Another Claude session sent a message') && !head.startsWith('<agent-message') && !head.startsWith('<cross-session-message')) {
@@ -251,7 +251,7 @@ function foldTaskStatus(
     description: msg.description ?? previous?.description,
     summary: msg.summary ?? previous?.summary,
     usage: msg.usage ?? previous?.usage,
-    outputFile: msg.outputFile ?? previous?.outputFile,
+    ...(msg.outputFile ?? previous?.outputFile ? { outputFile: msg.outputFile ?? previous?.outputFile } : {}),
     ...(agents ? { agents } : {}),
   });
   lastTaskSourceByToolUseId.set(toolUseId, msg);
@@ -432,7 +432,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
         if (msg.role === 'user') {
           const injected = parseInjectedMessage(content);
           if (injected && 'note' in injected) {
-            converted.push({ type: 'assistant', content: injected.note, timestamp: msg.timestamp, isTaskNotification: true, taskNotificationStatus: 'completed', ...sharedMetadata });
+            converted.push({ type: 'assistant', content: injected.note, timestamp: msg.timestamp, noteKind: injected.noteKind, ...sharedMetadata });
             break;
           }
           if (injected) {
@@ -442,24 +442,17 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           // Parse task notifications
           const taskNotif = parseTaskNotification(content);
           if (taskNotif) {
+            // quests: ONE row: the summary line, and the task's result inside the report frame under it, closed
+            // by default (requirement 47: never drawn as the chat's own prose).
             converted.push({
               type: 'assistant',
               content: taskNotif.summary,
               timestamp: msg.timestamp,
               isTaskNotification: true,
               taskNotificationStatus: taskNotif.status,
+              ...(taskNotif.result ? { reportBody: formatUsageLimitText(taskNotif.result) } : {}),
               ...sharedMetadata,
             });
-            // Render the agent's result as a normal assistant message so its
-            // markdown displays correctly instead of leaking raw XML.
-            if (taskNotif.result) {
-              converted.push({
-                type: 'assistant',
-                content: formatUsageLimitText(taskNotif.result),
-                timestamp: msg.timestamp,
-                ...sharedMetadata,
-              });
-            }
           } else {
             converted.push({
               type: 'user',
@@ -626,12 +619,19 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
         break;
     }
 
+    // quests: every row carries the id of the record behind it (requirement 52); a record that makes more than one
+    // row numbers them.
+    for (let index = convertedStart; index < converted.length; index += 1) {
+      const row = converted[index];
+      if (!row.id) row.id = index === convertedStart ? msg.id : `${msg.id}_${index - convertedStart}`;
+    }
+
     projectionCache.set(msg, {
       toolResultSource,
       subagentActivitySource,
       taskStatusSource,
-      // One source record can produce zero, one, or two UI messages (task
-      // notifications with a result produce two), so cache the whole slice.
+      // One source record can produce zero, one, or more UI messages, so cache
+      // the whole slice.
       messages: converted.slice(convertedStart),
     });
   }

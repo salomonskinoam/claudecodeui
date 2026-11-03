@@ -19,6 +19,7 @@ import { MarkdownContent } from '@/modules/chat/tools/ContentRenderers/MarkdownC
 import { SubagentTimeline } from '@/modules/chat/tools/SubagentTimeline';
 import { ToolErrorDisplay } from '@/modules/chat/tools/ToolErrorDisplay';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
+import { useRowOpen } from '@/modules/chat/ledger/rowOpen';
 import { useTranscriptSessionId } from '@/modules/chat/context/TranscriptSessionContext';
 import {
   describeWorkflowAgent,
@@ -29,6 +30,8 @@ import {
 import { parseWorkflowMeta } from '@/modules/chat/utils/workflowScriptMeta';
 
 type WorkflowPanelProps = {
+  /** quests: the id of the tool call this card stands for; its open state is kept under `card:<id>` (requirement 52). */
+  toolId?: string;
   /** Raw tool input of the `Workflow` call: the script (or its path) and a one-line description. */
   toolInput: unknown;
   toolResult?: ToolResult | null;
@@ -298,7 +301,7 @@ const WorkflowAgentRowView = memo(({ agent, timelineAddress, onFileOpen, createD
   const { t } = useTranslation();
   // Opened on demand: the timeline is a fetch and, for a long run, a few
   // hundred tool renderers.
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, toggleOpen] = useRowOpen(`card:${timelineAddress?.runId ?? ''}:${agent.agentId ?? ''}`);
   // A queued slot has no transcript yet, and outside a session there is
   // nothing to fetch one from.
   const canOpen = Boolean(timelineAddress && agent.agentId);
@@ -322,7 +325,7 @@ const WorkflowAgentRowView = memo(({ agent, timelineAddress, onFileOpen, createD
         <button
           type="button"
           aria-expanded={isOpen}
-          onClick={() => setIsOpen((previous) => !previous)}
+          onClick={toggleOpen}
           className="flex w-full items-center gap-1.5 text-left hover:text-foreground"
         >
           <ChevronRight className={cn('h-3 w-3 flex-shrink-0 transition-transform duration-150', isOpen && 'rotate-90')} />
@@ -376,11 +379,11 @@ WorkflowAgentRowView.displayName = 'WorkflowAgentRowView';
  * Shaped like SubagentPanel: the launch is a summary of work, and the
  * detail is only wanted on demand, so the body stays unmounted until opened.
  */
-export const WorkflowPanel = memo(({ toolInput, toolResult, workflow, taskStatus, onFileOpen, createDiff, selectedProject }: WorkflowPanelProps) => {
+export const WorkflowPanel = memo(({ toolId, toolInput, toolResult, workflow, taskStatus, onFileOpen, createDiff, selectedProject }: WorkflowPanelProps) => {
   const { t } = useTranslation();
   const isExporting = useIsExportingTranscript();
   // Collapsed by default, like an agent card; the header carries the status.
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, toggleOpen] = useRowOpen(`card:${toolId ?? workflow?.runId ?? ''}`);
   const showBody = isOpen || isExporting;
 
   const parsedInput = useMemo(() => parseToolInput(toolInput), [toolInput]);
@@ -441,7 +444,7 @@ export const WorkflowPanel = memo(({ toolInput, toolResult, workflow, taskStatus
       <button
         type="button"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((previous) => !previous)}
+        onClick={toggleOpen}
         className="flex w-full select-none items-center gap-1.5 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
         <ChevronRight className={cn('h-3 w-3 flex-shrink-0 transition-transform duration-150', isOpen && 'rotate-90')} />

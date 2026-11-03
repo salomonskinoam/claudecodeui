@@ -191,15 +191,15 @@ function chatMessageToNormalized(
 /* ------------------------------------------------------------------ */
 
 /**
- * quests: the first row in view, by its timestamp (every row carries one, also a lazy row's placeholder), and
+ * quests: the first row in view, by its row id (every row carries one, also a lazy row's placeholder), and
  * where its top sits below the pane's top. This is the reading position while scrolled up.
  */
-function findAnchorRow(pane: HTMLElement): { timestamp: string; offset: number } | null {
+function findAnchorRow(pane: HTMLElement): { rowId: string; offset: number } | null {
   const paneTop = pane.getBoundingClientRect().top;
-  for (const row of pane.querySelectorAll<HTMLElement>('[data-message-timestamp]')) {
+  for (const row of pane.querySelectorAll<HTMLElement>('[data-row-id]')) {
     const top = row.getBoundingClientRect().top;
     if (top + row.offsetHeight > paneTop) {
-      return { timestamp: row.dataset.messageTimestamp ?? '', offset: top - paneTop };
+      return { rowId: row.dataset.rowId ?? '', offset: top - paneTop };
     }
   }
   return null;
@@ -262,12 +262,12 @@ export function useChatSessionState({
   // quests: the reading position while scrolled up, taken at every scroll. Whenever the content changes height
   // (a new row streams in, a row above grows or folds, the window of visible rows slides, a reload), the anchor
   // row is put back at its offset, so the text being read stays where it is and new rows land below, out of view.
-  const anchorRef = useRef<{ timestamp: string; offset: number } | null>(null);
+  const anchorRef = useRef<{ rowId: string; offset: number } | null>(null);
   const restoreAnchor = useCallback(() => {
     const pane = scrollContainerRef.current;
     const anchor = anchorRef.current;
     if (!pane || !anchor || !isUserScrolledUpRef.current) return;
-    const row = pane.querySelector<HTMLElement>(`[data-message-timestamp="${anchor.timestamp}"]`);
+    const row = pane.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(anchor.rowId)}"]`);
     if (!row) return;
     const moved = row.getBoundingClientRect().top - pane.getBoundingClientRect().top - anchor.offset;
     if (moved !== 0) pane.scrollTop += moved;
