@@ -131,3 +131,26 @@ test('a poll that changes what it says about a listed task is not dropped as a r
   assert.equal(listed?.nested, true);
   assert.equal(listed?.description, 'Audit the whole frontend');
 });
+
+test('a message sent into a running turn keeps the tool as the step and counts as waiting', () => {
+  // quests: Noam, 3 Nov: "there was a tool running and i saw "running a tool" and then i sent a message and it
+  // CHANGED TO "thinking" ... it should be thinking AND STILL running the tool".
+  const { result } = renderHook(() => useSessionProtection());
+  act(() => {
+    result.current.markSessionProcessing('session-1', { canInterrupt: true, joins: true });
+    result.current.markSessionProcessing('session-1', { statusText: 'Bash: python hor.py status' });
+  });
+  act(() => {
+    result.current.markSessionProcessing('session-1', { canInterrupt: true, joins: true });
+  });
+  let activity = result.current.getSessionActivity('session-1');
+  assert.equal(activity?.statusText, 'Bash: python hor.py status', 'the tool keeps running: it stays the step');
+  assert.equal(activity?.queued, 1);
+  // The tool's result is in: the chat reads the message now.
+  act(() => {
+    result.current.markSessionProcessing('session-1', { statusText: 'thinking' });
+  });
+  activity = result.current.getSessionActivity('session-1');
+  assert.equal(activity?.statusText, 'thinking');
+  assert.equal(activity?.queued, 0);
+});

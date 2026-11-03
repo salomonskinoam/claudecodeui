@@ -8,6 +8,21 @@ import { useCallback, useId, useSyncExternalStore } from 'react';
  * Keys: a row id (a collapsed tool line), `group:<first row id>` (a tool group's chevron), `report:<row id>`
  * (a handed-in report's frame), `card:<tool id>` (an agent's or a workflow's card), `fold:<fold id>`.
  */
+/**
+ * A collapsed tool line (cloudcli-custom.css, the same selector): a tool group, or an assistant row without the
+ * plain-text block; anything with an input field (a question waiting for an answer) never collapses.
+ */
+export const TOOL_LINE = ':is(.chat-message.tool, .chat-message.assistant:not(:has(> .w-full > .w-full > div[dir="auto"]))):not(:has(input, textarea))';
+
+/** Opens the chat's last tool row and scrolls it into view: what a click on the running step shows. */
+export function revealLastToolRow(): void {
+  const rows = document.querySelectorAll<HTMLElement>(`.chat-messages-pane ${TOOL_LINE}`);
+  const row = rows[rows.length - 1];
+  if (!row) return;
+  if (row.dataset.rowId) setRowOpen(row.dataset.rowId, true);
+  row.scrollIntoView({ block: 'center' });
+}
+
 const open = new Set<string>();
 const listeners = new Set<() => void>();
 let version = 0;

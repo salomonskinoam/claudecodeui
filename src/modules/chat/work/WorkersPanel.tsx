@@ -6,6 +6,7 @@ import type { SessionActivity } from '@/shared/types';
 import { formatTaskDuration } from '@/modules/chat/utils/backgroundTasks';
 import { openWorkTab, type WorkKind } from '@/modules/chat/work/workTabs';
 import { noteWorkState } from '@/modules/chat/work/workStateStore';
+import { revealLastToolRow } from '@/modules/chat/ledger/rowOpen';
 
 /**
  * quests: the state of the main chat, apart from the states of its workers (requirement 40). Noam, 30 Oct:
@@ -160,7 +161,11 @@ function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
         {main.state === 'answering'
           ? <Shimmer className="shrink-0 font-medium">{`${mainLabel}…`}</Shimmer>
           : <span className="shrink-0 font-medium text-foreground">{mainLabel}</span>}
-        {mainDetail && <span className="min-w-0 truncate text-muted-foreground" title={mainDetail}>{mainDetail}</span>}
+        {mainDetail && main.state === 'answering'
+          // quests: the running tool is clickable: it opens the tool's row in the chat (Noam, 3 Nov).
+          ? <button type="button" data-quests-workers="step" onClick={revealLastToolRow} title="Show the tool call in the chat" className="min-w-0 truncate text-left text-muted-foreground hover:text-foreground hover:underline">{mainDetail}</button>
+          : mainDetail && <span className="min-w-0 truncate text-muted-foreground" title={mainDetail}>{mainDetail}</span>}
+        {inFlight?.queued ? <span className="shrink-0 text-muted-foreground/80" data-quests-workers="queued">· {inFlight.queued === 1 ? 'your message waits for it' : `${inFlight.queued} messages wait for it`}</span> : null}
         {inFlight && <span className="shrink-0 tabular-nums text-muted-foreground/70">for {formatTaskDuration(Math.max(0, now - stepRef.current.since))}</span>}
         {main.since !== null && <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">{main.state === 'answering' ? 'turn ' : ''}{formatTaskDuration(Math.max(0, now - main.since))}</span>}
         {workers.length === 0 && main.state !== 'idle' && <span className="shrink-0 text-muted-foreground/50">no workers</span>}

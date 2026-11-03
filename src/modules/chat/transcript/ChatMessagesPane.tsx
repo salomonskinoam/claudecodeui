@@ -12,7 +12,7 @@ import type { BackgroundTaskSummary,
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
 import { groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
 import { foldRepeatedReplies, rowIdOf, type ReplyFold } from '@/modules/chat/utils/repeatedReplies';
-import { isRowOpen, setRowOpen, useRowOpenVersion } from '@/modules/chat/ledger/rowOpen';
+import { TOOL_LINE, isRowOpen, setRowOpen, useRowOpenVersion } from '@/modules/chat/ledger/rowOpen';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelectionEmptyState';
@@ -87,11 +87,10 @@ type ChatMessagesPaneProps = {
 };
 
 /**
- * quests: a collapsed tool line (cloudcli-custom.css, the same selector). A click on the 7 px line opens it, a
- * click on the line of an open one closes it; a click inside an open one works as usual. The state is the row's
- * own, by id (rowOpen.ts), so React's re-renders draw it back and a remount keeps it.
+ * quests: a click on a collapsed tool line's 7 px opens it, a click on the line of an open one closes it; a click
+ * inside an open one works as usual. The state is the row's own, by id (rowOpen.ts), so React's re-renders draw
+ * it back and a remount keeps it.
  */
-const TOOL_LINE = ':is(.chat-message.tool, .chat-message.assistant:not(:has(> .w-full > .w-full > div[dir="auto"]))):not(:has(input, textarea))';
 function onToolLineClick(event: MouseEvent<HTMLDivElement>): void {
   const el = (event.target as HTMLElement).closest?.('.chat-message');
   if (!(el instanceof HTMLElement) || !el.matches(TOOL_LINE)) return;

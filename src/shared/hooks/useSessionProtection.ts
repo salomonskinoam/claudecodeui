@@ -74,20 +74,27 @@ export function useSessionProtection() {
       // its own clock: the stale idle-ack guard compares against it, and the
       // tasks' start is not when this response began.
       const continuing = existing && !existing.background ? existing : undefined;
+      // quests: a message sent into a running turn joins it: the tool the chat is on keeps running and stays
+      // the step; the message waits, counted, until the next status frame says the chat moved on (Noam, 3 Nov:
+      // "the tool should NOT be affected by the main chat ... it should be thinking AND STILL running the tool").
+      const joins = Boolean(activity?.joins && continuing);
       const next: SessionActivity = {
-        statusText:
-          activity?.statusText !== undefined ? activity.statusText : continuing?.statusText ?? null,
+        statusText: joins
+          ? continuing!.statusText
+          : activity?.statusText !== undefined ? activity.statusText : continuing?.statusText ?? null,
         canInterrupt: activity?.canInterrupt ?? continuing?.canInterrupt ?? true,
         startedAt: continuing?.startedAt ?? Date.now(),
         // The tasks keep running under the new turn; they are reported again
         // when it ends.
         ...(existing?.tasks ? { tasks: existing.tasks } : {}),
+        queued: joins ? (continuing!.queued ?? 0) + 1 : activity?.statusText !== undefined ? 0 : continuing?.queued ?? 0,
       };
 
       if (
         continuing
         && continuing.statusText === next.statusText
         && continuing.canInterrupt === next.canInterrupt
+        && (continuing.queued ?? 0) === next.queued
       ) {
         return prev;
       }
@@ -195,6 +202,7 @@ export function useSessionProtection() {
           startedAt: snapshotStartedAt ?? existing?.startedAt ?? now,
           ...(snapshot.background ? { background: true } : {}),
           ...(snapshot.tasks ? { tasks: snapshot.tasks } : {}),
+          ...(existing?.queued ? { queued: existing.queued } : {}),
         });
       }
 

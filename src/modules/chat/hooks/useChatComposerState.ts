@@ -913,9 +913,11 @@ export function useChatComposerState({
       // Mark this request as processing in the per-session activity map (the
       // single source of truth the indicator derives from). The id is always
       // concrete at this point — no pending placeholder exists anymore.
+      // quests: `joins`: into a turn already in flight the message waits for the tool the chat is on; the
+      // step shown stays that tool (requirement 54). On an idle session this starts the turn as before.
       onSessionProcessing?.(targetSessionId, {
-        statusText: null,
         canInterrupt: true,
+        joins: true,
       });
 
       setIsUserScrolledUp(false);

@@ -205,6 +205,8 @@ export type SessionActivity = {
   background?: boolean;
   /** The background tasks the session still has running, with or without a response in flight. */
   tasks?: BackgroundTaskSummary[];
+  /** quests: messages sent into this turn that the chat has not read yet; it reads them after the tool it is on. */
+  queued?: number;
 };
 
 /** Every busy session, keyed by session id. Read it to tell whether a session is busy; check `background` to tell how. */
@@ -213,7 +215,8 @@ export type SessionActivityMap = ReadonlyMap<string, SessionActivity>;
 /** Marks a session as producing a response; call it as soon as a send is dispatched so the UI reacts immediately. */
 export type MarkSessionProcessing = (
   sessionId?: string | null,
-  activity?: { statusText?: string | null; canInterrupt?: boolean },
+  /** quests: `joins` = a message sent into a turn already in flight: the step it is on stays, the message counts as queued. */
+  activity?: { statusText?: string | null; canInterrupt?: boolean; joins?: boolean },
 ) => void;
 
 /** Marks a session's response as finished; `ifStartedBefore` lets a late acknowledgement clear only a stale run. Leaves background-only work alone, which it says nothing about. */
