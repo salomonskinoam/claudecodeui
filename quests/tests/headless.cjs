@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -42,7 +42,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   await page.addInitScript((t) => localStorage.setItem('auth-token', t), token);
   // The list's default (focus) shows only the chats that wait for the user; every check but `focus` reads the
   // whole list, so they open the page in archive mode.
-  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), check === 'focus' ? 'focus' : 'archive');
+  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), check === 'focus' || check === 'hold' ? 'focus' : 'archive');
   page.on('pageerror', (error) => console.log('page error:', (error.stack || error.message).slice(0, 700)));
   await page.goto(check === 'plan' ? 'http://127.0.0.1:3001/' : `http://127.0.0.1:3001/session/${sessionId}`);
   await page.waitForTimeout(6000);
@@ -633,6 +633,19 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       });
     });
     console.log(JSON.stringify(rows, null, 0).replace(/\},\{/g, '},\n{'));
+  }
+
+  if (check === 'hold') {
+    // Focus mode: the "On hold" group lists exactly the dismissed entries of the queue, in queue order; a click
+    // opens it. Nothing is put on hold here.
+    const q = await apiQueue();
+    const dismissed = q.view.filter((k) => q.entries.find((e) => e.key === k)?.dismissed);
+    const group = page.locator('[data-quests-group="On hold"]');
+    const label = (await group.innerText().catch(() => '')).replace(/\s+/g, ' ');
+    await group.click().catch(() => undefined);
+    await page.waitForTimeout(400);
+    const members = await group.locator('xpath=..').locator('[data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+    console.log(JSON.stringify({ label, dismissed: dismissed.length, members: members.length, same: JSON.stringify(members) === JSON.stringify(dismissed) }));
   }
 
   if (check === 'dismissdialog') {

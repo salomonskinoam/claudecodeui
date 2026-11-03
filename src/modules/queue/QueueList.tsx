@@ -23,27 +23,27 @@ type QueueListProps = {
 };
 
 /**
- * quests priority queue: the session list. In focus mode (the default) the chats that wait for Noam, then two
- * collapsed groups, "Live chats" and "Tickets-Unclaimed"; in archive mode every entry in queue order, with a
+ * quests priority queue: the session list. In focus mode (the default) the chats that wait for Noam, then three
+ * collapsed groups, "On hold", "Live chats" and "Tickets-Unclaimed"; in archive mode every entry in queue order, with a
  * separator before the tickets no chat has claimed.
  */
 export default function QueueList({ onNewSession, onStartTicket }: QueueListProps) {
   const queue = useQueue();
-  const { mode, lines, live, unclaimed } = useQueueView();
+  const { mode, lines, hold, live, unclaimed } = useQueueView();
   const lookOf = useEntryLook();
   const open = useOpenEntry(onStartTicket);
   useEffect(() => setQueueOpener(open));
   const blinking = useBlink(queue);
   const [closing, setClosing] = useState<QueueEntry | null>(null);
   const [dismissing, setDismissing] = useState<QueueEntry | null>(null);
-  // quests: a right-click on a line opens the chat's menu (rename, pin, send to the end, hide, Cursor, the ticket).
+  // quests: a right-click on a line opens the chat's menu (rename, pin, send to the end, on hold, Cursor, the ticket).
   const [menu, setMenu] = useState<{ sessionId: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<QueueEntry | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const toggle = (label: string) => setOpenGroups((g) => { const n = new Set(g); if (n.has(label)) n.delete(label); else n.add(label); return n; });
 
   // Lines the view shows where the stored order has them: not the permission prompts, not the pinned chat.
-  const anchors = new Set([...lines, ...live, ...unclaimed].filter((e) => e.state !== 'permission' && e.key !== queue.latch).map((e) => e.key));
+  const anchors = new Set([...lines, ...hold, ...live, ...unclaimed].filter((e) => e.state !== 'permission' && e.key !== queue.latch).map((e) => e.key));
   const { marker, lineProps, listProps } = useLineDrag(queue.view, anchors);
 
   const line = (e: QueueEntry, separator: boolean) => (
@@ -64,7 +64,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
       onRename={e.sessionId ? () => setRenaming(e) : undefined}
     />
   );
-  const groups: Array<[string, QueueEntry[]]> = [['Live chats', live], ['Tickets-Unclaimed', unclaimed]];
+  const groups: Array<[string, QueueEntry[]]> = [['On hold', hold], ['Live chats', live], ['Tickets-Unclaimed', unclaimed]];
 
   return (
     <div className="flex flex-col" data-quests-queue="list" data-quests-mode={mode}>

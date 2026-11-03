@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { CircleCheck, EyeOff, Pencil, Pin, SquareArrowOutUpRight, Trash2 } from 'lucide-react';
+import { CircleCheck, EyeOff, Pause, Pencil, Pin, SquareArrowOutUpRight } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import EntryDot from '@/modules/queue/EntryDot';
@@ -26,11 +26,11 @@ type QueueLineProps = {
   drag: Record<string, unknown>;
   onOpen: (event: MouseEvent) => void;
   onCloseTicket: () => void;
-  /** The trash icon: hide the chat until it replies again (asks first). */
+  /** The pause icon: put the chat on hold until it replies again (asks first). */
   onDismiss: () => void;
   /** The slashed eye: the entry goes to the end of the queue (no question asked). */
   onSendToEnd: () => void;
-  /** A right-click: the chat's menu (rename, pin, hide, ...). */
+  /** A right-click: the chat's menu (rename, pin, on hold, ...). */
   onMenu?: (event: MouseEvent) => void;
   /** The pencil: rename the chat. */
   onRename?: () => void;
@@ -38,7 +38,7 @@ type QueueLineProps = {
 
 /**
  * quests priority queue: one line of the list. The chat's dot, the kind's sign, the title, and on the right five
- * icon columns: the pin, send to the end, hide (the trash), the Cursor link, the ticket's close button.
+ * icon columns: the pin, send to the end, on hold (the pause), the Cursor link, the ticket's close button.
  */
 export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onDismiss, onSendToEnd, onMenu, onRename }: QueueLineProps) {
   return (
@@ -68,7 +68,7 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       <KindSign kind={e.kind} />
       <EntryTitle entry={e} className="min-w-0 flex-1 truncate" />
       {/* Six fixed columns on the right, the same on every line: rename (the pencil), the pin, send to the end,
-          hide (the trash), the Cursor link, the ticket's close button. A column stays empty when the line has
+          on hold (the pause), the Cursor link, the ticket's close button. A column stays empty when the line has
           nothing for it, so the icons never shift sideways. */}
       <span className={SLOT}>
         {e.sessionId && onRename && (
@@ -98,9 +98,9 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       </span>
       <span className={SLOT}>
         {e.sessionId && (
-          <button type="button" title="Hide until it replies again" className="opacity-0 hover:opacity-100 group-hover:opacity-70"
+          <button type="button" title="Put on hold until it replies again" className="opacity-0 hover:opacity-100 group-hover:opacity-70"
             data-quests-line="dismiss" onClick={(event) => { event.stopPropagation(); onDismiss(); }}>
-            <Trash2 className="h-3 w-3" />
+            <Pause className="h-3 w-3" />
           </button>
         )}
       </span>

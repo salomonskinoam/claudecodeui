@@ -56,7 +56,7 @@ export default function TabContextMenu({ sessionId, x, y, onClose, onCloseTab }:
           {entry.sessionId && <button type="button" className={item} data-quests-menu="rename" onClick={() => setDialog('rename')}>Rename…</button>}
           <button type="button" className={item} onClick={() => { void setQueueLatch(latched ? null : entry.key); onClose(); }}>{latched ? 'Unpin' : 'Pin on top'}</button>
           <button type="button" className={item} onClick={() => { void sendQueueEntryToEnd(entry.key); onClose(); }}>Send to the end of the queue</button>
-          <button type="button" className={item} onClick={() => setDialog('hide')}>Hide until it replies again</button>
+          <button type="button" className={item} onClick={() => setDialog('hide')}>Put on hold until it replies again</button>
           {entry.providerSessionId && (
             <a className={item} href={`cursor://anthropic.claude-code/open?session=${entry.providerSessionId}`} onClick={onClose}>Open in Cursor</a>
           )}
