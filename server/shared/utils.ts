@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import {
   access,
@@ -427,6 +427,16 @@ export async function validateWorkspacePath(requestedPath: string): Promise<Work
  */
 export function generateMessageId(prefix = 'msg'): string {
   return `${prefix}_${randomUUID()}`;
+}
+
+/**
+ * quests: the id of a transcript row that carries none of its own, from what the row says. The same row read
+ * twice gets the same id, so the page can tell a row it has drawn from a new one (requirement 52, point 2); a
+ * random id per read drew every Codex row again on every refresh.
+ */
+export function stableMessageId(prefix: string, parts: unknown[]): string {
+  const digest = createHash('sha1').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
+  return `${prefix}_${digest}`;
 }
 
 /**

@@ -8,6 +8,7 @@ import type { AnyRecord, FetchHistoryOptions, FetchHistoryResult, NormalizedMess
 import {
   createNormalizedMessage,
   generateMessageId,
+  stableMessageId,
   getOpenCodeDatabasePath,
   normalizeProviderTimestamp,
   readObjectRecord,
@@ -211,9 +212,10 @@ export class OpenCodeSessionsProvider implements IProviderSessions {
     const type = readOptionalString(raw.type) ?? readOptionalString(raw.event);
     const eventSessionId = readOptionalString(raw.sessionID) ?? readOptionalString(raw.sessionId) ?? sessionId;
     const timestamp = normalizeProviderTimestamp(raw.time ?? raw.timestamp);
+    // A row without an id of its own is known by what it says, the same on every read (requirement 52).
     const baseId = readOptionalString(raw.id)
       ?? readOptionalString(raw.messageID)
-      ?? generateMessageId('opencode');
+      ?? stableMessageId('opencode', [type, raw.text ?? raw.delta ?? raw.message, raw.time ?? raw.timestamp]);
 
     if (type === 'text') {
       // The client already renders an optimistic user bubble, so provider user

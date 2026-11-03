@@ -22,6 +22,7 @@ import {
   createNormalizedMessage,
   generateMessageId,
   readObjectRecord,
+  stableMessageId,
   sliceTailPage,
   truncateSubagentActivity,
 } from '@/shared/utils.js';
@@ -1943,7 +1944,8 @@ export class CodexSessionsProvider implements IProviderSessions {
    */
   private normalizeHistoryEntry(raw: AnyRecord, sessionId: string | null): NormalizedMessage[] {
     const ts = raw.timestamp || new Date().toISOString();
-    const baseId = raw.uuid || generateMessageId('codex');
+    // A row without an id of its own is known by what it says, the same on every read.
+    const baseId = raw.uuid || stableMessageId('codex', [raw.type, raw.message?.role, raw.message?.content, raw.content, raw.timestamp]);
 
     if (raw.type === 'status_note' && typeof raw.content === 'string') {
       return [createNormalizedMessage({
@@ -2074,7 +2076,7 @@ export class CodexSessionsProvider implements IProviderSessions {
     }
 
     const ts = raw.timestamp || new Date().toISOString();
-    const baseId = raw.uuid || generateMessageId('codex');
+    const baseId = raw.uuid || stableMessageId('codex', [raw.type, raw.itemType, raw.message?.content, raw.content, raw.timestamp]);
 
     if (raw.type === 'item') {
       // Live items carry a stable SDK id, so an in-progress row and its later

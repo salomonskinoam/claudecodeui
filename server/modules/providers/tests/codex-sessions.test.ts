@@ -610,3 +610,16 @@ test('Codex history restores user prompts from typed item_completed rows', { con
     await rm(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('a Codex transcript row without an id gets the same id on every read', () => {
+  // quests: the page tells a row it has drawn from a new one by id (requirement 52); a random id per read drew
+  // every such row again on every refresh.
+  const provider = new CodexSessionsProvider();
+  const raw = { type: 'message', timestamp: '2026-11-03T04:00:00.000Z', message: { role: 'assistant', content: 'the same words' } };
+  const first = provider.normalizeMessage(raw, 'session-1');
+  const second = provider.normalizeMessage({ ...raw }, 'session-1');
+  assert.ok(first.length > 0);
+  assert.deepEqual(first.map((m) => m.id), second.map((m) => m.id));
+  const other = provider.normalizeMessage({ ...raw, message: { role: 'assistant', content: 'other words' } }, 'session-1');
+  assert.notEqual(other[0]?.id, first[0]?.id);
+});
