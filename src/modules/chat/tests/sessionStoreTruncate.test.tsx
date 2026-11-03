@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 import type { NormalizedMessage } from '@/shared/types';
 
 /**
- * When an already-sent message is replaced, every client watching the session
- * drops the superseded turns before the replacement streams in — otherwise the
- * transcript shows the question twice until the next REST refresh.
+ * When an already-sent message is replaced, every client watching the session marks the superseded turns
+ * before the replacement streams in. quests (requirement 52): nothing is removed; the replaced rows stay
+ * drawn, dimmed, and a transcript that still serves a row (a provider that rewinds by branching re-stamps the
+ * kept turns) revives it.
  */
 
 const sessionMessages = vi.fn();
@@ -60,18 +61,20 @@ async function loadedStore() {
   return view;
 }
 
+/** What the pane draws as live history: the rows an edit did not replace. */
+const live = (messages: NormalizedMessage[]) => messages.filter((m) => !m.superseded).map((m) => m.content);
+const all = (messages: NormalizedMessage[]) => messages.map((m) => `${m.superseded ? '~' : ''}${m.content}`);
+
 describe('truncateAt', () => {
-  it('drops the anchored message and everything after it', async () => {
+  it('marks the anchored message and everything after it as replaced, removing nothing', async () => {
     const { result } = await loadedStore();
 
     act(() => {
       result.current.truncateAt('session-1', 'u2');
     });
 
-    assert.deepEqual(
-      result.current.getMessages('session-1').map((message) => message.content),
-      ['first prompt', 'first answer'],
-    );
+    assert.deepEqual(live(result.current.getMessages('session-1')), ['first prompt', 'first answer']);
+    assert.deepEqual(all(result.current.getMessages('session-1')), ['first prompt', 'first answer', '~second prompt', '~second answer']);
   });
 
   it('keeps a message whose anchor was not the cut point', async () => {
@@ -81,20 +84,21 @@ describe('truncateAt', () => {
       result.current.truncateAt('session-1', 'u1');
     });
 
-    assert.deepEqual(result.current.getMessages('session-1'), []);
+    assert.deepEqual(live(result.current.getMessages('session-1')), []);
+    assert.equal(result.current.getMessages('session-1').length, 4);
   });
 
   it('leaves the transcript alone for an anchor it does not hold', async () => {
     const { result } = await loadedStore();
 
     act(() => {
-      result.current.truncateAt('session-1', 'not-here');
+      result.current.truncateAt('session-1', 'u9');
     });
 
-    assert.equal(result.current.getMessages('session-1').length, 4);
+    assert.deepEqual(live(result.current.getMessages('session-1')), HISTORY.map((m) => m.content));
   });
 
-  it('clears rows that streamed for the turn being replaced', async () => {
+  it('marks rows that streamed for the turn being replaced', async () => {
     const { result } = await loadedStore();
 
     act(() => {
@@ -106,10 +110,8 @@ describe('truncateAt', () => {
       result.current.truncateAt('session-1', 'u2');
     });
 
-    assert.deepEqual(
-      result.current.getMessages('session-1').map((message) => message.content),
-      ['first prompt', 'first answer'],
-    );
+    assert.deepEqual(live(result.current.getMessages('session-1')), ['first prompt', 'first answer']);
+    assert.equal(result.current.getMessages('session-1').length, 5);
   });
 
   it('keeps the replacement the cut was made for', async () => {
@@ -117,11 +119,10 @@ describe('truncateAt', () => {
 
     // The composer appends its echo of the edited message before the server
     // acknowledges the edit, so the cut arrives with the replacement already
-    // on screen. Clearing it left the chat pane without the message the user
-    // had just sent until the run finished.
+    // on screen.
     act(() => {
       result.current.appendRealtime('session-1', {
-        ...row('5', 'second prompt, corrected'),
+        ...row('local_5', 'second prompt, corrected'),
         role: 'user',
         replacesAnchorId: 'u2',
       } as NormalizedMessage);
@@ -131,18 +132,15 @@ describe('truncateAt', () => {
       result.current.truncateAt('session-1', 'u2');
     });
 
-    assert.deepEqual(
-      result.current.getMessages('session-1').map((message) => message.content),
-      ['first prompt', 'first answer', 'second prompt, corrected'],
-    );
+    assert.deepEqual(live(result.current.getMessages('session-1')), ['first prompt', 'first answer', 'second prompt, corrected']);
   });
 
-  it('keeps the replacement last when the kept history comes back re-stamped', async () => {
+  it('revives the kept history when it comes back re-stamped, and keeps the replacement where it was', async () => {
     const { result } = await loadedStore();
 
     act(() => {
       result.current.appendRealtime('session-1', {
-        ...row('5', 'second prompt, corrected'),
+        ...row('local_5', 'second prompt, corrected'),
         role: 'user',
         replacesAnchorId: 'u2',
       } as NormalizedMessage);
@@ -150,16 +148,14 @@ describe('truncateAt', () => {
     });
 
     // A provider that rewinds by branching writes the surviving turns into a
-    // fresh transcript, so the next refresh returns them stamped later than
-    // the replacement was typed. Without a floor on where a replacement can
-    // sort, the message the user just sent moves to the top.
+    // fresh transcript, with new ids and later stamps. They are the same rows.
     sessionMessages.mockResolvedValue({
       ok: true,
       json: async () => ({
         data: {
           messages: [
-            { ...row('1', 'first prompt', 'u1'), timestamp: '2026-01-01T00:00:09.000Z' },
-            { ...row('2', 'first answer'), timestamp: '2026-01-01T00:00:09.001Z' },
+            { ...row('1', 'first prompt', 'u1'), id: 'n1', timestamp: '2026-01-01T00:00:09.000Z' },
+            { ...row('2', 'first answer'), id: 'n2', timestamp: '2026-01-01T00:00:09.001Z' },
           ],
           total: 2,
           hasMore: false,
@@ -171,44 +167,39 @@ describe('truncateAt', () => {
       await result.current.refreshLatestFromServer('session-1');
     });
 
-    assert.deepEqual(
-      result.current.getMessages('session-1').map((message) => message.content),
-      ['first prompt', 'first answer', 'second prompt, corrected'],
-    );
+    assert.deepEqual(live(result.current.getMessages('session-1')), ['first prompt', 'first answer', 'second prompt, corrected']);
+    assert.equal(result.current.getMessages('session-1').length, 5, 'the re-stamped copies confirm the rows drawn, they add none');
   });
 
-  it('keeps only the newest replacement when an earlier attempt was refused', async () => {
+  it('keeps only the newest replacement live when an earlier attempt was refused', async () => {
     const { result } = await loadedStore();
 
     // A refused send leaves its echo in place — nothing rolls it back — so by
     // the time an edit succeeds the store can be holding two attempts at the
-    // same message.
+    // same message. The earlier one is replaced like the rest.
     act(() => {
       result.current.appendRealtime('session-1', {
-        ...row('5', 'first attempt'),
+        ...row('local_5', 'first attempt'),
         role: 'user',
         replacesAnchorId: 'u2',
       } as NormalizedMessage);
       result.current.appendRealtime('session-1', {
-        ...row('6', 'second attempt'),
+        ...row('local_6', 'second attempt'),
         role: 'user',
         replacesAnchorId: 'u2',
       } as NormalizedMessage);
       result.current.truncateAt('session-1', 'u2');
     });
 
-    assert.deepEqual(
-      result.current.getMessages('session-1').map((message) => message.content),
-      ['first prompt', 'first answer', 'second attempt'],
-    );
+    assert.deepEqual(live(result.current.getMessages('session-1')), ['first prompt', 'first answer', 'second attempt']);
   });
 
-  it('clears a replacement tagged for a different cut', async () => {
+  it('replaces a replacement tagged for a different cut like any other row', async () => {
     const { result } = await loadedStore();
 
     act(() => {
       result.current.appendRealtime('session-1', {
-        ...row('5', 'first prompt, corrected'),
+        ...row('local_5', 'first prompt, corrected'),
         role: 'user',
         replacesAnchorId: 'u1',
       } as NormalizedMessage);
@@ -218,9 +209,6 @@ describe('truncateAt', () => {
       result.current.truncateAt('session-1', 'u2');
     });
 
-    assert.deepEqual(
-      result.current.getMessages('session-1').map((message) => message.content),
-      ['first prompt', 'first answer'],
-    );
+    assert.deepEqual(live(result.current.getMessages('session-1')), ['first prompt', 'first answer']);
   });
 });

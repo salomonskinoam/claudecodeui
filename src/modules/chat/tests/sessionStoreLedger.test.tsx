@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 import type { NormalizedMessage } from '@/shared/types';
 
 /**
- * quests: chronological order, always (Noam, 2 Nov: "it can never be the case that i type something, press enter,
- * and it's not the last thing i see in that second. also anything that chronologically came after has to be
- * printed after"; "make tests for that so it doesn't get fucked"). The store's merged list is what the pane
- * draws, in order; these tests pin its order through sends and history refreshes.
+ * quests: the store draws the ledger (requirement 52) and the order is the order of arrival (requirement 50,
+ * Noam, 2 Nov: "it can never be the case that i type something, press enter, and it's not the last thing i
+ * see in that second"; "make tests for that so it doesn't get fucked"). These tests pin what the store hands
+ * the pane through sends and history refreshes; the ledger's own rules are pinned in chatLedger.test.ts.
  */
 
 const sessionMessages = vi.fn();
@@ -23,7 +23,7 @@ vi.mock('@/shared/api', () => ({
 }));
 
 const at = (second: number) => `2026-11-02T20:00:${String(second).padStart(2, '0')}.000Z`;
-// A row typed on this page carries a local_ id: that is what the store retires once the transcript holds the echo.
+// A row typed on this page carries a local_ id: the ledger confirms it once the transcript holds the copy.
 const row = (id: string, role: 'user' | 'assistant', content: string, second: number): NormalizedMessage => ({
   id,
   kind: 'text',
@@ -67,13 +67,8 @@ async function loadedStore() {
 }
 
 const texts = (messages: NormalizedMessage[]) => messages.map((m) => m.content);
-const assertChronological = (messages: NormalizedMessage[]) => {
-  for (let i = 1; i < messages.length; i += 1) {
-    assert.ok(Date.parse(messages[i - 1].timestamp) <= Date.parse(messages[i].timestamp), `row ${i} ("${messages[i].content}") is older than the row before it`);
-  }
-};
 
-describe('chronological order of the transcript', () => {
+describe('the order the page draws', () => {
   it('a message typed now is the last row at once', async () => {
     const { result } = await loadedStore();
     act(() => {
@@ -81,7 +76,7 @@ describe('chronological order of the transcript', () => {
     });
     const messages = result.current.getMessages('session-1');
     assert.equal(messages.at(-1)?.content, 'executive summary and are we done');
-    assertChronological(messages);
+    assert.equal(messages.at(-1)?.delivery, 'pending');
   });
 
   it('a history refresh that does not hold the typed message yet keeps it last', async () => {
@@ -95,7 +90,7 @@ describe('chronological order of the transcript', () => {
     });
     const messages = result.current.getMessages('session-1');
     assert.equal(messages.at(-1)?.content, 'executive summary and are we done');
-    assertChronological(messages);
+    assert.equal(messages.length, 5);
   });
 
   it('a history refresh that holds the typed message shows it once, still last, and the reply after it', async () => {
@@ -110,22 +105,8 @@ describe('chronological order of the transcript', () => {
     const messages = result.current.getMessages('session-1');
     assert.deepEqual(texts(messages).slice(-2), ['executive summary and are we done', 'This chat had one job.']);
     assert.equal(messages.filter((m) => m.content === 'executive summary and are we done').length, 1);
-    assertChronological(messages);
-  });
-
-  it('rows that came earlier are never drawn after a later row, whatever arrived first', async () => {
-    const { result } = await loadedStore();
-    // A reply streamed live, then an older report row delivered late by a refresh.
-    act(() => {
-      result.current.appendRealtime('session-1', row('live-1', 'assistant', 'live reply', 20));
-    });
-    serve([...HISTORY, row('h5', 'assistant', 'a report that happened before the reply', 18)]);
-    await act(async () => {
-      await result.current.refreshLatestFromServer('session-1', { limit: 20 });
-    });
-    const messages = result.current.getMessages('session-1');
-    assert.deepEqual(texts(messages).slice(-2), ['a report that happened before the reply', 'live reply']);
-    assertChronological(messages);
+    assert.equal(messages.at(-2)?.id, 'local_1', 'the row drawn at Enter is the row that stays');
+    assert.equal(messages.at(-2)?.delivery, undefined);
   });
 
   it('two messages typed in a row stay in the order typed', async () => {
@@ -136,6 +117,36 @@ describe('chronological order of the transcript', () => {
     });
     const messages = result.current.getMessages('session-1');
     assert.deepEqual(texts(messages).slice(-2), ['wait for instructions', 'where bro']);
-    assertChronological(messages);
+  });
+
+  it('a refresh never moves or removes a drawn row; what it brings lands after', async () => {
+    const { result } = await loadedStore();
+    act(() => {
+      result.current.appendRealtime('session-1', row('live-1', 'assistant', 'live reply', 20));
+    });
+    const before = result.current.getMessages('session-1').map((m) => m.id);
+    serve([...HISTORY, row('h5', 'assistant', 'a report the page had not seen', 18), row('live-1', 'assistant', 'live reply', 20)]);
+    await act(async () => {
+      await result.current.refreshLatestFromServer('session-1', { limit: 20 });
+    });
+    const after = result.current.getMessages('session-1').map((m) => m.id);
+    assert.deepEqual(after.slice(0, before.length), before);
+    assert.deepEqual(after.slice(before.length), ['h5']);
+  });
+
+  it('an older page lands before the first row and leaves the rest as it was', async () => {
+    const { result } = await loadedStore();
+    const slot = result.current.getSessionSlot('session-1')!;
+    slot.hasMore = true;
+    const body = result.current.getMessages('session-1').map((m) => m.id);
+    sessionMessages.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { messages: [row('h-1', 'user', 'older prompt', 0), row('h0', 'assistant', 'older answer', 0), HISTORY[0], HISTORY[1]], total: 6, hasMore: false } }),
+    });
+    await act(async () => {
+      await result.current.fetchMore('session-1', { limit: 20 });
+    });
+    assert.deepEqual(result.current.getMessages('session-1').map((m) => m.id), ['h-1', 'h0', ...body]);
+    assert.equal(result.current.getSessionSlot('session-1')?.hasMore, false);
   });
 });

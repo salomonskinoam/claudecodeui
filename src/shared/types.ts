@@ -532,24 +532,10 @@ export type NormalizedMessage = {
    * Set only on the client-side optimistic echo of an edited message, naming
    * the anchor that echo replaces. Never sent by the backend.
    *
-   * The truncation that follows an edit clears every live row, because they
-   * belonged to the turn being replaced. This tag is what tells the store the
-   * replacement itself is not one of them.
+   * The cut that follows an edit marks the rows from the anchor on as replaced;
+   * this tag is what tells the ledger the replacement itself is not one of them.
    */
   replacesAnchorId?: string;
-  /**
-   * How many persisted rows survived the cut this echo was sent for, stamped
-   * when the truncation is applied.
-   *
-   * The echo is retired once the provider persists it, and that is decided by
-   * matching text and attachments inside a time window. That is enough until a
-   * rewind re-stamps the surviving turns — a provider that has to branch
-   * writes the copy with the timestamps of the copy — because an earlier turn
-   * with the same words then sits inside the window and retires the message
-   * the user just sent. The replacement can only be a row that was not there
-   * when the cut was made, so this is where those rows begin.
-   */
-  replacesAfterRowCount?: number;
   sessionId: string;
   timestamp: string;
   provider: LLMProvider;

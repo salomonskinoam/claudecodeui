@@ -144,9 +144,12 @@ function sameContent(row: LedgerRow, incoming: NormalizedMessage): boolean {
  * I4: the row keeps its id, its place and its drawn state; everything else is the copy's. A copy of another kind
  * (a tool call for a text row) is refused, except the one transition a streamed reply makes into its text.
  */
-function confirmRow(l: Ledger, i: number, incoming: NormalizedMessage): boolean {
+function confirmRow(l: Ledger, i: number, incoming: NormalizedMessage, fromRead = false): boolean {
   const old = l.rows[i];
   l.alias[incoming.id] = old.id;
+  // A row an edit replaced that the transcript still serves survived the edit (a provider that rewinds by
+  // branching rewrites the kept turns with new ids and times): it is live history again.
+  const revived = fromRead && old.superseded;
   const kindChanges = old.kind !== incoming.kind || (old.role ?? null) !== (incoming.role ?? null);
   const streamToText = old.kind === 'stream_delta' && isAssistantText(incoming);
   if (kindChanges && !streamToText) {
@@ -160,7 +163,7 @@ function confirmRow(l: Ledger, i: number, incoming: NormalizedMessage): boolean 
     }
     return false;
   }
-  if (!old.delivery && sameContent(old, incoming)) return false;
+  if (!old.delivery && !revived && sameContent(old, incoming)) return false;
   const { delivery: _delivery, ...kept } = old;
   l.rows = l.rows.slice();
   l.rows[i] = {
@@ -170,7 +173,7 @@ function confirmRow(l: Ledger, i: number, incoming: NormalizedMessage): boolean 
     pos: old.pos,
     source: old.source,
     ...(old.foldId ? { foldId: old.foldId } : {}),
-    ...(old.superseded ? { superseded: true } : {}),
+    ...(old.superseded && !revived ? { superseded: true } : {}),
     ...(old.enteredAt ? { enteredAt: old.enteredAt } : {}),
     ...(kept.noteKind ? { noteKind: kept.noteKind } : {}),
   };
@@ -202,7 +205,7 @@ function matchByText(l: Ledger, m: NormalizedMessage): number {
       if (!row.delivery || !isUserText(row)) continue;
       if (normalizeText(row.content) !== text) continue;
       if (countOf(row.images) !== countOf(m.images) || countOf(row.files) !== countOf(m.files)) continue;
-      if (stamp && row.enteredAt && stamp < row.enteredAt - CONFIRM_CLOCK_SKEW_MS) continue;
+      if (stamp && stamp < (timeOf(row) || row.enteredAt || 0) - CONFIRM_CLOCK_SKEW_MS) continue;
       return i;
     }
     return -1;
@@ -212,9 +215,24 @@ function matchByText(l: Ledger, m: NormalizedMessage): number {
     const row = l.rows[i];
     if (row.source !== 'stream' && row.source !== 'live') continue;
     if (!isAssistantText(row) || normalizeText(row.content) !== text) continue;
-    if (stamp && row.enteredAt && stamp < row.enteredAt - CONFIRM_CLOCK_SKEW_MS) continue;
+    if (stamp && stamp < (timeOf(row) || row.enteredAt || 0) - CONFIRM_CLOCK_SKEW_MS) continue;
     // Already confirmed by another copy: its alias points at a transcript id.
     if (Object.keys(l.alias).some((id) => id !== row.id && l.alias[id] === row.id && !id.startsWith('local_'))) continue;
+    return i;
+  }
+  return -1;
+}
+
+/** A re-stamped transcript row: the first unclaimed row with the same kind, role and words. */
+function matchRestamped(l: Ledger, m: NormalizedMessage, claimed: Set<string>): number {
+  if (m.kind !== 'text' && m.kind !== 'tool_use' && m.kind !== 'tool_result' && m.kind !== 'thinking') return -1;
+  const text = normalizeText(m.content);
+  for (let i = 0; i < l.rows.length; i += 1) {
+    const row = l.rows[i];
+    if (claimed.has(row.id) || row.kind !== m.kind || (row.role ?? null) !== (m.role ?? null)) continue;
+    if (row.source === 'stream' || row.delivery) continue;
+    if (normalizeText(row.content) !== text) continue;
+    if ((row.toolName ?? null) !== (m.toolName ?? null)) continue;
     return i;
   }
   return -1;
@@ -367,12 +385,28 @@ export function appendRead(l: Ledger, page: NormalizedMessage[], options: ReadOp
     let i = indexOf(l, m.id, index);
     if (i < 0) i = matchByText(l, m);
     if (i >= 0) {
-      if (confirmRow(l, i, m)) changed = true;
+      if (confirmRow(l, i, m, true)) changed = true;
       if (firstKnown < 0) firstKnown = at;
       return;
     }
     unseen.push({ m, at });
   });
+  // A latest page with not one id in common: the transcript was rewritten under the page (a provider that
+  // rewinds by branching gives the kept turns new ids and times). Its rows are matched to the rows drawn by
+  // their words, in order, each row claimed once; a row an edit had marked comes back as live history.
+  if (firstKnown < 0 && l.rows.length > 0 && options.direction === 'latest') {
+    const claimed = new Set<string>();
+    const still: typeof unseen = [];
+    for (const u of unseen) {
+      const i = matchRestamped(l, u.m, claimed);
+      if (i < 0) { still.push(u); continue; }
+      claimed.add(l.rows[i].id);
+      if (confirmRow(l, i, u.m, true)) changed = true;
+      firstKnown = firstKnown < 0 ? u.at : Math.min(firstKnown, u.at);
+    }
+    unseen.length = 0;
+    unseen.push(...still);
+  }
   let appended = 0;
   let prepended = 0;
   if (l.rows.length === 0) {

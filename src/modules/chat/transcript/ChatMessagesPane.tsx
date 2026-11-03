@@ -368,7 +368,7 @@ function ChatMessagesPane({
   useEffect(() => {
     const pane = scrollContainerRef.current;
     const content = contentRef.current;
-    if (!pane || !content) {
+    if (!pane || !content || typeof ResizeObserver === 'undefined') {
       return undefined;
     }
     let atBottom = true;

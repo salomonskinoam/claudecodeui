@@ -91,6 +91,9 @@ export function useChatRealtimeHandlers({
   activeViewSessionIdRef.current = selectedSession?.id || currentSessionId || null;
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
+  // quests: the streamed reply so far, per session. One buffer for every session (the old single string) mixed
+  // two chats streaming at once, and a hidden chat's deltas were appended as one row each.
+  const streamBySession = useRef(new Map<string, string>());
 
   // Keep the latest pending-permission snapshot available to the websocket
   // listener so back-to-back permission events can dedupe and re-arm the
@@ -209,35 +212,38 @@ export function useChatRealtimeHandlers({
       // --- Streaming: buffer for performance ---
       if (msg.kind === 'stream_delta') {
         const text = (msg.content as string) || '';
-        if (!text) return;
-        accumulatedStreamRef.current += text;
+        if (!text || !sid) return;
+        const accumulated = (streamBySession.current.get(sid) ?? '') + text;
+        streamBySession.current.set(sid, accumulated);
+        if (sid !== activeViewSessionId) {
+          // A hidden chat: its one streamed row grows in the store, drawn when the chat is shown.
+          sessionStore.updateStreaming(sid, accumulated, provider);
+          return;
+        }
+        accumulatedStreamRef.current = accumulated;
         if (!streamTimerRef.current) {
           streamTimerRef.current = window.setTimeout(() => {
             streamTimerRef.current = null;
-            if (sid) {
-              sessionStore.updateStreaming(sid, accumulatedStreamRef.current, provider);
-            }
+            sessionStore.updateStreaming(sid, streamBySession.current.get(sid) ?? '', provider);
           }, 100);
-        }
-        // Also route to store for non-active sessions
-        if (sid && sid !== activeViewSessionId) {
-          sessionStore.appendRealtime(sid, msg as unknown as NormalizedMessage);
         }
         return;
       }
 
-      if (msg.kind === 'stream_end') {
+      const endStream = (streamSid: string) => {
         if (streamTimerRef.current) {
           clearTimeout(streamTimerRef.current);
           streamTimerRef.current = null;
         }
-        if (sid) {
-          if (accumulatedStreamRef.current) {
-            sessionStore.updateStreaming(sid, accumulatedStreamRef.current, provider);
-          }
-          sessionStore.finalizeStreaming(sid);
-        }
-        accumulatedStreamRef.current = '';
+        const accumulated = streamBySession.current.get(streamSid);
+        if (accumulated) sessionStore.updateStreaming(streamSid, accumulated, provider);
+        sessionStore.finalizeStreaming(streamSid);
+        streamBySession.current.delete(streamSid);
+        if (streamSid === activeViewSessionId) accumulatedStreamRef.current = '';
+      };
+
+      if (msg.kind === 'stream_end') {
+        if (sid) endStream(sid);
         return;
       }
 
@@ -257,15 +263,7 @@ export function useChatRealtimeHandlers({
       switch (msg.kind) {
         case 'complete': {
           // Flush any remaining streaming state
-          if (streamTimerRef.current) {
-            clearTimeout(streamTimerRef.current);
-            streamTimerRef.current = null;
-          }
-          if (sid && accumulatedStreamRef.current) {
-            sessionStore.updateStreaming(sid, accumulatedStreamRef.current, provider);
-            sessionStore.finalizeStreaming(sid);
-          }
-          accumulatedStreamRef.current = '';
+          if (sid) endStream(sid);
 
           // `complete` is the unified terminal event — every provider run ends
           // with exactly one, regardless of success, failure, or abort. The
