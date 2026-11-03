@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { isServerAnswering } from '@/modules/chat/work/workStateStore';
 import type { MutableRefObject } from 'react';
 
 import { api } from '@/shared/api';
@@ -868,7 +869,9 @@ export function useChatSessionState({
       try {
         // Skip store refresh during active streaming. quests: only while this page streams the run; a run
         // outside the page (an IDE or the CLI, not interruptible from here) reaches us only as transcript changes.
-        if (!isProcessing || isRunOutsidePage) {
+        // And only while the server agrees a turn is in flight: the page's own memory of one can go stale (a
+        // complete that never arrived), and a transcript that moved on must show (Noam, 2 Nov).
+        if (!isProcessing || isRunOutsidePage || !isServerAnswering(selectedSession.id)) {
           const shouldStickToBottom = isActiveRef.current && isNearBottom();
           await requestLatestMessages(selectedSession.id);
 

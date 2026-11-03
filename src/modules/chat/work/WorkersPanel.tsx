@@ -5,6 +5,7 @@ import { Shimmer } from '@/shared/ui';
 import type { SessionActivity } from '@/shared/types';
 import { formatTaskDuration } from '@/modules/chat/utils/backgroundTasks';
 import { openWorkTab, type WorkKind } from '@/modules/chat/work/workTabs';
+import { noteWorkState } from '@/modules/chat/work/workStateStore';
 
 /**
  * quests: the state of the main chat, apart from the states of its workers (requirement 40). Noam, 30 Oct:
@@ -101,7 +102,9 @@ function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
       const response = await authenticatedFetch(`/api/quests/work/state/${encodeURIComponent(sessionId)}`);
       if (stopped || !response.ok) return;
       try {
-        setState((await response.json()) as WorkState);
+        const next = (await response.json()) as WorkState;
+        noteWorkState(sessionId, next.main.state);
+        setState(next);
       } catch {
         /* an older server: the panel stays empty */
       }
