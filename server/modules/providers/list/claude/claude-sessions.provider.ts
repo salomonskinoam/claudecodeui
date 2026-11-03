@@ -567,6 +567,14 @@ function replaceLaunchToolResultContent(message: AnyRecord, replacement: string)
  * so a conversation is a path through it rather than the whole file. Editing a
  * sent message makes a second path appear alongside the first.
  */
+/**
+ * The row types the history is built from. The CLI writes many more (`api-request-blob` holds the whole API
+ * request as a role-user message with no uuid and no timestamp; `last-prompt`, `ai-title`, `cost-state`...):
+ * a blob read as a message got a fresh id and the read's time on every read, so the page drew the chat's
+ * first prompt again and again (Noam, 3 Nov: "the dupes again").
+ */
+const TRANSCRIPT_ROW_TYPES = new Set(['user', 'assistant', 'attachment', 'system', 'progress', 'last-prompt', 'queue-operation']);
+
 async function readTranscriptRows(jsonlPath: string, providerSessionId: string): Promise<AnyRecord[]> {
   const rows: AnyRecord[] = [];
   const fileStream = fs.createReadStream(jsonlPath);
@@ -578,7 +586,7 @@ async function readTranscriptRows(jsonlPath: string, providerSessionId: string):
     }
     try {
       const entry = JSON.parse(line) as AnyRecord;
-      if (entry.sessionId === providerSessionId) {
+      if (entry.sessionId === providerSessionId && TRANSCRIPT_ROW_TYPES.has(String(entry.type))) {
         rows.push(entry);
       }
     } catch {

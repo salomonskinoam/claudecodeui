@@ -350,6 +350,40 @@ test('Claude history keeps rows that have no uuid when a queue-operation notific
   }
 });
 
+test('Claude history ignores an api-request-blob row (the API request the CLI records, role user, no uuid)', { concurrency: false }, async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'claude-blob-row-'));
+
+  try {
+    const parentPath = await writeClaudeSubagentSession(tempRoot);
+    await writeFile(
+      parentPath,
+      `${(await readFile(parentPath, 'utf8')).trim()}\n${JSON.stringify({
+        type: 'api-request-blob',
+        sessionId: SESSION_ID,
+        hash: 'abc',
+        message: { role: 'user', content: [{ type: 'text', text: '<system-reminder>x</system-reminder>' }, { type: 'text', text: 'the blob prompt' }] },
+      })}\n`,
+      'utf8',
+    );
+
+    await withIsolatedDatabase(async () => {
+      const now = new Date().toISOString();
+      sessionsDb.createSession(SESSION_ID, 'claude', tempRoot, 'Subagent session', now, now, parentPath);
+
+      const history = await new ClaudeSessionsProvider().fetchHistory(SESSION_ID, {
+        providerSessionId: SESSION_ID,
+      });
+
+      assert.ok(
+        !history.messages.some((message) => String(message.content).includes('the blob prompt')),
+        'an api-request-blob row is not a message',
+      );
+    });
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('Claude history drops every notification row of a task that reported more than once', { concurrency: false }, async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'claude-renotified-agent-'));
 
