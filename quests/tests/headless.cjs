@@ -639,7 +639,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // Focus mode: the "On hold" group lists exactly the dismissed entries of the queue, in queue order; a click
     // opens it. Nothing is put on hold here.
     const q = await apiQueue();
-    const dismissed = q.view.filter((k) => q.entries.find((e) => e.key === k)?.dismissed);
+    const dismissed = q.view.filter((k) => { const e = q.entries.find((x) => x.key === k); return e?.dismissed && !e.archived; });
     const group = page.locator('[data-quests-group="On hold"]');
     const label = (await group.innerText().catch(() => '')).replace(/\s+/g, ' ');
     await group.click().catch(() => undefined);
