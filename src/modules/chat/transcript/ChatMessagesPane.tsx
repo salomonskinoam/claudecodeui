@@ -128,12 +128,15 @@ const StickyUserPin = memo(function StickyUserPin({
   hasMoreMessages,
   isLoadingMoreMessages,
   loadOlderMessages,
+  onHeight,
 }: {
   paneRef: RefObject<HTMLDivElement>;
   chatMessages: ChatMessage[];
   hasMoreMessages: boolean;
   isLoadingMoreMessages: boolean;
   loadOlderMessages: (container: HTMLDivElement) => Promise<boolean>;
+  /** quests: the pin's height on screen (0 without a pin), so the background-work strip sits under it, never behind it. */
+  onHeight: (height: number) => void;
 }) {
   const [pinned, setPinned] = useState<HTMLElement | null>(null);
   const [offset, setOffset] = useState(0);
@@ -181,7 +184,10 @@ const StickyUserPin = memo(function StickyUserPin({
         void loadOlderMessages(pane);
       }
       const gap = next ? next.getBoundingClientRect().top - paneTop : Infinity;
-      setOffset(Math.min(0, Math.round(gap - (pinRef.current?.offsetHeight ?? 0) - 8)));
+      const pinHeight = pinRef.current?.offsetHeight ?? 0;
+      const pushedUp = Math.min(0, Math.round(gap - pinHeight - 8));
+      setOffset(pushedUp);
+      onHeight(above ? Math.max(0, pinHeight + pushedUp) : 0);
     };
     update();
     const markUserScroll = () => {
@@ -197,7 +203,7 @@ const StickyUserPin = memo(function StickyUserPin({
       pane.removeEventListener('touchmove', markUserScroll);
       pane.removeEventListener('keydown', markUserScroll);
     };
-  }, [paneRef, chatMessages, hasMoreMessages, isLoadingMoreMessages, loadOlderMessages]);
+  }, [paneRef, chatMessages, hasMoreMessages, isLoadingMoreMessages, loadOlderMessages, onHeight]);
 
   if (!pinned) {
     return null;
@@ -279,6 +285,9 @@ function ChatMessagesPane({
   // quests: every loaded message stays mounted. Unmounting rows off screen swapped them for estimated-height
   // placeholders, so the content height changed while scrolling and the view jumped.
   const lazyRows = null;
+  // quests: the pinned user message's height, so the strip of background work sticks under it (Noam, 3 Nov:
+  // "UNDER THE PINNED USER MESSAGE is something else ... was under the pinned message").
+  const [pinHeight, setPinHeight] = useState(0);
 
   const groupedVisibleMessages = useMemo(
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
@@ -393,9 +402,10 @@ function ChatMessagesPane({
         hasMoreMessages={hasMoreMessages}
         isLoadingMoreMessages={isLoadingMoreMessages}
         loadOlderMessages={loadOlderMessages}
+        onHeight={setPinHeight}
       />
       {chatMessages.length > 0 && (
-        <div className="pointer-events-none sticky right-4 top-3 z-10 mb-2 flex items-start justify-between gap-2 sm:px-4">
+        <div className="pointer-events-none sticky right-4 z-10 mb-2 flex items-start justify-between gap-2 sm:px-4" style={{ top: pinHeight ? pinHeight + 8 : 12 }}>
           {/* Running background work stays in view while the transcript scrolls under it. */}
           <div className="pointer-events-auto min-w-0 pl-4 sm:pl-0">
             <BackgroundTasksStrip
