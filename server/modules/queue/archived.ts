@@ -23,3 +23,16 @@ export function setArchived(entryKey: string, archived: boolean): void {
   else delete all[entryKey];
   queueDb.setState(KEY, all);
 }
+
+/**
+ * "Send to the end of the queue" on an archived entry: the drawer lists the newest archive first, so the end
+ * is the oldest; the entry is marked archived before every other one (Noam, 3 Nov: "send to end of queue does
+ * nothing from archived").
+ */
+export function setArchivedOldest(entryKey: string): void {
+  const all = read();
+  if (all[entryKey] === undefined) return;
+  const oldest = Math.min(...Object.values(all).map((v) => (v === true ? 0 : v)));
+  all[entryKey] = oldest - 1;
+  queueDb.setState(KEY, all);
+}

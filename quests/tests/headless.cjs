@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'toend'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -42,7 +42,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   await page.addInitScript((t) => localStorage.setItem('auth-token', t), token);
   // The list's default (focus) shows only the chats that wait for the user; every check but `focus` reads the
   // whole list, so they open the page in archive mode.
-  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), ['focus', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'ticketchat', 'switch', 'search'].includes(check) ? 'focus' : 'archive');
+  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), ['focus', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'ticketchat', 'switch', 'search', 'toend'].includes(check) ? 'focus' : 'archive');
   page.on('pageerror', (error) => console.log('page error:', (error.stack || error.message).slice(0, 700)));
   await page.goto(check === 'plan' ? 'http://127.0.0.1:3001/' : `http://127.0.0.1:3001/session/${sessionId}`);
   await page.waitForTimeout(6000);
@@ -640,6 +640,33 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       });
     });
     console.log(JSON.stringify(rows, null, 0).replace(/\},\{/g, '},\n{'));
+  }
+
+  if (check === 'toend') {
+    // Focus mode, every drawer: the slashed-eye button on a drawer's first line sends it to the end of THAT
+    // drawer (the archive lists the newest first, so its end is the oldest). The drawer's order is then rebuilt
+    // by sending each other line to the end in turn, so the queue is left as it was.
+    const out = {};
+    for (const label of ['Pending chats', 'Active chats', 'On hold', 'Archived']) {
+      const header = page.locator(`[data-quests-group="${label}"]`);
+      const drawer = header.locator('xpath=..');
+      const order = async () => drawer.locator('[data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+      if ((await order()).length === 0) { await header.click(); await page.waitForTimeout(400); }
+      const before = await order();
+      const toEnd = async (key) => { await drawer.locator(`[data-queue-key="${key}"] [data-quests-line="to-end"]`).dispatchEvent('click'); await page.waitForTimeout(1000); };
+      const movable = [];
+      for (const key of before) if (await drawer.locator(`[data-queue-key="${key}"] [data-quests-line="to-end"]`).count()) movable.push(key);
+      if (movable.length < 2) { out[label] = { lines: before.length, movable: movable.length, skipped: true }; continue; }
+      await toEnd(movable[0]);
+      const moved = await order();
+      const sentLast = moved.filter((k) => movable.includes(k)).at(-1) === movable[0];
+      for (const key of movable.slice(1)) await toEnd(key);
+      const after = await order();
+      out[label] = { lines: before.length, movable: movable.length, sentLast, restored: JSON.stringify(after) === JSON.stringify(before), ...(sentLast && JSON.stringify(after) === JSON.stringify(before) ? {} : { before, moved, after }) };
+      await header.click();
+      await page.waitForTimeout(200);
+    }
+    console.log(JSON.stringify(out));
   }
 
   if (check === 'search') {
