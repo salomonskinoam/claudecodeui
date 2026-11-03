@@ -6,7 +6,7 @@ import type { QueueEntry } from '@/modules/queue/types';
 
 type CloseTicketDialogProps = { entry: QueueEntry; entries: QueueEntry[]; onDone: () => void };
 
-const btn = 'rounded-sm border border-[#454647] px-3 py-1 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e] disabled:opacity-50';
+const btn = 'rounded-sm border border-[#454647] px-4 py-1.5 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e] disabled:opacity-50';
 
 /**
  * quests priority queue: closing a ticket from the page. A root (a quest, or a ticket with no open parent) that
@@ -26,8 +26,8 @@ export default function CloseTicketDialog({ entry, entries, onDone }: CloseTicke
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onDone(); }}>
-      <DialogContent className="max-w-lg bg-[#1E1F22] text-[#cccccc]">
-        <DialogTitle className="not-sr-only text-[14px] font-medium">Close ticket #{entry.number}?</DialogTitle>
+      <DialogContent className="w-[440px] max-w-[92vw] rounded-md border border-[#454647] bg-[#1E1F22] p-5 text-[#cccccc] shadow-2xl">
+        <DialogTitle className="not-sr-only text-[15px] font-semibold leading-snug text-white">Close ticket #{entry.number}?</DialogTitle>
         <p className="text-[13px]">{entry.title}</p>
         {blockers.length > 0 && (
           <div className="text-[13px]">
@@ -37,8 +37,8 @@ export default function CloseTicketDialog({ entry, entries, onDone }: CloseTicke
             </ul>
           </div>
         )}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className={btn} disabled={busy} onClick={() => choose('close')}>Yes, close it</button>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button type="button" className="rounded-sm bg-[#3794ff] px-4 py-1.5 text-[13px] font-medium text-white hover:bg-[#2f7fe0] disabled:opacity-50" disabled={busy} onClick={() => choose('close')}>Yes, close it</button>
           {blockers.length > 0 && (
             <>
               <button type="button" className={btn} disabled={busy} onClick={() => choose('blockers-to-quest')}>Convert the blockers to quests</button>
