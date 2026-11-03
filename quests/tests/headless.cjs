@@ -489,12 +489,13 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'dupes') {
-    // Rows shown twice: every row's timestamp attribute and text head, and the groups with the same text.
-    const rows = await page.locator('[data-message-timestamp]').evaluateAll((ns) => ns.map((n) => ({ ts: n.getAttribute('data-message-timestamp'), key: n.getAttribute('data-message-key') || n.id || '', text: n.textContent.replace(/\s+/g, ' ').trim().slice(0, 70) })));
-    const byText = new Map();
-    for (const r of rows) byText.set(r.text, [...(byText.get(r.text) || []), r]);
-    const dupes = [...byText.values()].filter((g) => g.length > 1);
-    console.log(JSON.stringify({ rows: rows.length, distinctTexts: byText.size, dupeGroups: dupes.length, sample: dupes.slice(0, 4) }, null, 1));
+    // Rows shown twice: the top-level rows (a lazy row's wrapper and the row inside both carry the attributes,
+    // so nested ones are left out), grouped by row id and by text head. Expected: no group by id.
+    const rows = await page.locator('.chat-messages-pane > div > div > [data-message-timestamp]').evaluateAll((ns) => ns.map((n) => ({ ts: n.getAttribute('data-message-timestamp'), id: n.getAttribute('data-row-id') || '', text: n.textContent.replace(/\s+/g, ' ').trim().slice(0, 70) })));
+    const group = (key) => { const by = new Map(); for (const r of rows) by.set(r[key], [...(by.get(r[key]) || []), r]); return [...by.values()].filter((g) => g.length > 1); };
+    const byId = group('id');
+    const byText = group('text');
+    console.log(JSON.stringify({ rows: rows.length, dupeGroupsById: byId.length, dupeGroupsByText: byText.length, sampleById: byId.slice(0, 3), sampleByText: byText.slice(0, 3) }, null, 1));
   }
 
   if (check === 'ledger') {
@@ -524,13 +525,16 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       open: await page.locator('.chat-message.qt-open').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id'))),
       folds: await page.locator('[data-quests-fold]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-quests-fold'))),
     });
-    const lines = page.locator('.chat-messages-pane .chat-message:not(.qt-open):not(.user)');
+    const lines = page.locator('.chat-messages-pane > div > div > .chat-message:not(.qt-open):not(.user)');
     const n = await lines.count();
-    for (const i of [n - 1, n - 2]) {
-      if (i < 0) continue;
+    let clicked = 0;
+    for (let i = n - 1; i >= 0 && clicked < 2; i -= 1) {
       const line = lines.nth(i);
+      await line.scrollIntoViewIfNeeded().catch(() => undefined);
       const box = await line.boundingBox().catch(() => null);
-      if (box && box.height <= 10) await page.mouse.click(box.x + box.width / 2, box.y + 3);
+      if (!box || box.height > 10) continue;
+      await page.mouse.click(box.x + box.width / 2, box.y + 3);
+      clicked += 1;
     }
     await page.waitForTimeout(1500);
     const before = await read();
@@ -539,7 +543,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(3000);
     const after = await read();
     const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
-    console.log(JSON.stringify({ before: { rows: before.ids.length, open: before.open, folds: before.folds }, after: { rows: after.ids.length, open: after.open, folds: after.folds }, sameRows: same(before.ids, after.ids), sameOpen: same(before.open, after.open), sameFolds: same(before.folds, after.folds) }, null, 1));
+    console.log(JSON.stringify({ clicked, before: { rows: before.ids.length, open: before.open, folds: before.folds }, after: { rows: after.ids.length, open: after.open, folds: after.folds }, sameRows: same(before.ids, after.ids), sameOpen: same(before.open, after.open), sameFolds: same(before.folds, after.folds) }, null, 1));
   }
 
   if (check === 'folds') {
