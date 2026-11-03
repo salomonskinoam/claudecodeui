@@ -562,6 +562,11 @@ export type NormalizedMessage = {
   seq?: number;
   /** quests: the run `seq` counts in (see ServerEvent.runId). */
   runId?: string;
+  /** quests: the ledger's marks (src/modules/chat/ledger/chatLedger.ts); never sent by the backend. */
+  foldId?: string;
+  delivery?: 'pending' | 'failed';
+  superseded?: boolean;
+  noteKind?: 'gap';
 
   // kind-specific fields (flat for simplicity)
   role?: 'user' | 'assistant';
