@@ -399,6 +399,7 @@ test('quests: a message sent while the turn runs joins that turn; its tools keep
       .then(() => { secondDone = true; });
     await waitFor(() => first.script.read.length === 2);
     await waitFor(() => secondDone);
+    assert.equal((first.script.read[1] as { priority?: string }).priority, 'next', 'read at the next model call, never as an interrupt');
     assert.equal(second.script.created(), 0, 'no second process');
     assert.equal(first.script.released(), false, 'the running process goes on');
     assert.equal(sent.filter((message) => message.kind === 'complete').length, 0, 'the turn is not over');

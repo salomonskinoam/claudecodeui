@@ -1272,7 +1272,11 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       if (!turnCompleteSent) {
         ws = newWs;
         pushedAwaitingAssistant = true;
-        return heldPrompt.push(messages);
+        // quests: priority "next": the CLI reads the message at its next model call, after the tool it is on.
+        // Without it a message that lands while a tool call is pending cancels that tool ("The user doesn't want
+        // to proceed with this tool use", "[Request interrupted by user]") and the message itself is lost, as
+        // happened on 2 Nov 23:56 in "oct_30 fusion argus-reward-hack fix".
+        return heldPrompt.push(messages.map((m) => ({ ...m, priority: 'next' })));
       }
       return new Promise((resolve) => {
         ws = newWs;
