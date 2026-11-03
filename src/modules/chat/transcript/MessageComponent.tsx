@@ -1,4 +1,5 @@
 import { memo, useMemo, useRef, useState } from 'react';
+import { formatClosingLines } from '@/modules/chat/utils/closingLines';
 import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
@@ -314,7 +315,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                 <ReasoningTrigger />
                 <ReasoningContent>
                   <Markdown className="prose prose-sm prose-gray max-w-none font-serif dark:prose-invert">
-                    {message.content}
+                    {formatClosingLines(String(message.content ?? ''))}
                   </Markdown>
                   {!isExporting && (
                     <div className="mt-3 flex items-center text-[11px]">
