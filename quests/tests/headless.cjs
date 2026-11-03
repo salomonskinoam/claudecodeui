@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -724,6 +724,41 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const ungrouped = numbers.filter((n) => !inSome.has(n)).length;
     if (expected.length && ungrouped) expected.push(['', ungrouped]);
     console.log(JSON.stringify({ headers, asExpected: JSON.stringify(headers) === JSON.stringify(expected), tickets: shown.length, addLine: await drawer.locator('[data-quests-ticket-group-add]').count() }));
+  }
+
+  if (check === 'switch') {
+    // Switching tabs: the given chat and a second chat from the queue are opened as tabs; then the tabs are
+    // clicked in turn, A, B, A, B. Per click: the time until the pane shows rows and holds still, the number of
+    // message reads sent to the server, whether the pane sits at the bottom, and the row count.
+    const q = await apiQueue();
+    const other = q.entries.find((e) => e.sessionId && e.sessionId !== sessionId && !e.heldOutside && !e.archived);
+    const reads = [];
+    page.on('request', (r) => { if (/\/api\/providers\/sessions\/[^/]+\/messages/.test(r.url())) reads.push(r.url()); });
+    await page.goto(`http://127.0.0.1:3001/session/${other.sessionId}`);
+    await page.waitForTimeout(6000);
+    const dialog = await page.evaluate(() => { const n = document.querySelector('.fixed.inset-0.z-50'); return n ? n.outerHTML.replace(/\s+/g, ' ').slice(0, 900) : ''; });
+    console.log(JSON.stringify({ dialog }));
+    await page.screenshot({ path: process.env.SHOT || '/tmp/claude-1000/switch.png' });
+    if (dialog) { await page.keyboard.press('Escape'); await page.waitForTimeout(500); }
+    const tabs = page.locator('[data-quests-tabs="row"] div[draggable="true"][title]');
+    const names = await tabs.evaluateAll((ns) => ns.map((n) => n.getAttribute('title')));
+    const results = [];
+    for (const target of [0, 1, 0, 1]) {
+      const before = reads.length;
+      const t0 = Date.now();
+      await tabs.nth(target).dispatchEvent('click');
+      let rows = 0; let stableSince = 0; let settled = 0;
+      while (Date.now() - t0 < 15000) {
+        await page.waitForTimeout(50);
+        const n = await page.locator('.chat-messages-pane [data-row-id]').count();
+        if (n !== rows) { rows = n; stableSince = Date.now(); }
+        else if (n > 0 && Date.now() - stableSince >= 400) { settled = Date.now() - t0 - 400; break; }
+      }
+      await page.waitForTimeout(1500);
+      const atBottom = await page.locator('.chat-messages-pane').evaluate((p) => p.scrollHeight - p.scrollTop - p.clientHeight < 50);
+      results.push({ tab: names[target], ms: settled || null, rows, reads: reads.length - before, atBottom });
+    }
+    console.log(JSON.stringify({ dialog, tabs: names, results }, null, 1));
   }
 
   if (check === 'archived') {

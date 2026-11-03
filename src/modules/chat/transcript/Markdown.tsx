@@ -1,5 +1,4 @@
 import React, { memo, useMemo, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -9,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { MermaidDiagram } from '@/modules/code-editor';
 import { MarkdownImage } from '@/modules/chat/transcript/MarkdownImage';
+import { markdownTree, renderMarkdownTree } from '@/modules/chat/transcript/markdownCache';
 import { normalizeInlineCodeFences } from '@/modules/chat/utils/chatFormatting';
 import { normalizeLatexDelimiters } from '@/modules/chat/utils/latexDelimiters';
 import { copyTextToClipboard } from '@/shared/utils';
@@ -333,10 +333,11 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
     [openFileInEditor, openDirectory],
   );
 
-  return (
-    <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components as any}>
-      {content}
-    </ReactMarkdown>
+  // quests: the parsed tree is cached by text (markdownCache.ts), so a row mounted again on a tab switch skips
+  // the markdown pipeline; only the elements are built here.
+  return useMemo(
+    () => renderMarkdownTree(markdownTree(`${breaks ? 'b' : ''}${hasMath ? 'm' : ''}\n${content}`, content, remarkPlugins, rehypePlugins), components as Record<string, unknown>),
+    [breaks, hasMath, content, remarkPlugins, rehypePlugins, components],
   );
 }
 
