@@ -131,7 +131,13 @@ function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
   // which time is the whole turn and which is the running command, nor whether it is stuck").
   const stepRef = useRef<{ text: string | null; since: number }>({ text: null, since: Date.now() });
   const stepText = inFlight ? inFlight.statusText ?? null : null;
-  if (stepText !== stepRef.current.text) stepRef.current = { text: stepText, since: Date.now() };
+  // A new turn starts its step clock over (the clock read 3m 55s on a turn 9 seconds old, 2 Nov).
+  const turnKey = inFlight ? `${inFlight.startedAt}|${stepText ?? ''}` : '';
+  const turnRef = useRef('');
+  if (turnKey !== turnRef.current) {
+    turnRef.current = turnKey;
+    stepRef.current = { text: stepText, since: Date.now() };
+  }
   if (!sessionId || (!state && !inFlight)) return null;
   // A worker quiet for half an hour is not live, whatever the server still lists (Noam, 30 Oct: "350 minutes
   // idle is not live is it"); the Monitor tool itself gives up after 30 minutes.

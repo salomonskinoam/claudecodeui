@@ -1,19 +1,32 @@
 import type { ChatMessage } from '@/shared/types';
 
 /**
- * quests: replies that repeat are folded. A chat on a watcher loop answers every report, and says the same thing
- * each time while nothing changes; Noam, 30 Oct: "i dont understand how to filter this to see the repeating part
- * only when it matters and not a million times, especially in a row".
+ * quests: replies that repeat are folded (requirement 39). Three small steps, each on its own:
  *
- * The rule. A reply's STATE is what it asks of Noam: its "Required from you:" line, plus the kind of its closing
- * line ("waiting for" alone, since the wording of a wait changes with every report; "question", "blocker" and
- * "Done" with their whole line, since a new question is a new state). A reply without the "Required from you:"
- * line has its whole text as its state (exact repeats). Between two messages Noam typed, consecutive replies
- * with the same state form a run. In a run of two or more, every reply but the last is folded, with everything between
- * it and the last reply (the steps and reports in between): one line says how many replies said the same and
- * when, and shows them on click. The last reply, the newest word, stays. A reply without the closing block and
- * its re-send after the stop hook's feedback have different states, so they never fold into each other.
+ *   1. segmentTurns   the transcript as turns: each starts with a starter row (a message Noam typed, a task's
+ *                     report, something a hook or an agent handed in) and ends before the next; its reply is
+ *                     its last text.
+ *   2. replyState     what a reply asks of Noam: its "Required from you:" line plus the kind of its closing line.
+ *   3. foldRuns       which turns fold: only turns a REPORT started (a watcher's loop), in a run of two or more
+ *                     with the same state, all but the last. A turn Noam's own message started never folds: the
+ *                     answer to his message always shows. A turn a hook started is no reply of its own. A turn
+ *                     whose reply Noam has already seen on this page never folds later.
+ *
+ * Noam, 2 Nov: "i saw uncollapsed correctly, and then when i sent another message it collapsed things i just
+ * read" and "have the requirements clear first and then have things with single responsibility".
  */
+
+export type StarterKind = 'typed' | 'report' | 'hook' | 'agent' | 'none';
+
+export type Turn = {
+  /** Index of the first row of the turn (the starter row, or 0 for rows before any starter). */
+  start: number;
+  /** Index after the turn's last row. */
+  end: number;
+  starter: StarterKind;
+  /** Index of the reply, the turn's last text; -1 when the turn has none. */
+  reply: number;
+};
 
 export type ReplyFold = {
   /** The run's id: the timestamp of its first folded reply. */
@@ -29,7 +42,42 @@ export type ReplyFold = {
 
 const normalize = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
-/** The state of a reply: its "Required from you:" line and the kind of its closing line, else its whole text. */
+/** Step 1a: what kind of row starts a turn, or 'none' for a row that starts nothing. */
+export function starterOf(m: ChatMessage): StarterKind {
+  if (m.isTaskNotification) return 'report';
+  if (m.agentReportFrom) return m.agentReportFrom === 'the stop hook' ? 'hook' : 'agent';
+  if (m.type !== 'user' || m.isToolUse || typeof m.content !== 'string') return 'none';
+  const head = m.content.trimStart();
+  if (head.startsWith('Stop hook feedback')) return 'hook';
+  if (head.startsWith('<task-notification>') || head.startsWith('<system-reminder>')) return 'report';
+  return 'typed';
+}
+
+/** Step 1b: a reply row: the chat's own text, not a tool call, not a note, not something handed in. */
+export const isReply = (m: ChatMessage): boolean =>
+  m.type === 'assistant' && !m.isToolUse && !m.isThinking && !m.isTaskNotification && !m.agentReportFrom
+  && typeof m.content === 'string' && m.content.trim() !== '';
+
+/** Step 1: the transcript as turns. */
+export function segmentTurns(messages: ChatMessage[]): Turn[] {
+  const turns: Turn[] = [];
+  let current: Turn = { start: 0, end: 0, starter: 'none', reply: -1 };
+  messages.forEach((m, i) => {
+    const starter = starterOf(m);
+    if (starter !== 'none') {
+      current.end = i;
+      if (current.end > current.start) turns.push(current);
+      current = { start: i, end: i, starter, reply: -1 };
+      return;
+    }
+    if (isReply(m)) current.reply = i;
+  });
+  current.end = messages.length;
+  if (current.end > current.start) turns.push(current);
+  return turns;
+}
+
+/** Step 2: the state of a reply: its "Required from you:" line and the kind of its closing line, else its whole text. */
 export function replyState(text: string): string {
   const lines = text.split('\n').map((l) => normalize(l.replace(/\*\*/g, ''))).filter(Boolean);
   const required = [...lines].reverse().find((l) => /^Required from you:/i.test(l));
@@ -39,77 +87,54 @@ export function replyState(text: string): string {
   return `${required.toLowerCase()} | ${kind === 'waiting for' ? kind : last.toLowerCase()}`;
 }
 
-const isReply = (m: ChatMessage): boolean =>
-  m.type === 'assistant' && !m.isToolUse && !m.isThinking && !m.isTaskNotification && !m.agentReportFrom
-  && typeof m.content === 'string' && m.content.trim() !== '';
-
-/** A row that starts a turn: a user row, a task's report, or what a hook or an agent handed in (framed rows). */
-const startsTurn = (m: ChatMessage): boolean => (m.type === 'user' && !m.isToolUse) || Boolean(m.isTaskNotification) || Boolean(m.agentReportFrom);
-
-/** A message Noam typed: a user row that is not a hook's feedback (the hook writes as the user). */
-const isTyped = (m: ChatMessage): boolean => {
-  if (m.type !== 'user' || m.isToolUse || typeof m.content !== 'string') return false;
-  const head = m.content.trimStart();
-  return !head.startsWith('Stop hook feedback') && !head.startsWith('<system-reminder>');
-};
-
 /**
- * The fold of every hidden message, by message. Messages not in the map are shown as they are.
- *
- * A TURN is what one user row starts (a typed message, a task's report, a hook's feedback): its tool calls, its
- * texts along the way, and its REPLY, the last text before the next user row. The reply's state is the turn's.
+ * Step 3: the folds. `seen` holds the timestamps of replies Noam has already had on screen on this page: a turn
+ * with such a reply never folds later.
  */
-export function foldRepeatedReplies(messages: ChatMessage[]): Map<ChatMessage, ReplyFold> {
+export function foldRuns(messages: ChatMessage[], turns: Turn[], seen: ReadonlySet<string> = new Set()): Map<ChatMessage, ReplyFold> {
   const folds = new Map<ChatMessage, ReplyFold>();
-  type Turn = { start: number; reply: number; state: string };
+  const stamp = (turn: Turn) => messages[turn.reply].timestamp ?? String(turn.reply);
+  // The runs: consecutive report-started turns with a reply and one state. Any other turn ends the run.
   let run: Turn[] = [];
+  let state: string | null = null;
   const close = () => {
-    if (run.length >= 2) {
-      const first = run[0];
-      const lastShown = run[run.length - 1];
+    const last = run[run.length - 1];
+    const hidden = run.filter((t) => t !== last && !seen.has(stamp(t)));
+    if (hidden.length > 0) {
       const fold: Omit<ReplyFold, 'first'> = {
-        id: messages[first.reply].timestamp ?? String(first.reply),
-        count: run.length - 1,
-        from: messages[first.reply].timestamp ?? '',
-        to: messages[run[run.length - 2].reply].timestamp ?? '',
+        id: stamp(hidden[0]),
+        count: hidden.length,
+        from: stamp(hidden[0]),
+        to: stamp(hidden[hidden.length - 1]),
       };
-      for (let i = first.start; i < lastShown.start; i += 1) {
-        folds.set(messages[i], { ...fold, first: i === first.start });
+      let first = true;
+      for (const t of hidden) {
+        for (let i = t.start; i < t.end; i += 1) {
+          folds.set(messages[i], { ...fold, first });
+          first = false;
+        }
       }
     }
     run = [];
+    state = null;
   };
-  const endTurn = (start: number, reply: number, hookTurn: boolean) => {
-    // A turn the stop hook forced (its feedback starts it) only re-sends the closing lines: it is no reply of
-    // its own and never folds the reply before it, which holds the content (Noam, 2 Nov: "it collapsed all
-    // model text that came before it").
-    if (reply < 0 || hookTurn) return;
-    const text = messages[reply].content as string;
-    const state = replyState(text);
-    const turn: Turn = { start, reply, state };
-    const previous = run[run.length - 1];
-    // A reply the stop hook sent back and its re-send never fold into each other: the first holds the content,
-    // the re-send often only the closing lines (Noam, 2 Nov: "it collapsed all model text that came before it").
-    if (previous && previous.state !== state) close();
-    run.push(turn);
-  };
-  let start = 0;
-  let reply = -1;
-  let hookTurn = false;
-  messages.forEach((m, i) => {
-    if (startsTurn(m)) {
-      endTurn(start, reply, hookTurn);
-      const typed = isTyped(m);
-      if (typed) close();
-      // A typed message is never hidden; a report or a hook's feedback belongs to the turn it starts.
-      start = typed ? i + 1 : i;
-      reply = -1;
-      hookTurn = m.agentReportFrom === 'the stop hook';
-      return;
+  for (const turn of turns) {
+    if (turn.starter === 'hook') continue; // no reply of its own; neither joins nor ends a run
+    const foldableTurn = turn.starter === 'report' && turn.reply >= 0;
+    if (!foldableTurn) {
+      close();
+      continue;
     }
-    if (isReply(m)) reply = i;
-  });
-  endTurn(start, reply, hookTurn);
+    const s = replyState(messages[turn.reply].content as string);
+    if (state !== null && s !== state) close();
+    state = s;
+    run.push(turn);
+  }
   close();
   return folds;
+}
+
+/** The fold of every hidden message, by message. Messages not in the map are shown as they are. */
+export function foldRepeatedReplies(messages: ChatMessage[], seen: ReadonlySet<string> = new Set()): Map<ChatMessage, ReplyFold> {
+  return foldRuns(messages, segmentTurns(messages), seen);
 }

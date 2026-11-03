@@ -1296,6 +1296,12 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     // Process streaming messages
     console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
     for await (const message of queryInstance) {
+      // quests: the SDK echoes user messages back with isReplay (the prompt just sent, and on a resume the
+      // messages of earlier turns). The page has them already; forwarding them drew every old message of the
+      // chat again, as new, each time a process was started (2 Nov, "wtf are we seeing").
+      if (message.isReplay === true) {
+        continue;
+      }
       // Capture session ID from first message
       if (message.session_id && !capturedSessionId) {
 

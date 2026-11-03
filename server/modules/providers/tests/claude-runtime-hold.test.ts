@@ -513,6 +513,19 @@ test('quests: a follow-up turn the CLI runs on its own shows as thinking and end
   });
 });
 
+test('quests: a user message the SDK echoes back as a replay is not forwarded to the page', async () => {
+  await withRun(async ({ script, sent }) => {
+    script.emit(init());
+    script.emit({ type: 'user', session_id: NATIVE_ID, parent_tool_use_id: null, isReplay: true, uuid: 'u1',
+      message: { role: 'user', content: [{ type: 'text', text: 'where bro' }] } });
+    script.emit(text('Here.'));
+    script.emit(result());
+    await waitFor(() => sent.some((m) => m.kind === 'complete'));
+    assert.equal(sent.some((m) => typeof m.content === 'string' && m.content.includes('where bro')), false, 'the replay is dropped');
+    assert.equal(sent.some((m) => typeof m.content === 'string' && m.content.includes('Here.')), true, 'the reply goes through');
+  });
+});
+
 test('a turn whose tool emits no task events still holds on the static rule', async () => {
   await withRun(async ({ script }) => {
     script.emit(init());

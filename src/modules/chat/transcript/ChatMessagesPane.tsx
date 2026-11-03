@@ -266,8 +266,15 @@ function ChatMessagesPane({
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
     [visibleMessages, showThinking],
   );
-  // quests: replies that repeat are folded (see repeatedReplies.ts); a fold opens on click and stays open.
-  const replyFolds = useMemo(() => foldRepeatedReplies(visibleMessages), [visibleMessages]);
+  // quests: replies that repeat are folded (see repeatedReplies.ts), over the whole transcript, never only the
+  // visible window; a fold opens on click and stays open; a reply once on screen never folds later.
+  const seenReplies = useRef(new Set<string>());
+  const replyFolds = useMemo(() => foldRepeatedReplies(chatMessages, seenReplies.current), [chatMessages]);
+  useEffect(() => {
+    for (const m of visibleMessages) {
+      if (m.timestamp && !replyFolds.has(m) && m.type === 'assistant' && !m.isToolUse) seenReplies.current.add(m.timestamp);
+    }
+  }, [visibleMessages, replyFolds]);
   const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set());
   const foldOf = useCallback((item: ChatMessage | { messages: ChatMessage[] }): ReplyFold | null => {
     const message = 'messages' in item ? item.messages[0] : item;
