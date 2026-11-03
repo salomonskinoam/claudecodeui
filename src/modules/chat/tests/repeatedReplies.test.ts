@@ -60,4 +60,6 @@ test('quests: a lone reply, or replies that differ, never fold', () => {
   assert.equal(foldRepeatedReplies([reply('a', 'second done'), reply('b', 'second done')]).size, 0);
   const hook = { type: 'assistant', agentReportFrom: 'the stop hook', content: 'no closing line', timestamp: 'h' } as ChatMessage;
   assert.equal(foldRepeatedReplies([reply('a', 'second done'), hook, reply('b', `Running: nothing\n${STATE}`)]).size, 0);
+  // The same state on both sides of the hook (the hook complained about something else): still no fold.
+  assert.equal(foldRepeatedReplies([reply('a', `the brief.\n${STATE}`), hook, reply('b', `Running: nothing\n${STATE}`)]).size, 0);
 });

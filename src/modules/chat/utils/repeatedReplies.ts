@@ -79,8 +79,11 @@ export function foldRepeatedReplies(messages: ChatMessage[]): Map<ChatMessage, R
     }
     run = [];
   };
-  const endTurn = (start: number, reply: number) => {
-    if (reply < 0) return;
+  const endTurn = (start: number, reply: number, hookTurn: boolean) => {
+    // A turn the stop hook forced (its feedback starts it) only re-sends the closing lines: it is no reply of
+    // its own and never folds the reply before it, which holds the content (Noam, 2 Nov: "it collapsed all
+    // model text that came before it").
+    if (reply < 0 || hookTurn) return;
     const text = messages[reply].content as string;
     const state = replyState(text);
     const turn: Turn = { start, reply, state };
@@ -92,19 +95,21 @@ export function foldRepeatedReplies(messages: ChatMessage[]): Map<ChatMessage, R
   };
   let start = 0;
   let reply = -1;
+  let hookTurn = false;
   messages.forEach((m, i) => {
     if (startsTurn(m)) {
-      endTurn(start, reply);
+      endTurn(start, reply, hookTurn);
       const typed = isTyped(m);
       if (typed) close();
       // A typed message is never hidden; a report or a hook's feedback belongs to the turn it starts.
       start = typed ? i + 1 : i;
       reply = -1;
+      hookTurn = m.agentReportFrom === 'the stop hook';
       return;
     }
     if (isReply(m)) reply = i;
   });
-  endTurn(start, reply);
+  endTurn(start, reply, hookTurn);
   close();
   return folds;
 }
