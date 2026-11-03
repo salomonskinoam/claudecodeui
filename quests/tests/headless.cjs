@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -621,6 +621,24 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       nextButton: await page.locator('[data-quests-next-from-queue]').count(),
       chatRows: await page.locator('[data-message-timestamp]').count(),
     }));
+  }
+
+  if (check === 'textscale') {
+    // Ctrl+= twice, Ctrl+wheel down once, Ctrl+0: the root font size follows, the browser zoom is not touched.
+    const size = () => page.evaluate(() => [document.documentElement.style.fontSize, document.documentElement.dataset.questsTextScale]);
+    const start = await size();
+    await page.keyboard.press('Control+Equal');
+    await page.keyboard.press('Control+Equal');
+    const up = await size();
+    await page.mouse.move(600, 400);
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, 120);
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(200);
+    const down = await size();
+    await page.keyboard.press('Control+Digit0');
+    const reset = await size();
+    console.log(JSON.stringify({ start, up, down, reset }));
   }
 
   if (check === 'subagents') {
