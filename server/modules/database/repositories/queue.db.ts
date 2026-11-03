@@ -17,7 +17,7 @@ export type QueueSessionRow = {
 };
 
 /** quests priority queue: the stored order, the pin, the dismissals, and the chats' closing lines. */
-type StateKey = 'order' | 'latch' | 'dismissed';
+type StateKey = 'order' | 'latch' | 'dismissed' | 'archived';
 
 export const queueDb = {
   getState<T>(key: StateKey): T | undefined {

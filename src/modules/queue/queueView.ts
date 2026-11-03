@@ -10,6 +10,7 @@ import { isChat, type QueueEntry } from '@/modules/queue/types';
  *            lines, "On hold (n)" (the chats Noam put on hold, until they reply again), "Live chats (n)" (every
  *            chat with a process, whatever its state) and "Tickets-Unclaimed (n)"
  *   archive  everything, as the stored order has it, in its three groups
+ * In both modes the entries Noam archived are only in the "Archived (n)" drawer at the bottom.
  * Noam, 28 Oct: "the philosophy is to filter for the user only chats that require attention. the rest is spam."
  * The mode is a per-viewer convenience kept in the browser.
  */
@@ -50,6 +51,8 @@ export type QueueView = {
   hold: QueueEntry[];
   live: QueueEntry[];
   unclaimed: QueueEntry[];
+  /** Both modes: the entries Noam archived, in queue order. */
+  archived: QueueEntry[];
 };
 
 export function useQueueView(): QueueView {
@@ -57,8 +60,10 @@ export function useQueueView(): QueueView {
   const current = useQueueMode();
   const shown = useShownChat();
   const byKey = new Map(queue.entries.map((e) => [e.key, e]));
-  const all = queue.view.map((k) => byKey.get(k)).filter((e): e is QueueEntry => Boolean(e));
-  if (current === 'archive') return { mode: current, lines: all, hold: [], live: [], unclaimed: [] };
+  const every = queue.view.map((k) => byKey.get(k)).filter((e): e is QueueEntry => Boolean(e));
+  const archived = every.filter((e) => e.archived);
+  const all = every.filter((e) => !e.archived);
+  if (current === 'archive') return { mode: current, lines: all, hold: [], live: [], unclaimed: [], archived };
   return {
     mode: current,
     // The chat on screen stays listed, unless its reply was dismissed: then it leaves the list and the forest
@@ -69,5 +74,6 @@ export function useQueueView(): QueueView {
     hold: all.filter((e) => e.dismissed),
     live: all.filter((e) => e.live),
     unclaimed: all.filter((e) => e.state === 'unclaimed'),
+    archived,
   };
 }

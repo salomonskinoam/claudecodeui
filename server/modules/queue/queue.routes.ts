@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 
-import { dismissEntry, dragTo, getQueue, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
+import { archiveEntry, dismissEntry, dragTo, getQueue, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
 import { closeTicket, type CloseChoice } from '@/modules/queue/sources/tickets.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -47,6 +47,13 @@ router.put('/dismiss', asyncHandler(async (req: Request, res: Response) => {
   const { key } = req.body ?? {};
   if (typeof key !== 'string') throw bad('key is required.');
   res.json(createApiSuccessResponse(dismissEntry(key)));
+}));
+
+// The archive icon: the entry goes to the "Archived" drawer, or leaves it.
+router.put('/archive', asyncHandler(async (req: Request, res: Response) => {
+  const { key, archived } = req.body ?? {};
+  if (typeof key !== 'string' || typeof archived !== 'boolean') throw bad('key and archived are required.');
+  res.json(createApiSuccessResponse(archiveEntry(key, archived)));
 }));
 
 router.post('/sync-cursor', asyncHandler(async (_req: Request, res: Response) => {

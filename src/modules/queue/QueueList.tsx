@@ -9,7 +9,7 @@ import QueueToolbar from '@/modules/queue/QueueToolbar';
 import RenameDialog from '@/modules/queue/RenameDialog';
 import TabContextMenu from '@/modules/queue/TabContextMenu';
 import { setQueueOpener } from '@/modules/queue/queueNavigation';
-import { sendQueueEntryToEnd, useQueue } from '@/modules/queue/queueStore';
+import { sendQueueEntryToEnd, setQueueArchived, useQueue } from '@/modules/queue/queueStore';
 import { useQueueView } from '@/modules/queue/queueView';
 import type { QueueEntry } from '@/modules/queue/types';
 import { useBlink } from '@/modules/queue/useBlink';
@@ -29,7 +29,7 @@ type QueueListProps = {
  */
 export default function QueueList({ onNewSession, onStartTicket }: QueueListProps) {
   const queue = useQueue();
-  const { mode, lines, hold, live, unclaimed } = useQueueView();
+  const { mode, lines, hold, live, unclaimed, archived } = useQueueView();
   const lookOf = useEntryLook();
   const open = useOpenEntry(onStartTicket);
   useEffect(() => setQueueOpener(open));
@@ -43,7 +43,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
   const toggle = (label: string) => setOpenGroups((g) => { const n = new Set(g); if (n.has(label)) n.delete(label); else n.add(label); return n; });
 
   // Lines the view shows where the stored order has them: not the permission prompts, not the pinned chat.
-  const anchors = new Set([...lines, ...hold, ...live, ...unclaimed].filter((e) => e.state !== 'permission' && e.key !== queue.latch).map((e) => e.key));
+  const anchors = new Set([...lines, ...hold, ...live, ...unclaimed, ...archived].filter((e) => e.state !== 'permission' && e.key !== queue.latch).map((e) => e.key));
   const { marker, lineProps, listProps } = useLineDrag(queue.view, anchors);
 
   const line = (e: QueueEntry, separator: boolean) => (
@@ -60,18 +60,22 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
       onCloseTicket={() => setClosing(e)}
       onDismiss={() => setDismissing(e)}
       onSendToEnd={() => void sendQueueEntryToEnd(e.key)}
+      onArchive={() => void setQueueArchived(e.key, !e.archived)}
       onMenu={e.sessionId ? (event) => { event.preventDefault(); setMenu({ sessionId: e.sessionId as string, x: event.clientX, y: event.clientY }); } : undefined}
       onRename={e.sessionId ? () => setRenaming(e) : undefined}
     />
   );
-  const groups: Array<[string, QueueEntry[]]> = [['On hold', hold], ['Live chats', live], ['Tickets-Unclaimed', unclaimed]];
+  // The "Archived" drawer is the last group in both modes (Noam, 3 Nov: "a button to archive, and an archive drawer").
+  const groups: Array<[string, QueueEntry[]]> = mode === 'focus'
+    ? [['On hold', hold], ['Live chats', live], ['Tickets-Unclaimed', unclaimed], ['Archived', archived]]
+    : [['Archived', archived]];
 
   return (
     <div className="flex flex-col" data-quests-queue="list" data-quests-mode={mode}>
       <QueueToolbar onNewSession={onNewSession} />
       <div {...listProps}>
         {lines.map((e, i) => line(e, mode === 'archive' && i > 0 && (lines[i - 1].group === 2) !== (e.group === 2)))}
-        {mode === 'focus' && groups.map(([label, members]) => (
+        {groups.map(([label, members]) => (
           <div key={label}>
             <QueueGroupLine label={label} count={members.length} open={openGroups.has(label)} onToggle={() => toggle(label)} />
             {openGroups.has(label) && members.map((e) => line(e, false))}

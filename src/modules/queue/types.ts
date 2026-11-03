@@ -28,8 +28,10 @@ export type QueueEntry = {
   waitsForMe: boolean;
   /** The chat has a running process, whatever its state. */
   live: boolean;
-  /** Noam dismissed the chat's current reply (the trash icon); over when it replies again. */
+  /** Noam dismissed the chat's current reply (the pause icon); over when it replies again. */
   dismissed: boolean;
+  /** Noam archived the entry: it waits in the "Archived" drawer, whatever it does, until he takes it out. */
+  archived: boolean;
   replyAt: string | null;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
   heldOutside: boolean;

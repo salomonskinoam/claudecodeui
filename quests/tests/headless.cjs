@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -646,6 +646,20 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(400);
     const members = await group.locator('xpath=..').locator('[data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
     console.log(JSON.stringify({ label, dismissed: dismissed.length, members: members.length, same: JSON.stringify(members) === JSON.stringify(dismissed) }));
+  }
+
+  if (check === 'archived') {
+    // The "Archived" drawer lists exactly the archived entries of the queue, in queue order, and none of them is
+    // among the other lines; a click opens it. Nothing is archived here.
+    const q = await apiQueue();
+    const archived = q.view.filter((k) => q.entries.find((e) => e.key === k)?.archived);
+    const drawer = page.locator('[data-quests-group="Archived"]');
+    const label = (await drawer.innerText().catch(() => '')).replace(/\s+/g, ' ');
+    const before = await page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+    await drawer.click().catch(() => undefined);
+    await page.waitForTimeout(400);
+    const members = await drawer.locator('xpath=..').locator('[data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+    console.log(JSON.stringify({ label, archived: archived.length, members: members.length, same: JSON.stringify(members) === JSON.stringify(archived), leaked: before.filter((k) => archived.includes(k)).length }));
   }
 
   if (check === 'dismissdialog') {

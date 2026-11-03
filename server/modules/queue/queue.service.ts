@@ -1,3 +1,4 @@
+import { setArchived } from '@/modules/queue/archived.js';
 import { chatsIn } from '@/modules/queue/chats.js';
 import { dismiss } from '@/modules/queue/dismissals.js';
 import { buildEntries, type QueueEntry } from '@/modules/queue/entries.js';
@@ -40,6 +41,12 @@ export function setLatch(key: string | null): Queue {
 export function dismissEntry(key: string): Queue {
   const entry = buildEntries().find((e) => e.key === key);
   if (entry) dismiss(key, entry.replyAt ?? 'none');
+  return getQueue();
+}
+
+/** The archive icon: the entry goes to the "Archived" drawer (or leaves it), whatever it does. */
+export function archiveEntry(key: string, archived: boolean): Queue {
+  setArchived(key, archived);
   return getQueue();
 }
 

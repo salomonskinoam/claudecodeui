@@ -53,8 +53,10 @@ export function reportPageTabs(sessionIds: string[]): void {
 
 export const dragQueue = (key: string, beforeKey: string | null) => request('PUT', '/drag', { key, beforeKey });
 export const setQueueLatch = (key: string | null) => request('PUT', '/latch', { key });
-/** The trash icon: hide the entry's chat until it replies again. */
+/** The pause icon: put the entry's chat on hold until it replies again. */
 export const dismissQueueEntry = (key: string) => request('PUT', '/dismiss', { key });
+/** The archive icon: the entry goes to the "Archived" drawer, or leaves it. */
+export const setQueueArchived = (key: string, archived: boolean) => request('PUT', '/archive', { key, archived });
 /** The slashed eye: the entry goes to the end of the queue. */
 export const sendQueueEntryToEnd = (key: string) => request('PUT', '/drag', { key, beforeKey: null });
 export const closeQueueTicket = (number: number, choice: string) => request('POST', '/close', { number, choice });

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import CloseTicketDialog from '@/modules/queue/CloseTicketDialog';
 import DismissDialog from '@/modules/queue/DismissDialog';
 import RenameDialog from '@/modules/queue/RenameDialog';
-import { sendQueueEntryToEnd, setQueueLatch, useQueue } from '@/modules/queue/queueStore';
+import { sendQueueEntryToEnd, setQueueArchived, setQueueLatch, useQueue } from '@/modules/queue/queueStore';
 import { entryOfChat } from '@/modules/queue/types';
 
 type TabContextMenuProps = {
@@ -57,6 +57,7 @@ export default function TabContextMenu({ sessionId, x, y, onClose, onCloseTab }:
           <button type="button" className={item} onClick={() => { void setQueueLatch(latched ? null : entry.key); onClose(); }}>{latched ? 'Unpin' : 'Pin on top'}</button>
           <button type="button" className={item} onClick={() => { void sendQueueEntryToEnd(entry.key); onClose(); }}>Send to the end of the queue</button>
           <button type="button" className={item} onClick={() => setDialog('hide')}>Put on hold until it replies again</button>
+          <button type="button" className={item} onClick={() => { void setQueueArchived(entry.key, !entry.archived); onClose(); }}>{entry.archived ? 'Take out of the archive' : 'Archive'}</button>
           {entry.providerSessionId && (
             <a className={item} href={`cursor://anthropic.claude-code/open?session=${entry.providerSessionId}`} onClick={onClose}>Open in Cursor</a>
           )}
