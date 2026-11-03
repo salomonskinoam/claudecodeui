@@ -5,6 +5,7 @@
 //   the shown chat (the workspace reports it) and moving between chats
 export { default as QueueList } from '@/modules/queue/QueueList';
 export { default as QueueForest } from '@/modules/queue/QueueForest';
+export { default as TicketView } from '@/modules/queue/TicketView';
 export { default as OutsideChatBanner } from '@/modules/queue/OutsideChatBanner';
 export { default as KindSign } from '@/modules/queue/KindSign';
 export { default as DoneButton } from '@/modules/queue/DoneButton';

@@ -128,6 +128,8 @@ export default function App() {
                       <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
                       {/* quests: a plan tab (~/.claude/plans/<planName>.md), shown in the same workspace. */}
                       <Route path="/plan/:planName" element={<ProjectWorkspaceRoute />} />
+                      {/* quests: a ticket tab (an open ticket's page, with "Claim this ticket"), shown in the same workspace. */}
+                      <Route path="/ticket/:number" element={<ProjectWorkspaceRoute />} />
                       {/* quests: a work tab (an agent, or a backgrounded command's output), shown in the same workspace. */}
                       <Route path="/work/:kind/*" element={<ProjectWorkspaceRoute />} />
                     </Routes>

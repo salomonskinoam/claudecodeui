@@ -131,6 +131,10 @@ export const moveTab = (id: string, toPane: 'left' | 'right', beforeId: string |
 export const planTabId = (planName: string) => `plan:${planName}`;
 /** The plan name of a plan tab id, else null. */
 export const planNameOf = (tabId: string): string | null => (tabId.startsWith('plan:') ? tabId.slice(5) : null);
+/** quests: a ticket tab's id, `ticket:<number>`: the ticket's page, for reading it before claiming it. */
+export const ticketTabId = (number: number) => `ticket:${number}`;
+/** The ticket number of a ticket tab id, else null. */
+export const ticketOf = (tabId: string): number | null => (/^ticket:\d+$/.test(tabId) ? Number(tabId.slice(7)) : null);
 /** quests: a work tab's id, `work:<kind>:<ref>`: an agent (`agent`, ref `<session id>/<agent id>`) or a backgrounded command's output (`output`, ref its file without the leading slash). */
 export const workTabId = (kind: string, ref: string) => `work:${kind}:${ref}`;
 /** The kind and ref of a work tab id, else null. */

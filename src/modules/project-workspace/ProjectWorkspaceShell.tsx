@@ -10,7 +10,7 @@ import SplitDropZone, { type SplitSide } from '@/modules/project-workspace/Split
 import { useTabDragging } from '@/modules/project-workspace/tabDrag';
 import { PlanView, WorkView, registerWorkNavigate, useWorkTitles } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
-import { noteShownChat, reportPageTabs } from '@/modules/queue';
+import { noteShownChat, reportPageTabs, TicketView } from '@/modules/queue';
 import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -32,6 +32,8 @@ import {
   workTabId,
   swapIntoLeft,
   usePanes,
+  ticketOf,
+  ticketTabId,
 } from '@/shared/hooks/useSplitPane';
 
 /** Rendered by ProjectWorkspaceRoute to lay out the workspace sidebar, main region and global overlays. */
@@ -42,12 +44,13 @@ function ProjectWorkspaceShell({
   navigate,
 }: ProjectWorkspaceShellProps) {
   // quests: chat tabs per pane and the split screen (see useSplitPane).
-  const params = useParams<{ sessionId?: string; planName?: string; kind?: string; '*'?: string }>();
+  const params = useParams<{ sessionId?: string; planName?: string; kind?: string; '*'?: string; number?: string }>();
   const { sessionId, planName } = params;
   // A plan tab (route /plan/:planName) shows a plan file in place of a chat; a work tab (route /work/:kind/*) an
-  // agent or a backgrounded command's output.
+  // agent or a backgrounded command's output; a ticket tab (route /ticket/:number) a ticket's page.
   const workTab = params.kind && params['*'] ? workTabId(params.kind, params['*']) : null;
-  const urlTab = sessionId ?? workTab ?? (planName ? planTabId(planName) : NEW_CHAT_TAB);
+  const ticketTab = params.number ? ticketTabId(Number(params.number)) : null;
+  const urlTab = sessionId ?? workTab ?? ticketTab ?? (planName ? planTabId(planName) : NEW_CHAT_TAB);
   useEffect(() => {
     registerWorkNavigate(navigate);
     return () => registerWorkNavigate(null);
@@ -82,7 +85,7 @@ function ProjectWorkspaceShell({
   const askedNames = useRef(new Set<string>());
   useEffect(() => {
     for (const id of [...panes.left, ...panes.right]) {
-      if (id === NEW_CHAT_TAB || planNameOf(id) || workOf(id) || askedNames.current.has(id) || loadedName(id)) continue;
+      if (id === NEW_CHAT_TAB || planNameOf(id) || workOf(id) || ticketOf(id) !== null || askedNames.current.has(id) || loadedName(id)) continue;
       askedNames.current.add(id);
       void api.sessionDetails(id).then((r) => r.json()).then((json) => {
         const name = json?.data?.summary;
@@ -97,6 +100,9 @@ function ProjectWorkspaceShell({
     }
     if (planNameOf(id)) {
       return `Plan: ${planNameOf(id)}`;
+    }
+    if (ticketOf(id) !== null) {
+      return `Ticket #${ticketOf(id)}`;
     }
     const work = workOf(id);
     if (work) {
@@ -117,7 +123,7 @@ function ProjectWorkspaceShell({
   }, [showTabs, sessionId]);
   // quests priority queue: the chats open as tabs rank at the top of the queue (the user chose to open them).
   useEffect(() => {
-    if (showTabs) reportPageTabs([...panes.left, ...panes.right].filter((id) => id !== NEW_CHAT_TAB && !planNameOf(id) && !workOf(id)));
+    if (showTabs) reportPageTabs([...panes.left, ...panes.right].filter((id) => id !== NEW_CHAT_TAB && !planNameOf(id) && !workOf(id) && ticketOf(id) === null));
   }, [showTabs, panes.left, panes.right]);
   const dots = useChatDots();
   const dotOf = useCallback((id: string): ChatDot | null => dots[id] ?? null, [dots]);
@@ -173,7 +179,8 @@ function ProjectWorkspaceShell({
   const showLeftTab = useCallback((id: string) => {
     const plan = planNameOf(id);
     const work = workOf(id);
-    navigate(id === NEW_CHAT_TAB ? '/' : plan ? `/plan/${plan}` : work ? `/work/${work.kind}/${work.ref}` : `/session/${id}`);
+    const ticket = ticketOf(id);
+    navigate(id === NEW_CHAT_TAB ? '/' : plan ? `/plan/${plan}` : work ? `/work/${work.kind}/${work.ref}` : ticket !== null ? `/ticket/${ticket}` : `/session/${id}`);
   }, [navigate]);
   const closeLeft = useCallback((id: string) => {
     if (id === leftActive) {
@@ -251,6 +258,8 @@ function ProjectWorkspaceShell({
           <div className="relative flex min-h-0 flex-1 flex-col">
             {workTab ? (
               <WorkView tabId={workTab} />
+            ) : ticketTab ? (
+              <TicketView number={ticketOf(ticketTab) as number} />
             ) : planName ? (
               <PlanView planName={planName} />
             ) : (
@@ -297,6 +306,8 @@ function ProjectWorkspaceShell({
             />
             {workOf(panes.rightActive) ? (
               <WorkView tabId={panes.rightActive} />
+            ) : ticketOf(panes.rightActive) !== null ? (
+              <TicketView number={ticketOf(panes.rightActive) as number} />
             ) : planNameOf(panes.rightActive) ? (
               <PlanView planName={planNameOf(panes.rightActive) as string} />
             ) : panes.rightActive === sessionId ? (

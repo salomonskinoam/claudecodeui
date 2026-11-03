@@ -238,12 +238,10 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.keyboard.press('Alt+Enter');
     await page.waitForTimeout(2500);
     const e = q.entries.find((x) => x.key === expected);
-    // A chat opens; an unclaimed ticket opens a new chat with the ticket text typed in (cleared again here).
-    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    // A chat opens; an unclaimed ticket opens its page.
     const opened = e.sessionId ? await page.evaluate((id) => location.pathname === `/session/${id}`, e.sessionId)
-      : (await box.inputValue()) === `we are starting this ticket ${e.url}`;
+      : await page.evaluate((n) => location.pathname === `/ticket/${n}`, e.number);
     console.log(JSON.stringify({ expected, url: await page.evaluate(() => location.pathname), opened }));
-    if (!e.sessionId) { await box.fill(''); await page.waitForTimeout(1500); }
   }
 
   if (check === 'latch') {
@@ -294,15 +292,24 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'ticketchat') {
-    // Click an unclaimed ticket: a new chat opens with the ticket text typed in, unsent (it names itself at its start).
-    // The text is then cleared, so no draft is left behind. Nothing is sent.
+    // Click an unclaimed ticket: its page opens in the chat window (title, text, "Claim this ticket"). The button
+    // opens a new chat with "claim this ticket <link>" typed in, unsent (it names itself at its start). The text
+    // is then cleared, so no draft is left behind. Nothing is sent.
     const q = await apiQueue();
-    const t = q.entries.find((e) => e.state === 'unclaimed');
+    const t = q.entries.find((e) => e.state === 'unclaimed' && !e.archived && !e.dismissed);
+    await page.locator('[data-quests-group="Tickets-Unclaimed"]').click();
+    await page.waitForTimeout(300);
     await page.locator(`[data-quests-queue="list"] [data-queue-key="${t.key}"]`).click();
+    await page.waitForTimeout(3000);
+    const pageUrl = await page.evaluate(() => location.pathname);
+    const view = page.locator(`[data-quests-ticket="${t.number}"]`);
+    const title = (await view.locator('h1').textContent().catch(() => '')).trim();
+    const bodyChars = (await view.locator('.prose').textContent().catch(() => '')).length;
+    await page.locator(`[data-quests-ticket-claim="${t.number}"]`).click();
     await page.waitForTimeout(3000);
     const box = page.locator('[data-slot="prompt-input-textarea"]').first();
     const text = await box.inputValue();
-    console.log(JSON.stringify({ ticket: t.key, url: await page.evaluate(() => location.pathname), text, ok: text === `we are starting this ticket ${t.url}` }));
+    console.log(JSON.stringify({ ticket: t.key, pageUrl, title, titleOk: title === t.title, bodyChars, text, ok: text === `claim this ticket ${t.url}` }));
     await box.fill('');
     await page.waitForTimeout(1500);
   }

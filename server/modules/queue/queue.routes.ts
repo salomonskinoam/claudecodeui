@@ -2,7 +2,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 
 import { archiveEntry, dismissEntry, dragTo, getQueue, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
-import { closeTicket, type CloseChoice } from '@/modules/queue/sources/tickets.js';
+import { closeTicket, getTickets, type CloseChoice } from '@/modules/queue/sources/tickets.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
 /** quests priority queue: the HTTP surface, mounted at /api/quests/queue. Every answer is the whole queue. */
@@ -54,6 +54,15 @@ router.put('/archive', asyncHandler(async (req: Request, res: Response) => {
   const { key, archived } = req.body ?? {};
   if (typeof key !== 'string' || typeof archived !== 'boolean') throw bad('key and archived are required.');
   res.json(createApiSuccessResponse(archiveEntry(key, archived)));
+}));
+
+// The ticket page: one open ticket's title, labels and text (Noam, 3 Nov: "i want to see the ticket body in the
+// chat window for reading").
+router.get('/ticket/:number', asyncHandler(async (req: Request, res: Response) => {
+  const number = Number(req.params.number);
+  const t = getTickets().find((x) => x.number === number);
+  if (!t) throw new AppError(`No open ticket #${req.params.number}.`, { code: 'QUEUE_TICKET_NOT_FOUND', statusCode: 404 });
+  res.json(createApiSuccessResponse({ number: t.number, title: t.title, url: t.url, labels: t.labels, body: t.body, createdAt: t.createdAt }));
 }));
 
 router.post('/sync-cursor', asyncHandler(async (_req: Request, res: Response) => {

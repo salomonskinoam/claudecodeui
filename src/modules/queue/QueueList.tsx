@@ -8,7 +8,7 @@ import QueueLine from '@/modules/queue/QueueLine';
 import QueueToolbar from '@/modules/queue/QueueToolbar';
 import RenameDialog from '@/modules/queue/RenameDialog';
 import TabContextMenu from '@/modules/queue/TabContextMenu';
-import { setQueueOpener } from '@/modules/queue/queueNavigation';
+import { setQueueOpener, setTicketStarter } from '@/modules/queue/queueNavigation';
 import { sendQueueEntryToEnd, setQueueArchived, useQueue } from '@/modules/queue/queueStore';
 import { useQueueView } from '@/modules/queue/queueView';
 import type { QueueEntry } from '@/modules/queue/types';
@@ -18,7 +18,7 @@ import { useOpenEntry } from '@/modules/queue/useOpenEntry';
 
 type QueueListProps = {
   onNewSession: () => void;
-  /** Start a new chat for a ticket that no chat has claimed; the chat asks for its own name at its start. */
+  /** "Claim this ticket" on a ticket's page: a new chat for it; the chat asks for its own name at its start. */
   onStartTicket: (entry: QueueEntry) => void;
 };
 
@@ -31,8 +31,8 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
   const queue = useQueue();
   const { mode, lines, active, hold, unclaimed, archived } = useQueueView();
   const lookOf = useEntryLook();
-  const open = useOpenEntry(onStartTicket);
-  useEffect(() => setQueueOpener(open));
+  const open = useOpenEntry();
+  useEffect(() => { setQueueOpener(open); setTicketStarter(onStartTicket); });
   const blinking = useBlink(queue);
   const [closing, setClosing] = useState<QueueEntry | null>(null);
   const [dismissing, setDismissing] = useState<QueueEntry | null>(null);

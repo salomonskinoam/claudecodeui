@@ -686,7 +686,7 @@ export default function SidebarContent({
               // The folder of the chat that opened the ticket; else the shown chat's project.
               const project = projects.find((p) => p.fullPath === entry.startFolder) ?? projectListProps.selectedProject ?? projects[0];
               if (!project) return;
-              writeDraftText(`project:${project.projectId}`, `we are starting this ticket ${entry.url}`);
+              writeDraftText(`project:${project.projectId}`, `claim this ticket ${entry.url}`);
               projectListProps.onNewSession(project);
             }}
           />

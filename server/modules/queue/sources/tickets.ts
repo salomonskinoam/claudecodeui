@@ -21,6 +21,8 @@ export type Ticket = {
   blocksSids: string[];
   /** The session id in the "## Parent chat" section. */
   parentChatSid: string | null;
+  /** The issue's text, for the ticket page. */
+  body: string;
 };
 
 let tickets: Ticket[] = [];
@@ -59,6 +61,7 @@ export async function refreshTickets(): Promise<void> {
     claims: n.comments.nodes.flatMap((c) => [...c.body.matchAll(CLAIM)].map((m) => ({ name: m[1], sid: m[2] }))),
     blocksSids: [...section(n.body, 'Blocks').matchAll(SID)].map((m) => m[0]),
     parentChatSid: section(n.body, 'Parent chat').match(SID)?.[0] ?? null,
+    body: n.body,
   }));
 }
 
