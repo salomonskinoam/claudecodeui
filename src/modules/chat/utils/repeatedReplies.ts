@@ -1,19 +1,13 @@
 import type { ChatMessage } from '@/shared/types';
 
 /**
- * quests: replies that repeat are folded (requirement 39). Three small steps, each on its own:
+ * quests: replies that repeat are folded (requirement 39). The specification, word for word the requirement, so the
+ * code can be rebuilt from it:
  *
- *   1. segmentTurns   the transcript as turns: each starts with a starter row (a message Noam typed, a task's
- *                     report, something a hook or an agent handed in) and ends before the next; its reply is
- *                     its last text.
- *   2. replyState     what a reply asks of Noam: its "Required from you:" line plus the kind of its closing line.
- *   3. foldRuns       which turns fold: only turns a REPORT started (a watcher's loop), in a run of two or more
- *                     with the same state, all but the last. A turn Noam's own message started never folds: the
- *                     answer to his message always shows. A turn a hook started is no reply of its own. A turn
- *                     whose reply Noam has already seen on this page never folds later.
- *
- * Noam, 2 Nov: "i saw uncollapsed correctly, and then when i sent another message it collapsed things i just
- * read" and "have the requirements clear first and then have things with single responsibility".
+ * Folding, specified so it can be rebuilt from the text alone. A ROW is one entry of the transcript as the page holds it: type (user or assistant), flags isToolUse, isThinking, isTaskNotification (a task's report), agentReportFrom (text handed in; "the stop hook" or an agent's id), content (text), timestamp.
+ * Step 1, turns. A row is a STARTER when it is a report, or handed in, or a user row that is not a tool result. Its kind: "report" for a report row, or a user row whose text starts with "<task-notification>" or "<system-reminder>"; "hook" for a handed-in row from "the stop hook", or a user row whose text starts with "Stop hook feedback"; "agent" for any other handed-in row; "typed" for any other user row. A TURN is a starter row and every row after it up to the next starter, excluded. Rows before the first starter form a turn of kind "none". The turn's REPLY is its last row that is assistant text: type assistant, not a tool call, not thinking, not a report, not handed in, non-empty text. A turn may have no reply.
+ * Step 2, the state of a reply. Split the text into lines, remove "**", collapse whitespace, drop empty lines. REQUIRED = the last line starting with "Required from you:" (case ignored). If there is none, the state is the whole text with whitespace collapsed. Else LAST = the final line, KIND = its opening words if they are one of "waiting for", "question", "blocker", "done" (case ignored), else empty; the state is lowercase(REQUIRED) + " | " + ("waiting for" when KIND is "waiting for", else lowercase(LAST)).
+ * Step 3, the folds. Walk the turns in order with a RUN (a list of turns) and its state. A "hook" turn is skipped: it neither joins nor closes the run. A "report" turn with a reply: S = the reply's state; if the run is not empty and S differs from the run's state, close the run; then add the turn and set the run's state to S. Any other turn (typed, agent, none, or a report without a reply) closes the run. At the end, close the run. CLOSE: LAST = the run's last turn; HIDDEN = the run's turns except LAST and except those whose reply timestamp is in SEEN. If HIDDEN is not empty: one fold, id = the first hidden reply's timestamp, count = the number of hidden turns, from and to = the first and last hidden replies' timestamps; every row of every hidden turn, from its starter row to its last row, is hidden, and the first row of the first hidden turn draws the fold line "count replies with the same state folded, from to to · show". Then empty the run. SEEN = the timestamps of assistant non-tool rows this page has drawn unfolded; a fold opened by click stays open for the page's life. The folds are computed over the whole transcript held by the page, never over the visible window alone.
  */
 
 export type StarterKind = 'typed' | 'report' | 'hook' | 'agent' | 'none';
