@@ -40,7 +40,7 @@ export default function TabContextMenu({ sessionId, x, y, onClose, onCloseTab }:
   }, [dialog, onClose]);
 
   if (dialog === 'hide' && entry) return <DismissDialog entry={entry} onDone={onClose} />;
-  if (dialog === 'rename' && entry) return <RenameDialog entry={entry} onDone={onClose} />;
+  if (dialog === 'rename' && entry?.sessionId) return <RenameDialog sessionId={entry.sessionId} current={entry.chatName ?? entry.title} onDone={onClose} />;
   if (dialog === 'ticket' && entry) return <CloseTicketDialog entry={entry} entries={queue.entries} onDone={onClose} />;
 
   const latched = entry ? queue.latch === entry.key : false;

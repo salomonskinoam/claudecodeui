@@ -1,9 +1,11 @@
 import { memo, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import type { DragEvent } from 'react';
 
 import { type ChatDot, CHAT_DOT_STYLE } from '@/shared/hooks/useLiveChats';
 import { cn } from '@/shared/utils';
-import { KindSign, TabContextMenu, useChatLook } from '@/modules/queue';
+import { KindSign, RenameDialog, TabContextMenu, useChatLook } from '@/modules/queue';
+import { planNameOf, workOf, NEW_CHAT_TAB } from '@/shared/hooks/useSplitPane';
 import { TAB_DRAG_TYPE } from '@/modules/project-workspace/tabDrag';
 
 type PaneTabsProps = {
@@ -29,6 +31,9 @@ type PaneTabsProps = {
 function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf, onDropTab, onNewChat }: PaneTabsProps) {
   // quests: a right-click on a tab opens the chat's options of its list line (pin, send to the end, hide, Cursor, close the ticket).
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  // quests: the pencil on the active tab renames the chat (requirement 48: a visible button, not only the menu).
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const isChatTab = (id: string) => id !== NEW_CHAT_TAB && !planNameOf(id) && !workOf(id);
   // Where a dragged tab would land: before this id, or null for the end of the row; undefined while no drag.
   const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined);
   const lookOf = useChatLook();
@@ -120,6 +125,17 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
             )}
             {look && look.kind !== 'chat' && <KindSign kind={look.kind} />}
             <span className="truncate">{nameOf(id)}</span>
+            {id === activeId && isChatTab(id) && (
+              <button
+                type="button"
+                title="Rename"
+                data-quests-tab="rename"
+                className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[#dddddd]/70 hover:bg-muted hover:text-white"
+                onClick={(event) => { event.stopPropagation(); setRenaming(id); }}
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
             <button
               type="button"
               title="Close tab"
@@ -159,6 +175,7 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
       {menu && (
         <TabContextMenu sessionId={menu.id} x={menu.x} y={menu.y} onClose={() => setMenu(null)} onCloseTab={() => onClose(menu.id)} />
       )}
+      {renaming && <RenameDialog sessionId={renaming} current={nameOf(renaming)} onDone={() => setRenaming(null)} />}
     </div>
   );
 }

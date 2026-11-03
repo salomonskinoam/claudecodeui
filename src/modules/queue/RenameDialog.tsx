@@ -2,7 +2,6 @@ import { useState } from 'react';
 
 import { api } from '@/shared/api';
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui';
-import type { QueueEntry } from '@/modules/queue/types';
 
 const primary = 'rounded-sm bg-[#3794ff] px-4 py-1.5 text-[13px] font-medium text-white hover:bg-[#2f7fe0] disabled:opacity-50';
 const secondary = 'rounded-sm border border-[#454647] px-4 py-1.5 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e] disabled:opacity-50';
@@ -12,15 +11,15 @@ const secondary = 'rounded-sm border border-[#454647] px-4 py-1.5 text-[13px] te
  * page's session row and, through the Agent SDK, to the transcript's custom title, the one Cursor and the queue
  * read, so every place shows the same name within a few seconds.
  */
-export default function RenameDialog({ entry, onDone }: { entry: QueueEntry; onDone: () => void }) {
-  const [name, setName] = useState(entry.chatName ?? entry.title);
+export default function RenameDialog({ sessionId, current, onDone }: { sessionId: string; current: string; onDone: () => void }) {
+  const [name, setName] = useState(current);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const save = () => {
     const next = name.trim();
-    if (!next || !entry.sessionId) return;
+    if (!next) return;
     setBusy(true);
-    api.renameSession(entry.sessionId, next)
+    api.renameSession(sessionId, next)
       .then((response) => (response.ok ? onDone() : response.text().then((t) => { setError(t.slice(0, 200)); setBusy(false); })))
       .catch((e: unknown) => { setError(String(e)); setBusy(false); });
   };

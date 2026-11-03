@@ -9,6 +9,7 @@ export { default as OutsideChatBanner } from '@/modules/queue/OutsideChatBanner'
 export { default as KindSign } from '@/modules/queue/KindSign';
 export { default as DoneButton } from '@/modules/queue/DoneButton';
 export { default as TabContextMenu } from '@/modules/queue/TabContextMenu';
+export { default as RenameDialog } from '@/modules/queue/RenameDialog';
 export { useChatLook } from '@/modules/queue/entryLook';
 export { reportPageTabs, useQueue } from '@/modules/queue/queueStore';
 export type { Queue, QueueEntry, QueueKind } from '@/modules/queue/types';

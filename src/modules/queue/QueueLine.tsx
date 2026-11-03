@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { CircleCheck, EyeOff, Pin, SquareArrowOutUpRight, Trash2 } from 'lucide-react';
+import { CircleCheck, EyeOff, Pencil, Pin, SquareArrowOutUpRight, Trash2 } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import EntryDot from '@/modules/queue/EntryDot';
@@ -32,13 +32,15 @@ type QueueLineProps = {
   onSendToEnd: () => void;
   /** A right-click: the chat's menu (rename, pin, hide, ...). */
   onMenu?: (event: MouseEvent) => void;
+  /** The pencil: rename the chat. */
+  onRename?: () => void;
 };
 
 /**
  * quests priority queue: one line of the list. The chat's dot, the kind's sign, the title, and on the right five
  * icon columns: the pin, send to the end, hide (the trash), the Cursor link, the ticket's close button.
  */
-export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onDismiss, onSendToEnd, onMenu }: QueueLineProps) {
+export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onDismiss, onSendToEnd, onMenu, onRename }: QueueLineProps) {
   return (
     <div
       data-queue-key={e.key}
@@ -65,9 +67,17 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       <EntryDot sessionId={e.sessionId} className="h-2 w-2" />
       <KindSign kind={e.kind} />
       <EntryTitle entry={e} className="min-w-0 flex-1 truncate" />
-      {/* Five fixed columns on the right, the same on every line: the pin, send to the end, hide (the trash), the
-          Cursor link, the ticket's close button. A column stays empty when the line has nothing for it, so the
-          icons never shift sideways. */}
+      {/* Six fixed columns on the right, the same on every line: rename (the pencil), the pin, send to the end,
+          hide (the trash), the Cursor link, the ticket's close button. A column stays empty when the line has
+          nothing for it, so the icons never shift sideways. */}
+      <span className={SLOT}>
+        {e.sessionId && onRename && (
+          <button type="button" title="Rename" className="opacity-0 hover:opacity-100 group-hover:opacity-70"
+            data-quests-line="rename" onClick={(event) => { event.stopPropagation(); onRename(); }}>
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </span>
       <span className={SLOT}>
         {e.sessionId && (
           <button type="button" title={latched ? 'Unpin' : 'Pin on top'}

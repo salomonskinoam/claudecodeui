@@ -25,7 +25,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -639,6 +639,16 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.keyboard.press('Control+Digit0');
     const reset = await size();
     console.log(JSON.stringify({ start, up, down, reset }));
+  }
+
+  if (check === 'renamebutton') {
+    // The pencil on the active tab opens the rename popup with the chat name filled in; Cancel closes it.
+    const pencil = page.locator('[data-quests-tab="rename"]');
+    const count = await pencil.count();
+    if (count) { await pencil.first().click(); await page.waitForTimeout(500); }
+    const value = await page.locator('[data-quests-queue="rename"] input').inputValue().catch(() => null);
+    await page.locator('[data-quests-queue="rename"] button', { hasText: 'Cancel' }).click().catch(() => undefined);
+    console.log(JSON.stringify({ pencils: count, prefilled: value, lineRenames: await page.locator('[data-quests-line="rename"]').count() }));
   }
 
   if (check === 'subagents') {
