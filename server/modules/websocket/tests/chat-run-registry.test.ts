@@ -66,6 +66,10 @@ test('live events are remapped to the app session id and sequenced', async () =>
     assert.equal(connection.frames[0]?.seq, 1);
     assert.equal(connection.frames[1]?.sessionId, 'app-run-1');
     assert.equal(connection.frames[1]?.seq, 2);
+    // quests: every event names its run, so a seq is never read against another run's count.
+    assert.equal(typeof connection.frames[0]?.runId, 'string');
+    assert.equal(connection.frames[0]?.runId, run.runId);
+    assert.equal(connection.frames[1]?.runId, run.runId);
   });
 });
 

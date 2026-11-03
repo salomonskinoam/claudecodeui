@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { sessionsDb } from '@/modules/database/index.js';
 import { ChatSessionWriter } from '@/modules/websocket/services/chat-session-writer.service.js';
 import { broadcastSessionUpserted } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
@@ -25,6 +27,8 @@ type ChatRunStatus = 'running' | 'completed';
  */
 type ChatRun = {
   appSessionId: string;
+  /** quests: names this run on every event it emits, so a `seq` is never read against another run's count. */
+  runId: string;
   provider: LLMProvider;
   providerSessionId: string | null;
   status: ChatRunStatus;
@@ -115,6 +119,7 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
     ...message,
     sessionId: run.appSessionId,
     seq: run.lastSeq,
+    runId: run.runId,
   };
 
   if (message.kind === 'complete') {
@@ -208,6 +213,7 @@ export const chatRunRegistry = {
 
     const run: ChatRun = {
       appSessionId: input.appSessionId,
+      runId: randomUUID(),
       provider: input.provider,
       providerSessionId: input.providerSessionId,
       status: 'running',

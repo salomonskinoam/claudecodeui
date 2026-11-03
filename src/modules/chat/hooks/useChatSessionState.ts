@@ -9,6 +9,8 @@ import { SESSION_MESSAGES_PAGE_SIZE } from '@/modules/chat/utils/sessionMessageP
 import { createMessageHistoryRefreshCoordinator } from '@/modules/chat/utils/messageHistoryRefreshCoordinator';
 import { createCachedDiffCalculator } from '@/modules/chat/utils/messageTransforms';
 import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
+import { subscribeTarget } from '@/modules/chat/utils/replayPosition';
+import type { ReplayPosition } from '@/modules/chat/utils/replayPosition';
 import { findSearchTargetIndex, resolveSearchWindowSize } from '@/modules/chat/utils/searchTargetLocator';
 import { readSelectedProvider } from '@/shared/selectedProvider';
 import type { SearchTarget } from '@/modules/chat/utils/searchTargetLocator';
@@ -103,8 +105,8 @@ type UseChatSessionStateArgs = {
   resetStreamingState: () => void;
   /** When each session's `chat.subscribe` was last sent; guards stale idle acks. */
   statusCheckSentAtRef: MutableRefObject<Map<string, number>>;
-  /** Highest live seq observed per session; sent as `lastSeq` on subscribe. */
-  lastSeqRef: MutableRefObject<Map<string, number>>;
+  /** Highest live seq observed per session, with the run it counts in; sent on subscribe. */
+  lastSeqRef: MutableRefObject<Map<string, ReplayPosition>>;
   sessionStore: SessionStore;
 };
 
@@ -727,10 +729,7 @@ export function useChatSessionState({
     statusCheckSentAtRef.current.set(selectedSession.id, Date.now());
     sendMessage({
       type: 'chat.subscribe',
-      sessions: [{
-        sessionId: selectedSession.id,
-        lastSeq: lastSeqRef.current.get(selectedSession.id) ?? 0,
-      }],
+      sessions: [subscribeTarget(selectedSession.id, lastSeqRef.current.get(selectedSession.id))],
     });
   }, [lastSeqRef, selectedProject, selectedSession, sendMessage, statusCheckSentAtRef, ws]);
 

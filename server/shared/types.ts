@@ -326,6 +326,12 @@ export type NormalizedMessage = {
    * the live events they missed across websocket reconnects.
    */
   seq?: number;
+  /**
+   * quests: the run the `seq` counts in. `seq` restarts at 1 for every run of a session, so a client that
+   * remembers a `seq` from an earlier run would ask for a replay from the wrong place; the run id tells the
+   * two apart (requirement 52, race resistance).
+   */
+  runId?: string;
   role?: 'user' | 'assistant';
   content?: string;
   /**

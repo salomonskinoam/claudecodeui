@@ -20,6 +20,8 @@ import { useChatProviderState } from '@/modules/chat/hooks/useChatProviderState'
 import { useScheduledMessages } from '@/modules/chat/composer/useScheduledMessages';
 import { useChatSessionState } from '@/modules/chat/hooks/useChatSessionState';
 import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHandlers';
+import { subscribeTarget } from '@/modules/chat/utils/replayPosition';
+import type { ReplayPosition } from '@/modules/chat/utils/replayPosition';
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
 import {
@@ -94,7 +96,7 @@ function ChatInterface({
   // Highest live `seq` observed per session. Written by the realtime handler
   // on every sequenced frame, read whenever a `chat.subscribe` is sent so the
   // server replays only the events this client actually missed.
-  const lastSeqRef = useRef(new Map<string, number>());
+  const lastSeqRef = useRef(new Map<string, ReplayPosition>());
 
   const resetStreamingState = useCallback(() => {
     if (streamTimerRef.current) {
@@ -276,10 +278,7 @@ function ChatInterface({
     statusCheckSentAtRef.current.set(selectedSession.id, Date.now());
     sendMessage({
       type: 'chat.subscribe',
-      sessions: [{
-        sessionId: selectedSession.id,
-        lastSeq: lastSeqRef.current.get(selectedSession.id) ?? 0,
-      }],
+      sessions: [subscribeTarget(selectedSession.id, lastSeqRef.current.get(selectedSession.id))],
     });
   }, [isActive, requestLatestMessages, selectedProject, selectedSession, sendMessage]);
 

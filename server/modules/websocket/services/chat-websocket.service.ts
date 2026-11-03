@@ -540,6 +540,10 @@ function handleChatSubscribe(
 
     const run = chatRunRegistry.getRun(sessionId);
     const isProcessing = chatRunRegistry.isProcessing(sessionId);
+    // quests: the client's `lastSeq` counts in the run it names. Another run (a new turn, a server restart)
+    // started its count over, so a replay from that number would skip this run's first events.
+    const clientRunId = (target as AnyRecord).runId;
+    const afterSeq = run && clientRunId === run.runId ? lastSeq : 0;
 
     // Future live events for this run should land on the socket that asked —
     // this is what makes mid-stream page refreshes work for all providers.
@@ -560,6 +564,7 @@ function handleChatSubscribe(
       sessionId,
       isProcessing,
       lastSeq: run?.lastSeq ?? 0,
+      runId: run?.runId,
       pendingPermissions,
       timestamp: new Date().toISOString(),
     });
@@ -569,7 +574,7 @@ function handleChatSubscribe(
     // replaying them (e.g. after a page reload where the client's lastSeq is
     // 0) would duplicate messages the history fetch already returned.
     if (isProcessing) {
-      for (const event of chatRunRegistry.replayEvents(sessionId, lastSeq)) {
+      for (const event of chatRunRegistry.replayEvents(sessionId, afterSeq)) {
         sendJson(ws, event);
       }
     }
@@ -601,7 +606,7 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
  * - `chat.send`                { sessionId, content, options? }
  * - `chat.abort`               { sessionId }
  * - `chat.stop-task`           { sessionId, taskId }
- * - `chat.subscribe`           { sessions: [{ sessionId, lastSeq? }] }
+ * - `chat.subscribe`           { sessions: [{ sessionId, lastSeq?, runId? }] }
  * - `chat.permission-response` { requestId, allow, updatedInput?, message?, rememberEntry? }
  *
  * Outbound protocol (server to client): every frame is `kind`-based — either

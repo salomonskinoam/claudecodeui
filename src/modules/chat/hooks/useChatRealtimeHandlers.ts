@@ -7,6 +7,8 @@ import { playChatCompletionSound, playNotificationSound } from '@/shared/utils';
 import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
 import { collectRunningBackgroundTasks } from '@/modules/chat/utils/backgroundTasks';
+import type { ReplayPosition } from '@/modules/chat/utils/replayPosition';
+import { advanceReplayPosition } from '@/modules/chat/utils/replayPosition';
 
 // quests: a plan waiting for approval is as actionable as any permission prompt (the sound plays for it too).
 const isActionablePermissionRequest = (request: { toolName?: unknown } | null | undefined): boolean => {
@@ -34,7 +36,7 @@ type UseChatRealtimeHandlersArgs = {
    * the events this client actually missed. Written here on every sequenced
    * frame; read wherever a `chat.subscribe` is sent (session open, reconnect).
    */
-  lastSeqRef: MutableRefObject<Map<string, number>>;
+  lastSeqRef: MutableRefObject<Map<string, ReplayPosition>>;
   /** When each session's `chat.subscribe` was last sent; guards stale idle acks. */
   statusCheckSentAtRef: MutableRefObject<Map<string, number>>;
   onSessionProcessing?: MarkSessionProcessing;
@@ -116,12 +118,10 @@ export function useChatRealtimeHandlers({
       const activeViewSessionId = activeViewSessionIdRef.current;
       const sid = (typeof msg.sessionId === 'string' && msg.sessionId) || activeViewSessionId;
 
-      // Record replay progress for every sequenced live event.
+      // Record replay progress for every sequenced live event, per run: a new run starts the count over.
       if (sid && typeof msg.seq === 'number') {
-        const known = lastSeqRef.current.get(sid) ?? 0;
-        if (msg.seq > known) {
-          lastSeqRef.current.set(sid, msg.seq);
-        }
+        const next = advanceReplayPosition(lastSeqRef.current.get(sid), msg);
+        if (next) lastSeqRef.current.set(sid, next);
       }
 
       switch (msg.kind) {

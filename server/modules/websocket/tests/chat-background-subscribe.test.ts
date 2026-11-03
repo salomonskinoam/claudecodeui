@@ -99,6 +99,29 @@ test('a tab that subscribes during background work receives the run\'s later eve
   });
 });
 
+test('a lastSeq from another run replays this run from its start', async () => {
+  await withIsolatedDatabase(async () => {
+    // quests: seq restarts at 1 per run; a client holding seq 2 from the previous run must still get this
+    // run's events 1 and 2, so a lastSeq is honoured only with the run id it counts in.
+    const run = chatRunRegistry.startRun({ appSessionId: SESSION_ID, provider: 'claude', providerSessionId: 'native-1', connection: createFakeSocket() as never, userId: 1 });
+    assert.ok(run);
+    run.writer.send({ kind: 'text', provider: 'claude', sessionId: 'native-1', role: 'assistant', content: 'one' } as never);
+    run.writer.send({ kind: 'text', provider: 'claude', sessionId: 'native-1', role: 'assistant', content: 'two' } as never);
+    run.writer.send({ kind: 'text', provider: 'claude', sessionId: 'native-1', role: 'assistant', content: 'three' } as never);
+
+    const subscribe = async (target: Record<string, unknown>) => {
+      const tab = createFakeSocket();
+      handleChatConnection(tab as never, { user: { id: 1 } } as never, { runtime: { hasBackgroundWork: () => false, getPendingApprovalsForSession: () => [] } as never });
+      tab.emit('message', JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: SESSION_ID, ...target }] }));
+      await settle();
+      return tab.frames.filter((frame) => frame.kind === 'text').map((frame) => frame.content);
+    };
+    assert.deepEqual(await subscribe({ lastSeq: 2, runId: 'an-earlier-run' }), ['one', 'two', 'three']);
+    assert.deepEqual(await subscribe({ lastSeq: 2, runId: run.runId }), ['three']);
+    assert.deepEqual(await subscribe({ lastSeq: 2 }), ['one', 'two', 'three']);
+  });
+});
+
 test('a tab that subscribes to an idle session is not attached to its old run', async () => {
   await withIsolatedDatabase(async () => {
     const run = startAndCompleteRun(createFakeSocket());

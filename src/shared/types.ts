@@ -266,6 +266,8 @@ export type ServerEvent = {
   type?: string;
   sessionId?: string;
   seq?: number;
+  /** quests: the run `seq` counts in; a new run id resets the client's replay position. */
+  runId?: string;
   [key: string]: unknown;
 };
 
@@ -555,6 +557,8 @@ export type NormalizedMessage = {
    * REST history messages do not carry it.
    */
   seq?: number;
+  /** quests: the run `seq` counts in (see ServerEvent.runId). */
+  runId?: string;
 
   // kind-specific fields (flat for simplicity)
   role?: 'user' | 'assistant';
