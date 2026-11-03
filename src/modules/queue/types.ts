@@ -32,6 +32,8 @@ export type QueueEntry = {
   dismissed: boolean;
   /** Noam archived the entry: it waits in the "Archived" drawer, whatever it does, until he takes it out. */
   archived: boolean;
+  /** When it was archived (epoch ms; 0 for the ones archived before the time was kept), else null. */
+  archivedAt: number | null;
   replyAt: string | null;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
   heldOutside: boolean;

@@ -8,13 +8,18 @@ import { queueDb } from '@/modules/database/index.js';
 
 const KEY = 'archived';
 
-const read = (): Record<string, true> => queueDb.getState<Record<string, true>>(KEY) ?? {};
+/** Entry key -> when it was archived (epoch ms). Entries archived before the time was kept hold `true`: time 0. */
+const read = (): Record<string, number | true> => queueDb.getState<Record<string, number | true>>(KEY) ?? {};
 
-export const isArchived = (entryKey: string): boolean => read()[entryKey] === true;
+/** When the entry was archived (epoch ms), or undefined. */
+export function archivedAt(entryKey: string): number | undefined {
+  const v = read()[entryKey];
+  return v === undefined ? undefined : v === true ? 0 : v;
+}
 
 export function setArchived(entryKey: string, archived: boolean): void {
   const all = read();
-  if (archived) all[entryKey] = true;
+  if (archived) all[entryKey] = Date.now();
   else delete all[entryKey];
   queueDb.setState(KEY, all);
 }

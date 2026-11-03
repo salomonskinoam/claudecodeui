@@ -12,7 +12,7 @@ import { isChat, type QueueEntry } from '@/modules/queue/types';
  *                      attention by definition" (Noam, 3 Nov). Idle ones first, each half in queue order.
  *   On hold            the chats Noam put on hold, until they reply again.
  *   Tickets-Unclaimed  the tickets no chat claimed, in the order Noam drags.
- *   Archived           what Noam archived, whatever it does.
+ *   Archived           what Noam archived, whatever it does; the most recently archived first.
  * Noam, 28 Oct: "the philosophy is to filter for the user only chats that require attention. the rest is spam."
  * The "archive" mode (everything flat, as the stored order has it) has no button since 3 Nov; the headless
  * checks set it in the browser's storage.
@@ -54,7 +54,7 @@ export type QueueView = {
   active: QueueEntry[];
   hold: QueueEntry[];
   unclaimed: QueueEntry[];
-  /** Both modes: the entries Noam archived, in queue order. */
+  /** Both modes: the entries Noam archived, the most recently archived first. */
   archived: QueueEntry[];
 };
 
@@ -64,7 +64,7 @@ export function useQueueView(): QueueView {
   const shown = useShownChat();
   const byKey = new Map(queue.entries.map((e) => [e.key, e]));
   const every = queue.view.map((k) => byKey.get(k)).filter((e): e is QueueEntry => Boolean(e));
-  const archived = every.filter((e) => e.archived);
+  const archived = every.filter((e) => e.archived).sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
   const all = every.filter((e) => !e.archived);
   if (current === 'archive') return { mode: current, lines: all, active: [], hold: [], unclaimed: [], archived };
   // Noam, 3 Nov: "i want that section to keep chats i may want to go back to on my own". Its place in the

@@ -703,10 +703,11 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'archived') {
-    // The "Archived" drawer lists exactly the archived entries of the queue, in queue order, and none of them is
+    // The "Archived" drawer lists exactly the archived entries of the queue, newest first, and none of them is
     // among the other lines; a click opens it. Nothing is archived here.
     const q = await apiQueue();
-    const archived = q.view.filter((k) => q.entries.find((e) => e.key === k)?.archived);
+    const archived = q.view.filter((k) => q.entries.find((e) => e.key === k)?.archived)
+      .sort((a, b) => (q.entries.find((e) => e.key === b).archivedAt ?? 0) - (q.entries.find((e) => e.key === a).archivedAt ?? 0));
     const drawer = page.locator('[data-quests-group="Archived"]');
     const label = (await drawer.innerText().catch(() => '')).replace(/\s+/g, ' ');
     const before = await page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));

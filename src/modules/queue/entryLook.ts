@@ -10,11 +10,14 @@ import { entryOfChat, isChat, type QueueEntry, type QueueKind } from '@/modules/
  *   hovered  brighter, with a white frame inside
  *   shown    the chat on screen in the left pane: bold white text, a thick blue bar on its left (painted inside,
  *            so the text keeps its place)
- * An entry on hold or archived wears no color (Noam, 3 Nov: "archived and on hold chats hold no color").
+ * An entry on hold, archived, or a ticket no chat claimed wears gray, not its family's color (Noam, 3 Nov:
+ * "archived and tickets and on hold have no color (let's say all gray)").
  * The two are independent: the shown chat lights up on hover like any other.
  */
 export const HOVER_CLASS = 'brightness-150 ring-2 ring-inset ring-white';
 export const SHOWN_CLASS = 'shadow-[inset_4px_0_0_0_#3794ff] font-bold text-white';
+/** The gray of the lines that wear no family color. */
+export const GRAY = '#3a3a3a';
 
 export type EntryLook = {
   /** The family's color, for the background. */
@@ -38,7 +41,7 @@ export function useEntryLook(): (entry: QueueEntry) => EntryLook {
     const shown = isChat(entry, shownId);
     const hovered = hover === entry.key;
     return {
-      color: entry.dismissed || entry.archived ? 'transparent' : colors.get(entry.rootKey) ?? 'transparent',
+      color: entry.dismissed || entry.archived || entry.state === 'unclaimed' ? GRAY : colors.get(entry.rootKey) ?? 'transparent',
       kind: entry.kind,
       shown,
       hovered,

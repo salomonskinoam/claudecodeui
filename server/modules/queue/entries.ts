@@ -1,5 +1,5 @@
 import { getChats, isHeldOutside, isOpen, type Chat } from '@/modules/queue/chats.js';
-import { isArchived } from '@/modules/queue/archived.js';
+import { archivedAt } from '@/modules/queue/archived.js';
 import { dismissedAt } from '@/modules/queue/dismissals.js';
 import { groupOf, rootOf, waitsForMe, type QueueGroup, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import { getTickets, openBlockersOf, type Ticket } from '@/modules/queue/sources/tickets.js';
@@ -33,6 +33,8 @@ export type QueueEntry = QueueOrderEntry & {
   dismissed: boolean;
   /** Noam archived the entry (the archive icon): it waits in the "Archived" drawer, whatever it does, until he takes it out. */
   archived: boolean;
+  /** When it was archived (epoch ms; 0 for the ones archived before the time was kept), else null. */
+  archivedAt: number | null;
   /** The time of the chat's last reply, the dismissal's key. */
   replyAt: string | null;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
@@ -93,7 +95,7 @@ export function buildEntries(): QueueEntry[] {
     for (const { sid } of t.claims) if (!ticketOf.has(sid) || isRoot) ticketOf.set(sid, t.number);
   }
 
-  const entries: Omit<QueueEntry, 'rootKey' | 'group' | 'waitsForMe' | 'dismissed' | 'archived'>[] = [];
+  const entries: Omit<QueueEntry, 'rootKey' | 'group' | 'waitsForMe' | 'dismissed' | 'archived' | 'archivedAt'>[] = [];
   for (const t of tickets) {
     const chat = chats.get(claimant.get(t.number) ?? '') ?? null;
     const kind = kindOf(t);
@@ -124,7 +126,8 @@ export function buildEntries(): QueueEntry[] {
   // A dismissed reply hides a question or a Done; a permission prompt always waits, dismissed or not.
   return entries.map((e) => {
     const dismissed = dismissedAt(e.key) === (e.replyAt ?? 'none');
-    const archived = isArchived(e.key);
-    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), dismissed, archived, waitsForMe: !archived && (e.state === 'permission' || (waitsForMe(e) && !dismissed)) };
+    const at = archivedAt(e.key);
+    const archived = at !== undefined;
+    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), dismissed, archived, archivedAt: at ?? null, waitsForMe: !archived && (e.state === 'permission' || (waitsForMe(e) && !dismissed)) };
   });
 }
