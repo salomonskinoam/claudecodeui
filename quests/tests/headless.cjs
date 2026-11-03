@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -42,7 +42,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   await page.addInitScript((t) => localStorage.setItem('auth-token', t), token);
   // The list's default (focus) shows only the chats that wait for the user; every check but `focus` reads the
   // whole list, so they open the page in archive mode.
-  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), ['focus', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'ticketchat', 'switch'].includes(check) ? 'focus' : 'archive');
+  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), ['focus', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'ticketchat', 'switch', 'search'].includes(check) ? 'focus' : 'archive');
   page.on('pageerror', (error) => console.log('page error:', (error.stack || error.message).slice(0, 700)));
   await page.goto(check === 'plan' ? 'http://127.0.0.1:3001/' : `http://127.0.0.1:3001/session/${sessionId}`);
   await page.waitForTimeout(6000);
@@ -640,6 +640,31 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       });
     });
     console.log(JSON.stringify(rows, null, 0).replace(/\},\{/g, '},\n{'));
+  }
+
+  if (check === 'search') {
+    // Focus mode: text in the sidebar's search box leaves only the lines whose name, title, ticket number or
+    // world contain it, in every drawer, all open; text that matches nothing leaves no line; clearing the box
+    // restores the list.
+    const q = await apiQueue();
+    const keys = () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+    const textOf = (e) => [e.chatName, e.title, e.number !== null ? `#${e.number}` : '', e.world, e.closingLine].filter(Boolean).join(' ').toLowerCase();
+    const box = page.locator('input.nav-search-input:visible').first();
+    const before = (await keys()).length;
+    const sample = q.entries.find((e) => !e.archived && e.chatName) ?? q.entries[0];
+    const word = (sample.chatName ?? sample.title).split(/\s+/).find((w) => w.length >= 3) ?? sample.title.slice(0, 3);
+    await box.fill(word);
+    await page.waitForTimeout(500);
+    const shown = await keys();
+    const expected = q.view.filter((k) => textOf(q.entries.find((e) => e.key === k)).includes(word.toLowerCase()));
+    const allMatch = shown.every((k) => expected.includes(k));
+    await box.fill('zzqqxxvv');
+    await page.waitForTimeout(500);
+    const none = (await keys()).length;
+    await box.fill('');
+    await page.waitForTimeout(500);
+    const after = (await keys()).length;
+    console.log(JSON.stringify({ word, before, shown: shown.length, expected: expected.length, allMatch, complete: shown.length === expected.length, none, restored: after === before }));
   }
 
   if (check === 'hold') {

@@ -17,6 +17,8 @@ import { useLineDrag } from '@/modules/queue/useLineDrag';
 import { useOpenEntry } from '@/modules/queue/useOpenEntry';
 
 type QueueListProps = {
+  /** The sidebar's search box: only the lines whose name, title, ticket number or world contain it, every drawer open. */
+  filter: string;
   onNewSession: () => void;
   /** "Claim this ticket" on a ticket's page: a new chat for it; the chat asks for its own name at its start. */
   onStartTicket: (entry: QueueEntry) => void;
@@ -25,11 +27,17 @@ type QueueListProps = {
 /**
  * quests priority queue: the session list: the five drawers of queueView.ts ("Pending chats" open by default,
  * the others collapsed). In archive mode (no button) every entry in queue order, with a separator before the
- * tickets no chat has claimed, and the Archived drawer.
+ * tickets no chat has claimed, and the Archived drawer. With text in the sidebar's search box only the matching
+ * lines show, in every drawer, all open (Noam, 3 Nov: "the search does nothing").
  */
-export default function QueueList({ onNewSession, onStartTicket }: QueueListProps) {
+export default function QueueList({ filter, onNewSession, onStartTicket }: QueueListProps) {
   const queue = useQueue();
-  const { mode, lines, active, hold, unclaimed, archived } = useQueueView();
+  const view = useQueueView();
+  const q = filter.trim().toLowerCase();
+  const hit = (e: QueueEntry) => [e.chatName, e.title, e.number !== null ? `#${e.number}` : '', e.world, e.closingLine].filter(Boolean).join(' ').toLowerCase().includes(q);
+  const show = (xs: QueueEntry[]) => (q ? xs.filter(hit) : xs);
+  const { mode } = view;
+  const [lines, active, hold, unclaimed, archived] = [view.lines, view.active, view.hold, view.unclaimed, view.archived].map(show);
   const lookOf = useEntryLook();
   const open = useOpenEntry();
   useEffect(() => { setQueueOpener(open); setTicketStarter(onStartTicket); });
@@ -60,7 +68,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
       drag={lineProps(e.key, e.state !== 'permission' && e.key !== queue.latch)}
       onOpen={(event) => open(e, event)}
       onCloseTicket={() => setClosing(e)}
-      onDismiss={() => void dismissQueueEntry(e.key)}
+      onDismiss={() => void dismissQueueEntry(e.key, !e.dismissed)}
       onSendToEnd={() => void sendQueueEntryToEnd(e.key)}
       onArchive={() => void setQueueArchived(e.key, !e.archived)}
       onMenu={e.sessionId ? (event) => { event.preventDefault(); setMenu({ sessionId: e.sessionId as string, entryKey: e.key, x: event.clientX, y: event.clientY }); }
@@ -68,9 +76,10 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
       onRename={e.sessionId ? () => setRenaming(e) : undefined}
     />
   );
-  const groups: Array<[string, QueueEntry[]]> = mode === 'focus'
-    ? [['Pending chats', lines], ['Active chats', active], ['On hold', hold], ['Tickets-Unclaimed', unclaimed], ['Archived', archived]]
-    : [['Archived', archived]];
+  const groups: Array<[string, QueueEntry[]]> = (mode === 'focus'
+    ? [['Pending chats', lines], ['Active chats', active], ['On hold', hold], ['Tickets-Unclaimed', unclaimed], ['Archived', archived]] as Array<[string, QueueEntry[]]>
+    : [['Archived', archived]] as Array<[string, QueueEntry[]]>).filter(([, m]) => !q || m.length > 0);
+  const isOpen = (label: string) => Boolean(q) || openGroups.has(label);
 
   return (
     <div className="flex flex-col" data-quests-queue="list" data-quests-mode={mode}>
@@ -79,9 +88,9 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
         {mode === 'archive' && lines.map((e, i) => line(e, i > 0 && (lines[i - 1].group === 2) !== (e.group === 2)))}
         {groups.map(([label, members]) => (
           <div key={label}>
-            <QueueGroupLine label={label} count={members.length} open={openGroups.has(label)} onToggle={() => toggle(label)} />
-            {openGroups.has(label) && (label === 'Tickets-Unclaimed'
-              ? <TicketGroups members={members} line={(e) => line(e, false)} renaming={renamingGroup} onRenamed={() => setRenamingGroup(null)}
+            <QueueGroupLine label={label} count={members.length} open={isOpen(label)} onToggle={() => toggle(label)} />
+            {isOpen(label) && (label === 'Tickets-Unclaimed'
+              ? <TicketGroups members={members} hideEmpty={Boolean(q)} line={(e) => line(e, false)} renaming={renamingGroup} onRenamed={() => setRenamingGroup(null)}
                   onHeaderMenu={(index, event) => setTicketMenu({ target: { group: index }, x: event.clientX, y: event.clientY })} />
               : members.map((e) => line(e, false)))}
           </div>

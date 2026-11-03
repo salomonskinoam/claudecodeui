@@ -1,6 +1,6 @@
 import { setArchived } from '@/modules/queue/archived.js';
 import { chatsIn } from '@/modules/queue/chats.js';
-import { dismiss } from '@/modules/queue/dismissals.js';
+import { dismiss, undismiss } from '@/modules/queue/dismissals.js';
 import { buildEntries, type QueueEntry } from '@/modules/queue/entries.js';
 import { readLatch, readOrder, writeLatch, writeOrder } from '@/modules/queue/order-store.js';
 import { drag, lift, repair, view } from '@/modules/queue/queue-order.js';
@@ -44,16 +44,23 @@ export function setLatch(key: string | null): Queue {
   return getQueue();
 }
 
-/** The trash icon: hides the entry's chat until it replies again (its current reply is recorded as dismissed). */
-export function dismissEntry(key: string): Queue {
-  const entry = buildEntries().find((e) => e.key === key);
-  if (entry) dismiss(key, entry.replyAt ?? 'none');
+/**
+ * The pause icon: the entry goes to "On hold" until it replies again (its current reply is recorded as
+ * dismissed); pressed again (`dismissed` false) it comes back now.
+ */
+export function dismissEntry(key: string, dismissed = true): Queue {
+  if (!dismissed) undismiss(key);
+  else {
+    const entry = buildEntries().find((e) => e.key === key);
+    if (entry) dismiss(key, entry.replyAt ?? 'none');
+  }
   return getQueue();
 }
 
-/** The archive icon: the entry goes to the "Archived" drawer (or leaves it), whatever it does. */
+/** The archive icon: the entry goes to the "Archived" drawer (or leaves it), whatever it does. Leaving the archive ends its hold too. */
 export function archiveEntry(key: string, archived: boolean): Queue {
   setArchived(key, archived);
+  if (!archived) undismiss(key);
   return getQueue();
 }
 

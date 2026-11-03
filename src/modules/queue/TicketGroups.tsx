@@ -40,6 +40,8 @@ function NameInput({ initial, onDone }: { initial: string; onDone: (name: string
 type Props = {
   /** The drawer's tickets, in queue order. */
   members: QueueEntry[];
+  /** While the list is filtered: a group with no matching ticket is not drawn. */
+  hideEmpty?: boolean;
   line: (entry: QueueEntry) => ReactNode;
   /** A right-click on a header: the group's menu (rename, delete). */
   onHeaderMenu: (index: number, event: MouseEvent) => void;
@@ -48,7 +50,7 @@ type Props = {
   onRenamed: () => void;
 };
 
-export default function TicketGroups({ members, line, onHeaderMenu, renaming, onRenamed }: Props) {
+export default function TicketGroups({ members, hideEmpty, line, onHeaderMenu, renaming, onRenamed }: Props) {
   const groups = useQueue().ticketGroups;
   const [adding, setAdding] = useState(false);
   const inSome = new Set(groups.flatMap((g) => g.tickets));
@@ -58,6 +60,7 @@ export default function TicketGroups({ members, line, onHeaderMenu, renaming, on
     <>
       {groups.map((g, i) => {
         const own = members.filter((e) => e.number !== null && g.tickets.includes(e.number));
+        if (hideEmpty && own.length === 0) return null;
         return (
           <div key={g.name}>
             {renaming === i ? (

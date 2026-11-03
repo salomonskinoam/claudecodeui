@@ -54,7 +54,8 @@ export function reportPageTabs(sessionIds: string[]): void {
 export const dragQueue = (key: string, beforeKey: string | null) => request('PUT', '/drag', { key, beforeKey });
 export const setQueueLatch = (key: string | null) => request('PUT', '/latch', { key });
 /** The pause icon: put the entry's chat on hold until it replies again. */
-export const dismissQueueEntry = (key: string) => request('PUT', '/dismiss', { key });
+/** The pause icon: on hold until the chat replies again; `false` takes it off hold now. */
+export const dismissQueueEntry = (key: string, dismissed = true) => request('PUT', '/dismiss', { key, dismissed });
 /** Noam's groups of unclaimed tickets: the whole list. */
 export const setTicketGroups = (groups: TicketGroup[]) => request('PUT', '/groups', { groups });
 /** The archive icon: the entry goes to the "Archived" drawer, or leaves it. */

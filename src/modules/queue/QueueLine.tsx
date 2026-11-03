@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { Archive, ArchiveRestore, CircleCheck, EyeOff, Pause, Pencil, Pin, SquareArrowOutUpRight } from 'lucide-react';
+import { Archive, ArchiveRestore, CircleCheck, EyeOff, Pause, Pencil, Pin, Play, SquareArrowOutUpRight } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import EntryDot from '@/modules/queue/EntryDot';
@@ -100,9 +100,9 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       </span>
       <span className={SLOT}>
         {e.sessionId && (
-          <button type="button" title="Put on hold until it replies again" className="opacity-0 hover:opacity-100 group-hover:opacity-70"
-            data-quests-line="dismiss" onClick={(event) => { event.stopPropagation(); onDismiss(); }}>
-            <Pause className="h-3 w-3" />
+          <button type="button" title={e.dismissed ? 'Take off hold' : 'Put on hold until it replies again'} className="opacity-0 hover:opacity-100 group-hover:opacity-70"
+            data-quests-line={e.dismissed ? 'undismiss' : 'dismiss'} onClick={(event) => { event.stopPropagation(); onDismiss(); }}>
+            {e.dismissed ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
           </button>
         )}
       </span>

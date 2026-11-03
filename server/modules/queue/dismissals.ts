@@ -17,3 +17,9 @@ export const dismissedAt = (entryKey: string): string | undefined => read()[entr
 export function dismiss(entryKey: string, replyAt: string): void {
   queueDb.setState(KEY, { ...read(), [entryKey]: replyAt });
 }
+
+/** Ends the entry's dismissal: it leaves "On hold" now (Noam, 3 Nov: "archive and on hold are currently sinks"). */
+export function undismiss(entryKey: string): void {
+  const { [entryKey]: _gone, ...rest } = read();
+  queueDb.setState(KEY, rest);
+}

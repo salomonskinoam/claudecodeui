@@ -678,6 +678,7 @@ export default function SidebarContent({
           <>
           <QueueForest />
           <QueueList
+            filter={searchFilter}
             onNewSession={() => {
               const project = projectListProps.selectedProject ?? projects[0];
               if (project) projectListProps.onNewSession(project);

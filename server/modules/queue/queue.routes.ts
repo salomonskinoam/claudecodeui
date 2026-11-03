@@ -42,11 +42,12 @@ router.put('/latch', asyncHandler(async (req: Request, res: Response) => {
   res.json(createApiSuccessResponse(setLatch(key)));
 }));
 
-// The trash icon: hide the entry's chat until it replies again.
+// The pause icon: the entry goes on hold until it replies again; `dismissed: false` takes it off hold now.
 router.put('/dismiss', asyncHandler(async (req: Request, res: Response) => {
-  const { key } = req.body ?? {};
+  const { key, dismissed } = req.body ?? {};
   if (typeof key !== 'string') throw bad('key is required.');
-  res.json(createApiSuccessResponse(dismissEntry(key)));
+  if (dismissed !== undefined && typeof dismissed !== 'boolean') throw bad('dismissed must be a boolean.');
+  res.json(createApiSuccessResponse(dismissEntry(key, dismissed ?? true)));
 }));
 
 // The archive icon: the entry goes to the "Archived" drawer, or leaves it.
