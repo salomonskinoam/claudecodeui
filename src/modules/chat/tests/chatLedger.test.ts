@@ -4,7 +4,7 @@ import { test } from 'vitest';
 
 import type { NormalizedMessage } from '@/shared/types';
 import {
-  appendLive, appendLocal, appendRead, appendStreamDelta, createLedger, cut, dropStreamTwins, endStream, markUndelivered, mergeLedgers, setOpen,
+  appendLive, appendLocal, appendRead, appendStreamDelta, createLedger, cut, dropBlobRows, dropStreamTwins, endStream, markUndelivered, mergeLedgers, setOpen,
   type Ledger,
 } from '@/modules/chat/ledger/chatLedger';
 
@@ -248,4 +248,19 @@ test('16. a whole reply landing while its pieces still stream confirms the strea
   assert.deepEqual(texts(bad).slice(-2), ['Short reply', 'Another']);
   assert.equal(bad.rows.at(-2)!.id, 'c2');
   assert.equal(dropStreamTwins(bad), false);
+});
+
+test('17: at load, the user rows the server once made from api-request-blob records are dropped; typed rows with the CLI uuid stay', () => {
+  const l = createLedger('s');
+  appendRead(l, [
+    row('14e50811-9b92-4a4a-b365-30da8ad0b540_text_0', 'user', 'create a ticket', 0),
+    row('b1', 'assistant', 'Done.', 1),
+    row('claude_05a6e225-a7a5-4dec-bb46-615695062d8a_text_2', 'user', 'create a ticket', 100),
+    row('claude_4be44b5a-9fcb-4853-b123-9d15b3a3c454_text_1', 'user', 'Tool loaded.', 100),
+    row('claude_4be44b5a-9fcb-4853-b123-9d15b3a3c454_text_3', 'assistant', 'An assistant row without a uuid stays', 101),
+  ], { direction: 'latest', epoch: 0, batch: true, now: T0 });
+  assert.equal(dropBlobRows(l), true);
+  assert.deepEqual(texts(l), ['create a ticket', 'Done.', 'An assistant row without a uuid stays']);
+  assert.equal(l.alias['claude_05a6e225-a7a5-4dec-bb46-615695062d8a_text_2'], undefined);
+  assert.equal(dropBlobRows(l), false);
 });

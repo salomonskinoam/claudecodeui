@@ -7,8 +7,9 @@ import { foldRuns, isReply, replyState, rowIdOf, segmentTurns, starterOf, type S
  * thing the page draws. Pure functions over a plain object, so the store and the tests drive the same code.
  *
  * The rules, each named by the invariant in the plan:
- *  I1  Grow only: nothing here removes a row. One exception, at load: `dropStreamTwins` removes a streamed copy
- *      that was never confirmed and stands beside the same reply (a duplicate drawn by a bug, never a source).
+ *  I1  Grow only: nothing here removes a row. Two exceptions, at load: `dropStreamTwins` removes a streamed copy
+ *      that was never confirmed and stands beside the same reply, and `dropBlobRows` removes the user rows the
+ *      server once made from the CLI's api-request-blob records (duplicates drawn by bugs, never a source).
  *  I2  Order is permanent: older history goes before the first row as a block, everything else after the last.
  *  I3  One row per id: `alias` maps every id ever seen (the row's, a local echo's, a transcript copy's) to its row.
  *  I4  A confirmation changes content only; a copy that would change the row's kind is refused.
@@ -549,6 +550,24 @@ export function dropStreamTwins(l: Ledger): boolean {
   const kept = l.rows.filter((_, i) => !twin(i));
   if (kept.length === l.rows.length) return false;
   const gone = new Set(l.rows.filter((_, i) => twin(i)).map((row) => row.id));
+  l.rows = kept;
+  l.alias = Object.fromEntries(Object.entries(l.alias).filter(([id, target]) => !gone.has(id) && !gone.has(target)));
+  return true;
+}
+
+/**
+ * The second exception to I1, at load. Until 3 Nov the server read the CLI's `api-request-blob` records (the
+ * whole API request, role user, no uuid) as user messages, each read with a new generated id (`claude_<uuid>`)
+ * and the read's time, so the page appended the chat's first prompt once more per read. A typed row from the
+ * transcript always carries the CLI's own uuid as its id, so a user text row from the transcript under a
+ * generated id can only be such a blob; it is dropped.
+ */
+const GENERATED_ID = /^claude_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(_|$)/;
+export function dropBlobRows(l: Ledger): boolean {
+  const blob = (row: LedgerRow): boolean => row.source === 'transcript' && isUserText(row) && GENERATED_ID.test(row.id);
+  const kept = l.rows.filter((row) => !blob(row));
+  if (kept.length === l.rows.length) return false;
+  const gone = new Set(l.rows.filter(blob).map((row) => row.id));
   l.rows = kept;
   l.alias = Object.fromEntries(Object.entries(l.alias).filter(([id, target]) => !gone.has(id) && !gone.has(target)));
   return true;
