@@ -55,7 +55,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
       latched={queue.latch === e.key}
       separator={separator}
       marker={marker}
-      drag={lineProps(e.key, e.rootKey === e.key && e.state !== 'permission' && e.key !== queue.latch)}
+      drag={lineProps(e.key, e.state !== 'permission' && e.key !== queue.latch)}
       onOpen={(event) => open(e, event)}
       onCloseTicket={() => setClosing(e)}
       onDismiss={() => setDismissing(e)}

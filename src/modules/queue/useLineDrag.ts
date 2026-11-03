@@ -7,9 +7,10 @@ const DRAG_TYPE = 'application/x-quests-queue';
 export type LineMarker = { key: string; below: boolean };
 
 /**
- * quests priority queue: dragging a line of the list. The list stays still; `marker` names the line under the
- * mouse and whether the dragged line lands above or below it. A drop inside the list sends the move to the
- * server (which applies the family rules); a drop outside changes nothing.
+ * quests priority queue: dragging a line of the list, any line but a permission prompt or the pinned chat.
+ * The list stays still; `marker` names the line under the mouse and whether the dragged line lands above or
+ * below it. A drop inside the list sends the move to the server (which applies the family rules: a blocker
+ * dragged past its parent takes the family along); a drop outside changes nothing.
  *
  * The move is "stand before this key" in the stored order, and the key is taken from the VIEW: the first line
  * at or below the landing spot that sits in the view where it sits in the stored order. A permission prompt or

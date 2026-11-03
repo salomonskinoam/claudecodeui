@@ -50,11 +50,20 @@ test('quests: an entry that leaves returns to its place; a change of state or of
   assert.deepEqual(view(back, null, [a, { ...b, open: true }, c]), ['A', 'B', 'C']);
 });
 
-test('dragging a root below its side quest carries the side quest; above its blocker carries the blocker', () => {
+test('dragging a root takes its whole family along as one block, in its own order', () => {
   const list = ['B', 'R', 'S', 'X', 'Y'];
-  assert.deepEqual(drag(list, fam, 'R', 'Y'), ['B', 'X', 'R', 'S', 'Y']); // B stays: it is still above R
-  assert.deepEqual(drag(['X', 'B', 'R', 'S', 'Y'], fam, 'R', 'X'), ['B', 'R', 'X', 'S', 'Y']);
+  assert.deepEqual(drag(list, fam, 'R', 'Y'), ['X', 'B', 'R', 'S', 'Y']);
+  assert.deepEqual(drag(['X', 'B', 'R', 'S', 'Y'], fam, 'R', 'X'), ['B', 'R', 'S', 'X', 'Y']);
   assert.deepEqual(drag(list, fam, 'X', null), ['B', 'R', 'S', 'Y', 'X']);
+  assert.deepEqual(drag(list, fam, 'R', 'S'), list); // dropped onto its own family: nothing moves
+});
+
+test('a blocker or side quest moves alone on its own side of its parent; past it, the family comes along', () => {
+  const list = ['B', 'X', 'R', 'S', 'Y'];
+  assert.deepEqual(drag(list, fam, 'B', 'R'), ['X', 'B', 'R', 'S', 'Y']); // B down to just above R: alone
+  assert.deepEqual(drag(list, fam, 'B', null), ['X', 'Y', 'B', 'R', 'S']); // B to the bottom: the three go
+  assert.deepEqual(drag(list, fam, 'S', 'X'), ['B', 'R', 'S', 'X', 'Y']); // S above R: the three go, S stays below R
+  assert.deepEqual(drag(['B', 'R', 'X', 'S', 'Y'], fam, 'S', 'X'), ['B', 'R', 'S', 'X', 'Y']); // S up, still below R: alone
 });
 
 test('the view puts the pinned entry first, above the permission prompts; nothing else moves for it', () => {
@@ -90,7 +99,7 @@ test('being open moves nothing; the pinned entry is first whatever it is', () =>
 test('sync from Cursor lifts the given keys to the top in their order, each with its family block', () => {
   assert.deepEqual(lift(['A', 'B', 'C', 'U'], [e('A', 'chat'), e('B', 'chat'), e('C', 'chat'), e('U', 'chat')], ['C', 'A']),
     ['C', 'A', 'B', 'U']);
-  assert.deepEqual(lift(['X', 'B', 'R', 'S', 'Y'], fam, ['R', 'gone']), ['B', 'R', 'X', 'S', 'Y']);
+  assert.deepEqual(lift(['X', 'B', 'R', 'S', 'Y'], fam, ['R', 'gone']), ['B', 'R', 'S', 'X', 'Y']); // the family block, S included
 });
 
 test('next skips the shown entry and entries that do not need Noam', () => {

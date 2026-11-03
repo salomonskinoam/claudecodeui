@@ -673,13 +673,32 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.mouse.up();
     await page.waitForTimeout(2500);
     const after = await drawerOrder();
+    // A blocker or side quest of the drawer dragged to the bottom: its whole family lands there, as one block.
+    const member = shown.find((k) => { const e = before.entries.find((x) => x.key === k); return e && e.rootKey !== k; });
+    let familyAtBottom = null;
+    if (member) {
+      const rootKey = before.entries.find((x) => x.key === member).rootKey;
+      const family = shown.filter((k) => before.entries.find((x) => x.key === k)?.rootKey === rootKey);
+      await page.locator(`[data-queue-key="${member}"]`).scrollIntoViewIfNeeded();
+      const a = await page.locator(`[data-queue-key="${member}"]`).boundingBox();
+      await page.locator(`[data-queue-key="${after[after.length - 1]}"]`).scrollIntoViewIfNeeded();
+      const b = await page.locator(`[data-queue-key="${after[after.length - 1]}"]`).boundingBox();
+      await page.mouse.move(a.x + 40, a.y + a.height / 2);
+      await page.mouse.down();
+      for (let i = 1; i <= 8; i++) await page.mouse.move(b.x + 40, a.y + (b.y + 22 - a.y) * (i / 8));
+      await page.mouse.up();
+      await page.waitForTimeout(2500);
+      const now = await drawerOrder();
+      familyAtBottom = { member, family, tail: now.slice(-family.length), ok: now.slice(-family.length).every((k) => family.includes(k)) };
+    }
     await page.reload();
     await page.waitForTimeout(6000);
     await drawer.click();
     await page.waitForTimeout(400);
     const reloaded = await drawerOrder();
     const stored = (await apiQueue()).view.filter((k) => shown.includes(k));
-    console.log(JSON.stringify({ roots: roots.length, first, last, movedAboveFirst: after.indexOf(last) < after.indexOf(first), storedSame: JSON.stringify(stored) === JSON.stringify(after), reloadSame: JSON.stringify(reloaded) === JSON.stringify(after) }));
+    const expected = familyAtBottom ? await drawerOrder() : after;
+    console.log(JSON.stringify({ roots: roots.length, first, last, movedAboveFirst: after.indexOf(last) < after.indexOf(first), storedSame: JSON.stringify(stored) === JSON.stringify(expected), reloadSame: JSON.stringify(reloaded) === JSON.stringify(expected), familyAtBottom }));
     await put('/order', { order: before.order });
   }
 

@@ -123,23 +123,30 @@ function closure(start: string, pairs: Array<[string, string]>, up: boolean): Se
 }
 
 /**
- * Move `key` to stand right before `beforeKey` (null: last). Every entry that must stay above it and now
- * stands below is lifted to just above it; every entry that must stay below it and now stands above is
- * dropped to just below it: the dragged block grows.
+ * Move `key` to stand right before `beforeKey` (null: last). Any entry can be dragged. A blocker or a side
+ * quest dragged on its own side of its parent moves alone; the root, or a member dragged past an entry it must
+ * stay above or below, takes the whole family along as one block, in its own order (Noam, 3 Nov: "the blockers
+ * can't PASS their parent and be below it, not that they can't move at all ... dragging them should have
+ * dragged the whole three together"). Dropped onto its own family: nothing moves.
  */
 export function drag(list: string[], entries: QueueOrderEntry[], key: string, beforeKey: string | null): string[] {
+  const byKey = index(entries);
+  const root = byKey.has(key) ? rootOf(key, byKey) : key;
+  const family = list.filter((k) => k === key || (byKey.has(k) && rootOf(k, byKey) === root));
+  const alone = list.filter((k) => k !== key);
+  const at = beforeKey === null ? alone.length : alone.indexOf(beforeKey);
+  alone.splice(at < 0 ? alone.length : at, 0, key);
+  const pos = alone.indexOf(key);
   const pairs = constraints(entries);
-  const l = list.filter((k) => k !== key);
-  const at = beforeKey === null ? l.length : l.indexOf(beforeKey);
-  l.splice(at < 0 ? l.length : at, 0, key);
-  const pos = l.indexOf(key);
   const up = closure(key, pairs, true);
   const down = closure(key, pairs, false);
-  const lift = l.filter((k, i) => up.has(k) && i > pos);
-  const drop = l.filter((k, i) => down.has(k) && i < pos);
-  const rest = l.filter((k) => !lift.includes(k) && !drop.includes(k));
-  const p = rest.indexOf(key);
-  return settle([...rest.slice(0, p), ...lift, key, ...drop, ...rest.slice(p + 1)], entries);
+  const crossed = alone.some((k, i) => (up.has(k) && i > pos) || (down.has(k) && i < pos));
+  if (key !== root && !crossed) return settle(alone, entries);
+  if (beforeKey !== null && family.includes(beforeKey)) return settle(list, entries);
+  const rest = list.filter((k) => !family.includes(k));
+  const target = beforeKey === null ? rest.length : rest.indexOf(beforeKey);
+  rest.splice(target < 0 ? rest.length : target, 0, ...family);
+  return settle(rest, entries);
 }
 
 /** Move `keys` to the top, in their given order, each as a drag does: its family block comes along. */
