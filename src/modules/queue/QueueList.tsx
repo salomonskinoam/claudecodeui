@@ -36,7 +36,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
   const blinking = useBlink(queue);
   const [closing, setClosing] = useState<QueueEntry | null>(null);
   // quests: a right-click on a line opens the chat's menu (rename, pin, send to the end, on hold, Cursor, the ticket).
-  const [menu, setMenu] = useState<{ sessionId: string; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{ sessionId: string; entryKey: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<QueueEntry | null>(null);
   // quests: Noam's groups of unclaimed tickets: a right-click on a ticket or a group header, and the header being renamed.
   const [ticketMenu, setTicketMenu] = useState<{ target: { ticket: number } | { group: number }; x: number; y: number } | null>(null);
@@ -63,7 +63,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
       onDismiss={() => void dismissQueueEntry(e.key)}
       onSendToEnd={() => void sendQueueEntryToEnd(e.key)}
       onArchive={() => void setQueueArchived(e.key, !e.archived)}
-      onMenu={e.sessionId ? (event) => { event.preventDefault(); setMenu({ sessionId: e.sessionId as string, x: event.clientX, y: event.clientY }); }
+      onMenu={e.sessionId ? (event) => { event.preventDefault(); setMenu({ sessionId: e.sessionId as string, entryKey: e.key, x: event.clientX, y: event.clientY }); }
         : e.number !== null && e.state === 'unclaimed' ? (event) => { event.preventDefault(); setTicketMenu({ target: { ticket: e.number as number }, x: event.clientX, y: event.clientY }); } : undefined}
       onRename={e.sessionId ? () => setRenaming(e) : undefined}
     />
@@ -88,7 +88,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
         ))}
       </div>
       {closing && <CloseTicketDialog entry={closing} entries={queue.entries} onDone={() => setClosing(null)} />}
-      {menu && <TabContextMenu sessionId={menu.sessionId} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
+      {menu && <TabContextMenu sessionId={menu.sessionId} entryKey={menu.entryKey} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
       {ticketMenu && <TicketGroupMenu target={ticketMenu.target} x={ticketMenu.x} y={ticketMenu.y} onRename={setRenamingGroup} onClose={() => setTicketMenu(null)} />}
       {renaming?.sessionId && <RenameDialog sessionId={renaming.sessionId} current={renaming.chatName ?? renaming.title} onDone={() => setRenaming(null)} />}
     </div>

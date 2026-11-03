@@ -15,8 +15,8 @@ export type Ticket = {
   createdAt: string;
   labels: string[];
   parent: { number: number; state: string } | null;
-  /** Claims in comment order, the newest last. */
-  claims: Array<{ name: string; sid: string }>;
+  /** Claims in comment order, the newest last; `at` is the comment's time (epoch ms). */
+  claims: Array<{ name: string; sid: string; at: number }>;
   /** Session ids in the "## Blocks" section. */
   blocksSids: string[];
   /** The session id in the "## Parent chat" section. */
@@ -34,12 +34,12 @@ const section = (body: string, name: string): string =>
 const QUERY = `query($cursor: String) { repository(owner: "salomonskinoam", name: "tickets") {
   issues(states: OPEN, first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes {
     number title url body createdAt labels(first: 20) { nodes { name } } parent { number state }
-    comments(last: 50) { nodes { body } } } } } }`;
+    comments(last: 50) { nodes { body createdAt } } } } } }`;
 
 type IssueNode = {
   number: number; title: string; url: string; body: string; createdAt: string;
   labels: { nodes: Array<{ name: string }> }; parent: { number: number; state: string } | null;
-  comments: { nodes: Array<{ body: string }> };
+  comments: { nodes: Array<{ body: string; createdAt: string }> };
 };
 
 export async function refreshTickets(): Promise<void> {
@@ -58,7 +58,7 @@ export async function refreshTickets(): Promise<void> {
     createdAt: n.createdAt,
     labels: n.labels.nodes.map((l) => l.name),
     parent: n.parent,
-    claims: n.comments.nodes.flatMap((c) => [...c.body.matchAll(CLAIM)].map((m) => ({ name: m[1], sid: m[2] }))),
+    claims: n.comments.nodes.flatMap((c) => [...c.body.matchAll(CLAIM)].map((m) => ({ name: m[1], sid: m[2], at: Date.parse(c.createdAt) || 0 }))),
     blocksSids: [...section(n.body, 'Blocks').matchAll(SID)].map((m) => m[0]),
     parentChatSid: section(n.body, 'Parent chat').match(SID)?.[0] ?? null,
     body: n.body,

@@ -84,15 +84,34 @@ export function buildEntries(): QueueEntry[] {
   const over = (sid: string) => chats.get(sid)?.finalized ?? false;
 
   // A ticket shows its newest claimant whose chat is not over. A claim by a finalized chat does not count: the
-  // ticket drops back to the ticket level, as if unclaimed (Noam 2026-10-27). A chat's own ticket is the open one
-  // it claimed without an open parent, else the first it claimed (the tickets' session start hook).
+  // ticket drops back to the ticket level, as if unclaimed (Noam 2026-10-27). One chat holds one ticket (Noam,
+  // 3 Nov: "never allow two tickets to be owned by the same chat again"): a chat that would hold several keeps
+  // the one it claimed first, its claims on the others do not count, and the others go to their next claimant,
+  // or to the ticket level. A chat's own ticket is the open one it claimed without an open parent, else the
+  // first it claimed (the tickets' session start hook).
   const claimant = new Map<number, string>();
   const ticketOf = new Map<string, number>();
+  const ignored = new Set<string>(); // `${sid}:${number}`: a claim that does not count
+  for (;;) {
+    claimant.clear();
+    for (const t of tickets) {
+      const c = t.claims.filter((x) => !over(x.sid) && !ignored.has(`${x.sid}:${t.number}`)).pop();
+      if (c) claimant.set(t.number, c.sid);
+    }
+    const held = new Map<string, number[]>();
+    for (const [number, sid] of claimant) held.set(sid, [...(held.get(sid) ?? []), number]);
+    let changed = false;
+    for (const [sid, numbers] of held) {
+      if (numbers.length < 2) continue;
+      const first = (n: number) => tickets.find((t) => t.number === n)!.claims.find((x) => x.sid === sid)!.at;
+      const keep = numbers.reduce((a, b) => (first(b) < first(a) ? b : a));
+      for (const n of numbers) if (n !== keep) { ignored.add(`${sid}:${n}`); changed = true; }
+    }
+    if (!changed) break;
+  }
   for (const t of tickets) {
-    const c = t.claims.filter((x) => !over(x.sid)).pop();
-    if (c) claimant.set(t.number, c.sid);
     const isRoot = !(t.parent && t.parent.state === 'OPEN' && openTickets.has(t.parent.number));
-    for (const { sid } of t.claims) if (!ticketOf.has(sid) || isRoot) ticketOf.set(sid, t.number);
+    for (const { sid } of t.claims) if (!ignored.has(`${sid}:${t.number}`) && (!ticketOf.has(sid) || isRoot)) ticketOf.set(sid, t.number);
   }
 
   const entries: Omit<QueueEntry, 'rootKey' | 'group' | 'waitsForMe' | 'dismissed' | 'archived' | 'archivedAt'>[] = [];

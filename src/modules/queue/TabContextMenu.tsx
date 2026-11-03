@@ -9,6 +9,8 @@ import { entryOfChat } from '@/modules/queue/types';
 type TabContextMenuProps = {
   /** The tab's chat (its page session id). */
   sessionId: string;
+  /** From a list line: that line's entry, so a chat holding two tickets gets the right ticket items. */
+  entryKey?: string;
   x: number;
   y: number;
   onClose: () => void;
@@ -22,10 +24,10 @@ const item = 'block w-full px-3 py-1 text-left text-[13px] text-[#cccccc] hover:
  * quests: the right-click menu of a tab, with the chat's options of its line in the list (Noam, 2 Nov: "right
  * click on the tab in the tabs page should also give chat options from the list view such as the hide").
  */
-export default function TabContextMenu({ sessionId, x, y, onClose, onCloseTab }: TabContextMenuProps) {
+export default function TabContextMenu({ sessionId, entryKey, x, y, onClose, onCloseTab }: TabContextMenuProps) {
   const queue = useQueue();
   const navigate = useNavigate();
-  const entry = entryOfChat(queue.entries, sessionId);
+  const entry = entryKey ? queue.entries.find((e) => e.key === entryKey) : entryOfChat(queue.entries, sessionId);
   const [dialog, setDialog] = useState<'ticket' | 'rename' | null>(null);
 
   useEffect(() => {
