@@ -24,7 +24,7 @@ type QueueListProps = {
 
 /**
  * quests priority queue: the session list. In focus mode (the default) the chats that wait for Noam, then three
- * collapsed groups, "On hold", "Live chats" and "Tickets-Unclaimed"; in archive mode every entry in queue order, with a
+ * collapsed groups, "Live chats", "On hold", "Tickets-Unclaimed" and "Archived"; in archive mode every entry in queue order, with a
  * separator before the tickets no chat has claimed.
  */
 export default function QueueList({ onNewSession, onStartTicket }: QueueListProps) {
@@ -65,9 +65,10 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
       onRename={e.sessionId ? () => setRenaming(e) : undefined}
     />
   );
-  // The "Archived" drawer is the last group in both modes (Noam, 3 Nov: "a button to archive, and an archive drawer").
+  // The drawers, in the order Noam set (3 Nov): "the queue, live chats, on hold, tickets unclaimed, archive".
+  // "Archived" is the last group in both modes.
   const groups: Array<[string, QueueEntry[]]> = mode === 'focus'
-    ? [['On hold', hold], ['Live chats', live], ['Tickets-Unclaimed', unclaimed], ['Archived', archived]]
+    ? [['Live chats', live], ['On hold', hold], ['Tickets-Unclaimed', unclaimed], ['Archived', archived]]
     : [['Archived', archived]];
 
   return (

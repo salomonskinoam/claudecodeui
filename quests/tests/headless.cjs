@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -42,7 +42,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   await page.addInitScript((t) => localStorage.setItem('auth-token', t), token);
   // The list's default (focus) shows only the chats that wait for the user; every check but `focus` reads the
   // whole list, so they open the page in archive mode.
-  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), check === 'focus' || check === 'hold' ? 'focus' : 'archive');
+  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), ['focus', 'hold', 'archived', 'dragunclaimed'].includes(check) ? 'focus' : 'archive');
   page.on('pageerror', (error) => console.log('page error:', (error.stack || error.message).slice(0, 700)));
   await page.goto(check === 'plan' ? 'http://127.0.0.1:3001/' : `http://127.0.0.1:3001/session/${sessionId}`);
   await page.waitForTimeout(6000);
@@ -646,6 +646,41 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(400);
     const members = await group.locator('xpath=..').locator('[data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
     console.log(JSON.stringify({ label, dismissed: dismissed.length, members: members.length, same: JSON.stringify(members) === JSON.stringify(dismissed) }));
+  }
+
+  if (check === 'dragunclaimed') {
+    // Focus mode, the "Tickets-Unclaimed" drawer open: its last root ticket is dragged above its first; the
+    // stored order must hold it there, and still after a reload. The stored order is put back at the end.
+    const before = await apiQueue();
+    const put = (route, body) => page.evaluate(async ([r, b]) => fetch(`/api/quests/queue${r}`, {
+      method: 'PUT', headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(b),
+    }), [route, body]);
+    const drawer = page.locator('[data-quests-group="Tickets-Unclaimed"]');
+    const drawerOrder = async () => drawer.locator('xpath=..').locator('[data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
+    await drawer.click();
+    await page.waitForTimeout(400);
+    const shown = await drawerOrder();
+    const roots = shown.filter((k) => { const e = before.entries.find((x) => x.key === k); return e && e.rootKey === k; });
+    const first = roots[0];
+    const last = roots[roots.length - 1];
+    await page.locator(`[data-queue-key="${last}"]`).scrollIntoViewIfNeeded();
+    const from = await page.locator(`[data-queue-key="${last}"]`).boundingBox();
+    const to = await page.locator(`[data-queue-key="${first}"]`).boundingBox();
+    await page.mouse.move(from.x + 40, from.y + from.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(to.x + 40, from.y + (to.y + 3 - from.y) * (i / 8));
+    await page.mouse.up();
+    await page.waitForTimeout(2500);
+    const after = await drawerOrder();
+    await page.reload();
+    await page.waitForTimeout(6000);
+    await drawer.click();
+    await page.waitForTimeout(400);
+    const reloaded = await drawerOrder();
+    const stored = (await apiQueue()).view.filter((k) => shown.includes(k));
+    console.log(JSON.stringify({ roots: roots.length, first, last, movedAboveFirst: after.indexOf(last) < after.indexOf(first), storedSame: JSON.stringify(stored) === JSON.stringify(after), reloadSame: JSON.stringify(reloaded) === JSON.stringify(after) }));
+    await put('/order', { order: before.order });
   }
 
   if (check === 'archived') {

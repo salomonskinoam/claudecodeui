@@ -6,9 +6,9 @@ import { isChat, type QueueEntry } from '@/modules/queue/types';
 
 /**
  * quests priority queue: what the list shows. Two modes.
- *   focus    the default: only the chats that wait for Noam, plus the chat on screen; below them three collapsed
- *            lines, "On hold (n)" (the chats Noam put on hold, until they reply again), "Live chats (n)" (every
- *            chat with a process, whatever its state) and "Tickets-Unclaimed (n)"
+ *   focus    the default: only the chats that wait for Noam, plus the chat on screen; below them the collapsed
+ *            lines "Live chats (n)" (every chat with a process, whatever its state), "On hold (n)" (the chats
+ *            Noam put on hold, until they reply again) and "Tickets-Unclaimed (n)"
  *   archive  everything, as the stored order has it, in its three groups
  * In both modes the entries Noam archived are only in the "Archived (n)" drawer at the bottom.
  * Noam, 28 Oct: "the philosophy is to filter for the user only chats that require attention. the rest is spam."
