@@ -6,6 +6,7 @@ import { useEntryLook } from '@/modules/queue/entryLook';
 import QueueGroupLine from '@/modules/queue/QueueGroupLine';
 import QueueLine from '@/modules/queue/QueueLine';
 import QueueToolbar from '@/modules/queue/QueueToolbar';
+import TabContextMenu from '@/modules/queue/TabContextMenu';
 import { setQueueOpener } from '@/modules/queue/queueNavigation';
 import { sendQueueEntryToEnd, useQueue } from '@/modules/queue/queueStore';
 import { useQueueView } from '@/modules/queue/queueView';
@@ -34,6 +35,8 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
   const blinking = useBlink(queue);
   const [closing, setClosing] = useState<QueueEntry | null>(null);
   const [dismissing, setDismissing] = useState<QueueEntry | null>(null);
+  // quests: a right-click on a line opens the chat's menu (rename, pin, send to the end, hide, Cursor, the ticket).
+  const [menu, setMenu] = useState<{ sessionId: string; x: number; y: number } | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const toggle = (label: string) => setOpenGroups((g) => { const n = new Set(g); if (n.has(label)) n.delete(label); else n.add(label); return n; });
 
@@ -55,6 +58,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
       onCloseTicket={() => setClosing(e)}
       onDismiss={() => setDismissing(e)}
       onSendToEnd={() => void sendQueueEntryToEnd(e.key)}
+      onMenu={e.sessionId ? (event) => { event.preventDefault(); setMenu({ sessionId: e.sessionId as string, x: event.clientX, y: event.clientY }); } : undefined}
     />
   );
   const groups: Array<[string, QueueEntry[]]> = [['Live chats', live], ['Tickets-Unclaimed', unclaimed]];
@@ -72,6 +76,7 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
         ))}
       </div>
       {closing && <CloseTicketDialog entry={closing} entries={queue.entries} onDone={() => setClosing(null)} />}
+      {menu && <TabContextMenu sessionId={menu.sessionId} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
       {dismissing && <DismissDialog entry={dismissing} onDone={() => setDismissing(null)} />}
     </div>
   );

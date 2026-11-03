@@ -30,13 +30,15 @@ type QueueLineProps = {
   onDismiss: () => void;
   /** The slashed eye: the entry goes to the end of the queue (no question asked). */
   onSendToEnd: () => void;
+  /** A right-click: the chat's menu (rename, pin, hide, ...). */
+  onMenu?: (event: MouseEvent) => void;
 };
 
 /**
  * quests priority queue: one line of the list. The chat's dot, the kind's sign, the title, and on the right five
  * icon columns: the pin, send to the end, hide (the trash), the Cursor link, the ticket's close button.
  */
-export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onDismiss, onSendToEnd }: QueueLineProps) {
+export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onDismiss, onSendToEnd, onMenu }: QueueLineProps) {
   return (
     <div
       data-queue-key={e.key}
@@ -44,6 +46,7 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       onMouseEnter={look.onMouseEnter}
       onMouseLeave={look.onMouseLeave}
       onClick={onOpen}
+      onContextMenu={onMenu}
       title={e.chatName ?? e.title}
       className={cn(
         'group relative mx-1 flex h-[26px] cursor-pointer items-center gap-2 rounded-sm px-2 text-[15px] text-[#cccccc]',

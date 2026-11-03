@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
+import { renameSession as renameClaudeSession } from '@anthropic-ai/claude-agent-sdk';
+
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
@@ -748,7 +750,7 @@ export const sessionsService = {
   /**
    * Renames one session by id without requiring the caller to pass provider.
    */
-  renameSessionById(sessionId: string, summary: string): { sessionId: string; summary: string } {
+  async renameSessionById(sessionId: string, summary: string): Promise<{ sessionId: string; summary: string }> {
     const session = sessionsDb.getSessionById(sessionId);
     if (!session) {
       throw new AppError(`Session "${sessionId}" was not found.`, {
@@ -758,6 +760,13 @@ export const sessionsService = {
     }
 
     sessionsDb.updateSessionCustomName(sessionId, summary);
+    // quests: the transcript's custom title too (the Agent SDK writes the same line a rename in Cursor writes), so
+    // Cursor, the queue and the tabs all read the new name.
+    if (session.provider === 'claude') {
+      await renameClaudeSession(session.provider_session_id ?? sessionId, summary).catch((error: unknown) => {
+        console.warn('[quests] the transcript title was not written:', error instanceof Error ? error.message : String(error));
+      });
+    }
     return { sessionId, summary };
   },
 };

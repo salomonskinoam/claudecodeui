@@ -7,6 +7,7 @@ import { useEntryLook } from '@/modules/queue/entryLook';
 import EntryTitle from '@/modules/queue/EntryTitle';
 import KindSign from '@/modules/queue/KindSign';
 import { openQueueEntry } from '@/modules/queue/queueNavigation';
+import TabContextMenu from '@/modules/queue/TabContextMenu';
 import { useQueue } from '@/modules/queue/queueStore';
 import { useQueueView } from '@/modules/queue/queueView';
 import type { QueueEntry } from '@/modules/queue/types';
@@ -20,6 +21,7 @@ export default function QueueForest() {
   const queue = useQueue();
   const { lines } = useQueueView();
   const lookOf = useEntryLook();
+  const [menu, setMenu] = useState<{ sessionId: string; x: number; y: number } | null>(null);
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const rank = new Map(queue.view.map((k, i) => [k, i]));
   const byRank = (a: QueueEntry, b: QueueEntry) => (rank.get(a.key) ?? 0) - (rank.get(b.key) ?? 0);
@@ -47,6 +49,7 @@ export default function QueueForest() {
           onMouseEnter={look.onMouseEnter}
           onMouseLeave={look.onMouseLeave}
           onClick={() => openQueueEntry(e)}
+          onContextMenu={e.sessionId ? (event) => { event.preventDefault(); setMenu({ sessionId: e.sessionId as string, x: event.clientX, y: event.clientY }); } : undefined}
           className={cn('mt-0.5 flex h-[20px] max-w-[150px] cursor-pointer items-center gap-1 rounded-sm px-1 text-[12px] text-[#cccccc]',
             look.shownClass, look.hoverClass)}
           style={{ backgroundColor: look.color }}
@@ -71,6 +74,7 @@ export default function QueueForest() {
 
   return (
     <div data-quests-queue="forest" className="mx-1 mb-2 max-h-[33vh] overflow-auto border-b border-[#454647] pb-2">
+      {menu && <TabContextMenu sessionId={menu.sessionId} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
       <div className="flex w-max items-start gap-2">
         {roots.map((r) => node(r, 0))}
       </div>
