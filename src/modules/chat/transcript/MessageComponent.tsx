@@ -213,7 +213,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               onClick={() => setReportOpen((open) => !open)}
             >
               <span className="inline-block w-3">{reportOpen ? '▾' : '▸'}</span>
-              Report handed to the chat by {message.agentReportFrom}
+              Handed to the chat by {message.agentReportFrom}
             </button>
           )}
           {/* quests: a new response starts with a bold line, no avatar or name. */}

@@ -55,9 +55,9 @@ test('quests: turns whose reply has one state fold, all but the last; a typed me
 test('quests: a lone reply, or replies that differ, never fold', () => {
   assert.equal(foldRepeatedReplies([reply('a', `one\n${STATE}`)]).size, 0);
   assert.equal(foldRepeatedReplies([reply('a', 'first done'), reply('b', 'second done')]).size, 0);
-  // Two texts in one turn are one turn: nothing folds. The hook's re-send (the same reply, the closing block added) does.
+  // Two texts in one turn are one turn: nothing folds. A reply and its re-send after the stop hook never fold:
+  // the first holds the content, the re-send may hold only the closing lines.
   assert.equal(foldRepeatedReplies([reply('a', 'second done'), reply('b', 'second done')]).size, 0);
-  const hook = { type: 'user', content: 'Stop hook feedback: no closing line', timestamp: 'h' } as ChatMessage;
-  // The first attempt folds; the hook's feedback starts the shown turn, so it stays.
-  assert.equal(foldRepeatedReplies([reply('a', 'second done'), hook, reply('b', `second done\n${STATE}`)]).size, 1);
+  const hook = { type: 'assistant', agentReportFrom: 'the stop hook', content: 'no closing line', timestamp: 'h' } as ChatMessage;
+  assert.equal(foldRepeatedReplies([reply('a', 'second done'), hook, reply('b', `Running: nothing\n${STATE}`)]).size, 0);
 });

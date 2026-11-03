@@ -11,7 +11,8 @@ import type { ChatMessage } from '@/shared/types';
  * line has its whole text as its state (exact repeats). Between two messages Noam typed, consecutive replies
  * with the same state form a run. In a run of two or more, every reply but the last is folded, with everything between
  * it and the last reply (the steps and reports in between): one line says how many replies said the same and
- * when, and shows them on click. The last reply, the newest word, stays.
+ * when, and shows them on click. The last reply, the newest word, stays. A reply without the closing block and
+ * its re-send after the stop hook's feedback have different states, so they never fold into each other.
  */
 
 export type ReplyFold = {
@@ -39,10 +40,11 @@ export function replyState(text: string): string {
 }
 
 const isReply = (m: ChatMessage): boolean =>
-  m.type === 'assistant' && !m.isToolUse && !m.isThinking && !m.isTaskNotification && typeof m.content === 'string' && m.content.trim() !== '';
+  m.type === 'assistant' && !m.isToolUse && !m.isThinking && !m.isTaskNotification && !m.agentReportFrom
+  && typeof m.content === 'string' && m.content.trim() !== '';
 
-/** A row that starts a turn: a user row (typed, or a hook's feedback), or a task's report (shown as an assistant row). */
-const startsTurn = (m: ChatMessage): boolean => (m.type === 'user' && !m.isToolUse) || Boolean(m.isTaskNotification);
+/** A row that starts a turn: a user row, a task's report, or what a hook or an agent handed in (framed rows). */
+const startsTurn = (m: ChatMessage): boolean => (m.type === 'user' && !m.isToolUse) || Boolean(m.isTaskNotification) || Boolean(m.agentReportFrom);
 
 /** A message Noam typed: a user row that is not a hook's feedback (the hook writes as the user). */
 const isTyped = (m: ChatMessage): boolean => {
@@ -59,7 +61,7 @@ const isTyped = (m: ChatMessage): boolean => {
  */
 export function foldRepeatedReplies(messages: ChatMessage[]): Map<ChatMessage, ReplyFold> {
   const folds = new Map<ChatMessage, ReplyFold>();
-  type Turn = { start: number; reply: number; state: string; whole: boolean };
+  type Turn = { start: number; reply: number; state: string };
   let run: Turn[] = [];
   const close = () => {
     if (run.length >= 2) {
@@ -81,11 +83,11 @@ export function foldRepeatedReplies(messages: ChatMessage[]): Map<ChatMessage, R
     if (reply < 0) return;
     const text = messages[reply].content as string;
     const state = replyState(text);
-    const turn: Turn = { start, reply, state, whole: state === normalize(text) };
+    const turn: Turn = { start, reply, state };
     const previous = run[run.length - 1];
-    // The hook's re-send: a reply without the closing line, then the same reply with it. Same run.
-    const resend = previous?.whole && normalize(text).startsWith(previous.state);
-    if (previous && previous.state !== state && !resend) close();
+    // A reply the stop hook sent back and its re-send never fold into each other: the first holds the content,
+    // the re-send often only the closing lines (Noam, 2 Nov: "it collapsed all model text that came before it").
+    if (previous && previous.state !== state) close();
     run.push(turn);
   };
   let start = 0;

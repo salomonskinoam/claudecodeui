@@ -966,6 +966,20 @@ async function loadMcpConfig(cwd) {
  */
 async function queryClaudeSDK(command, options = {}, ws, context) {
   const { sessionId } = options;
+  // quests: a chat whose folder is gone (the worktree of a finalized chat) runs in the repo that folder belonged
+  // to, and the page is told. A missing folder made the spawn fail with ENOENT, which the SDK reported as "Claude
+  // Code native binary not found" (2 Nov, "Catalogue review run" in the removed chat-20261028-1458-0fbea6ac
+  // worktree).
+  if (options.cwd) {
+    const gone = await fs.access(options.cwd).then(() => false, () => true);
+    if (gone) {
+      const root = options.cwd.replace(/\/\.claude\/worktrees\/[^/]+(\/.*)?$/, '');
+      const rootOk = root !== options.cwd && (await fs.access(root).then(() => true, () => false));
+      const summary = `The chat's folder ${options.cwd} no longer exists (a removed worktree). ${rootOk ? `The chat runs in ${root}.` : 'There is no folder to run it in.'}`;
+      ws.send(createNormalizedMessage({ kind: 'text', role: 'user', content: `<task-notification>\n<status>stopped</status>\n<summary>${summary}</summary>`, sessionId: sessionId || null, provider: 'claude' }));
+      if (rootOk) options = { ...options, cwd: root };
+    }
+  }
   // quests: a pushed turn may carry a newer name.
   let { sessionSummary } = options;
   // Callers pass the stable app session id; the SDK only understands the

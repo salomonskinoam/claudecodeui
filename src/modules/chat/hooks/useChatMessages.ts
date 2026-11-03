@@ -56,6 +56,8 @@ function parseInjectedMessage(content: string): { from: string; body: string } |
   const head = content.trimStart();
   // Claude Code's own notices to the model, one line each.
   if (/^Tools? loaded\b/.test(head)) return { note: head.split('\n', 1)[0].slice(0, 120) };
+  // A hook's feedback (the stop hook sends a reply back): the hook's words, handed to the model, not Noam's.
+  if (head.startsWith('Stop hook feedback')) return { from: 'the stop hook', body: head.replace(/^Stop hook feedback:?\s*/, '') };
   if (!head.startsWith('Another Claude session sent a message') && !head.startsWith('<agent-message') && !head.startsWith('<cross-session-message')) {
     return null;
   }
