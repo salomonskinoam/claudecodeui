@@ -11,16 +11,18 @@
  * ledger changed. No merge of lists, no removal by text, no sort lives here any more.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
 import type { LLMProvider, NormalizedMessage } from '@/shared/types';
 import { SESSION_MESSAGES_PAGE_SIZE } from '@/modules/chat/utils/sessionMessagePagination';
 import type { SessionMessagesRequestOptions } from '@/modules/chat/utils/sessionMessagePagination';
 import {
-  appendLive, appendLocal, appendRead, appendStreamDelta, createLedger, cut, endStream, markUndelivered, setOpen as setLedgerOpen,
+  appendLive, appendLocal, appendRead, appendStreamDelta, createLedger, cut, endStream, markUndelivered, mergeLedgers,
   UNDELIVERED_AFTER_MS, type Ledger,
 } from '@/modules/chat/ledger/chatLedger';
+import { loadLedger, openKeysOf, saveLedger } from '@/modules/chat/ledger/ledgerStorage';
+import { onRowOpenChange, openKeys, seedRowOpen } from '@/modules/chat/ledger/rowOpen';
 
 // ─── Per-session slot ────────────────────────────────────────────────────────
 
@@ -28,6 +30,8 @@ export type SessionStatus = 'idle' | 'loading' | 'streaming' | 'error';
 
 export type SessionSlot = {
   ledger: Ledger;
+  /** Settles once the ledger this viewer stored for the chat has been loaded in (or there was none). */
+  ready: Promise<void>;
   /**
    * @internal Serializes history reads for this session so an older-page
    * request calculates its offset after any latest-page refresh completes.
@@ -44,12 +48,24 @@ export type SessionSlot = {
 
 const EMPTY: NormalizedMessage[] = [];
 const SESSION_HISTORY_REQUEST_TIMEOUT_MS = 30_000;
+/** A change is saved this long after the last one. */
+const SAVE_DEBOUNCE_MS = 1000;
 /** The biggest bridge read after a long absence. */
 const MAX_BRIDGE_ROWS = 5000;
+
+/** How many of a ledger's rows the transcript has served: where the next older page starts. */
+function transcriptRowCount(ledger: Ledger): number {
+  const confirmed = new Set<string>();
+  for (const [id, rowId] of Object.entries(ledger.alias)) {
+    if (!id.startsWith('local_') && !id.startsWith('__stream_')) confirmed.add(rowId);
+  }
+  return ledger.rows.filter((row) => row.source === 'transcript' || confirmed.has(row.id)).length;
+}
 
 function createEmptySlot(sessionId: string): SessionSlot {
   return {
     ledger: createLedger(sessionId),
+    ready: Promise.resolve(),
     status: 'idle',
     fetchedAt: 0,
     total: 0,
@@ -77,7 +93,8 @@ function enqueueHistoryMutation<T>(
   slot: SessionSlot,
   operation: () => Promise<T>,
 ): Promise<T> {
-  const result = slot._historyMutationQueue.then(operation);
+  // Every read waits for the stored ledger: a page is confirmed against what the viewer saw before.
+  const result = slot._historyMutationQueue.then(() => slot.ready).then(operation);
   slot._historyMutationQueue = result.then(
     () => undefined,
     () => undefined,
@@ -187,11 +204,34 @@ export function useSessionStore() {
   // allocates them before the first send), so slots are keyed directly with
   // no alias/redirect indirection.
   const [, setTick] = useState(0);
+  // The ledger is saved per viewer (requirement 52), a second after its last change and when the page hides.
+  const saveTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const saveNow = useCallback((sessionId: string) => {
+    const timer = saveTimersRef.current.get(sessionId);
+    if (timer) clearTimeout(timer);
+    saveTimersRef.current.delete(sessionId);
+    const slot = storeRef.current.get(sessionId);
+    if (slot && slot.ledger.rows.length > 0) void saveLedger(slot.ledger, openKeysOf(slot.ledger, openKeys()));
+  }, []);
+  const scheduleSave = useCallback((sessionId: string) => {
+    const timers = saveTimersRef.current;
+    const timer = timers.get(sessionId);
+    if (timer) clearTimeout(timer);
+    timers.set(sessionId, setTimeout(() => saveNow(sessionId), SAVE_DEBOUNCE_MS));
+  }, [saveNow]);
   const notify = useCallback((sessionId: string) => {
+    scheduleSave(sessionId);
     if (sessionId === activeSessionIdRef.current) {
       setTick(n => n + 1);
     }
-  }, []);
+  }, [scheduleSave]);
+  useEffect(() => {
+    const flush = () => { for (const sessionId of [...saveTimersRef.current.keys()]) saveNow(sessionId); };
+    window.addEventListener('pagehide', flush);
+    // A click on a row (its open state lives beside the ledger) is saved with the chat it belongs to.
+    const unsubscribe = onRowOpenChange(() => { if (activeSessionIdRef.current) scheduleSave(activeSessionIdRef.current); });
+    return () => { window.removeEventListener('pagehide', flush); unsubscribe(); };
+  }, [saveNow, scheduleSave]);
 
   const setActiveSession = useCallback((sessionId: string | null) => {
     activeSessionIdRef.current = sessionId;
@@ -200,7 +240,17 @@ export function useSessionStore() {
   const getSlot = useCallback((sessionId: string): SessionSlot => {
     const store = storeRef.current;
     if (!store.has(sessionId)) {
-      store.set(sessionId, createEmptySlot(sessionId));
+      const slot = createEmptySlot(sessionId);
+      // What this viewer saw of the chat before: loaded first, so a reload draws the chat as it was. Rows that
+      // arrive meanwhile are merged after it in their order.
+      slot.ready = loadLedger(sessionId).then((stored) => {
+        if (!stored) return;
+        slot.ledger = slot.ledger.rows.length === 0 ? stored : mergeLedgers(stored, slot.ledger);
+        slot.offset = Math.max(slot.offset, transcriptRowCount(slot.ledger));
+        seedRowOpen(Object.keys(stored.open));
+        if (sessionId === activeSessionIdRef.current) setTick(n => n + 1);
+      }).catch(() => undefined);
+      store.set(sessionId, slot);
     }
     return store.get(sessionId)!;
   }, []);
@@ -421,12 +471,6 @@ export function useSessionStore() {
     return storeRef.current.get(sessionId);
   }, []);
 
-  /** A row's open state, from a click (requirement 52, point 5). */
-  const setOpen = useCallback((sessionId: string, key: string, open: boolean) => {
-    const slot = getSlot(sessionId);
-    if (setLedgerOpen(slot.ledger, key, open)) notify(sessionId);
-  }, [getSlot, notify]);
-
   return useMemo(() => ({
     fetchFromServer,
     fetchMore,
@@ -439,11 +483,10 @@ export function useSessionStore() {
     finalizeStreaming,
     getMessages,
     getSessionSlot,
-    setOpen,
   }), [
     fetchFromServer, fetchMore, appendRealtime, truncateAt, refreshLatestFromServer,
     setActiveSession, isStale, updateStreaming, finalizeStreaming,
-    getMessages, getSessionSlot, setOpen,
+    getMessages, getSessionSlot,
   ]);
 }
 

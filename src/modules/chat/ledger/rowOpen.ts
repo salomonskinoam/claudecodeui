@@ -54,6 +54,25 @@ export function useRowOpen(rawKey: string): [boolean, () => void] {
   return [value, toggle];
 }
 
+/** Every open key, for the ledger's save (ledgerStorage.ts picks the ones that belong to a chat). */
+export const openKeys = (): Iterable<string> => open;
+
+/** The keys a stored ledger had open, when it loads. */
+export function seedRowOpen(keys: Iterable<string>): void {
+  let added = false;
+  for (const key of keys) {
+    if (!open.has(key)) { open.add(key); added = true; }
+  }
+  if (!added) return;
+  version += 1;
+  for (const listener of listeners) listener();
+}
+
+/** Called back on every change: the store saves the active chat's open state with its ledger. */
+export function onRowOpenChange(listener: () => void): () => void {
+  return subscribe(listener);
+}
+
 /** For tests: every row closed again. The page never calls this; a drawn state is only changed by a click. */
 export function resetRowOpen(): void {
   open.clear();

@@ -16,6 +16,9 @@
 //           color per family, no CloudCLI logo in the header
 //   drag    drags the first root line onto the last line (its family follows as the rules say), then drags another
 //           and releases it outside the list (the order must not change); puts the first root back at the end
+//   ledger  the rows by id now and after 90 s of the chat working: nothing missing, nothing moved, nothing twice,
+//           new rows only at the ends (requirement 52)
+//   reload  rows, open tool lines and folds before and after a page reload: all the same (the ledger is persisted)
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
 //           panes, prints the stored layout after each drag. Restores no layout: use a fresh browser profile.
 const os = require('node:os');
@@ -25,7 +28,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'dismissdialog', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -492,6 +495,51 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     for (const r of rows) byText.set(r.text, [...(byText.get(r.text) || []), r]);
     const dupes = [...byText.values()].filter((g) => g.length > 1);
     console.log(JSON.stringify({ rows: rows.length, distinctTexts: byText.size, dupeGroups: dupes.length, sample: dupes.slice(0, 4) }, null, 1));
+  }
+
+  if (check === 'ledger') {
+    // The chat view is a ledger (requirement 52): the rows drawn, by id, in order; then 90 s of the chat working
+    // (run it while the chat answers in Cursor); then again. Every earlier id must still be there, in the same
+    // relative order, each once, and the new ids only at the ends.
+    const readIds = () => page.locator('.chat-messages-pane > div > div > [data-row-id]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id')));
+    const before = await readIds();
+    await page.waitForTimeout(90000);
+    const after = await readIds();
+    const position = new Map(after.map((id, i) => [id, i]));
+    const missing = before.filter((id) => !position.has(id));
+    const kept = before.filter((id) => position.has(id)).map((id) => position.get(id));
+    const sameOrder = kept.every((pos, i) => i === 0 || pos > kept[i - 1]);
+    const unique = new Set(after).size === after.length;
+    const first = kept[0] ?? 0;
+    const last = kept[kept.length - 1] ?? -1;
+    const insertedInside = after.slice(first, last + 1).filter((id) => !before.includes(id));
+    console.log(JSON.stringify({ before: before.length, after: after.length, missing, sameOrder, unique, insertedInside, newAtEnd: after.length - 1 - last, newAtStart: first }, null, 1));
+  }
+
+  if (check === 'reload') {
+    // The ledger is persisted per viewer: the rows, which tool lines are open and which folds are closed must be
+    // the same across a reload. The check opens the last two collapsed tool lines first, so there is state to keep.
+    const read = async () => ({
+      ids: await page.locator('.chat-messages-pane > div > div > [data-row-id]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id'))),
+      open: await page.locator('.chat-message.qt-open').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id'))),
+      folds: await page.locator('[data-quests-fold]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-quests-fold'))),
+    });
+    const lines = page.locator('.chat-messages-pane .chat-message:not(.qt-open):not(.user)');
+    const n = await lines.count();
+    for (const i of [n - 1, n - 2]) {
+      if (i < 0) continue;
+      const line = lines.nth(i);
+      const box = await line.boundingBox().catch(() => null);
+      if (box && box.height <= 10) await page.mouse.click(box.x + box.width / 2, box.y + 3);
+    }
+    await page.waitForTimeout(1500);
+    const before = await read();
+    await page.reload();
+    await page.locator('.chat-messages-pane [data-row-id]').first().waitFor({ timeout: 20000 }).catch(() => undefined);
+    await page.waitForTimeout(3000);
+    const after = await read();
+    const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+    console.log(JSON.stringify({ before: { rows: before.ids.length, open: before.open, folds: before.folds }, after: { rows: after.ids.length, open: after.open, folds: after.folds }, sameRows: same(before.ids, after.ids), sameOpen: same(before.open, after.open), sameFolds: same(before.folds, after.folds) }, null, 1));
   }
 
   if (check === 'folds') {
