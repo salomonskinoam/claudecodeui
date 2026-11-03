@@ -11,7 +11,7 @@ import type { BackgroundTaskSummary,
   ProviderModelsDefinition } from '@/shared/types';
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
 import { groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
-import { foldRepeatedReplies, rowIdOf, type ReplyFold } from '@/modules/chat/utils/repeatedReplies';
+import { isReply } from '@/modules/chat/utils/repeatedReplies';
 import { TOOL_LINE, isRowOpen, setRowOpen, useRowOpenVersion } from '@/modules/chat/ledger/rowOpen';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
@@ -293,35 +293,48 @@ function ChatMessagesPane({
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
     [visibleMessages, showThinking],
   );
-  // quests: replies that repeat are folded (see repeatedReplies.ts), over the whole transcript, never only the
-  // visible window; a fold opens on click and stays open; a reply once on screen never folds later.
-  const seenReplies = useRef(new Set<string>());
-  const replyFolds = useMemo(() => foldRepeatedReplies(chatMessages, seenReplies.current), [chatMessages]);
-  useEffect(() => {
-    for (const m of visibleMessages) {
-      if (!replyFolds.has(m) && m.type === 'assistant' && !m.isToolUse) seenReplies.current.add(rowIdOf(m));
-    }
-  }, [visibleMessages, replyFolds]);
-  // An opened fold is row state by id (rowOpen.ts), like every open state; this re-renders on any change.
+  // quests: the folds are the ledger's decision, made once when each row was appended (requirement 39 at
+  // append, requirement 52 point 5): a row carries its fold id, or none. The pane only draws them: the rows
+  // of a fold are hidden until its line is clicked, and the fold's first row draws the line. Over the whole
+  // transcript held, never only the visible window.
   const openVersion = useRowOpenVersion();
-  const foldOf = useCallback((item: ChatMessage | { messages: ChatMessage[] }): ReplyFold | null => {
+  const folds = useMemo(() => {
+    const first = new Map<string, ChatMessage>();
+    const count = new Map<string, number>();
+    const from = new Map<string, string>();
+    const to = new Map<string, string>();
+    for (const m of chatMessages) {
+      if (!m.foldId) continue;
+      if (!first.has(m.foldId)) first.set(m.foldId, m);
+      if (isReply(m)) {
+        count.set(m.foldId, (count.get(m.foldId) ?? 0) + 1);
+        const stamp = String(m.timestamp ?? '');
+        if (!from.has(m.foldId)) from.set(m.foldId, stamp);
+        to.set(m.foldId, stamp);
+      }
+    }
+    return { first, count, from, to };
+  }, [chatMessages]);
+  const foldOf = useCallback((item: ChatMessage | { messages: ChatMessage[] }): { id: string; first: boolean } | null => {
     const message = 'messages' in item ? (item as { messages: ChatMessage[] }).messages[0] : (item as ChatMessage);
-    const fold = replyFolds.get(message);
-    return fold && !isRowOpen(`fold:${fold.id}`) ? fold : null;
+    const id = message.foldId;
+    if (!id || isRowOpen(`fold:${id}`)) return null;
+    return { id, first: folds.first.get(id) === message };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [replyFolds, openVersion]);
-  const foldLine = (fold: ReplyFold) => {
-    const at = (iso: string) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+  }, [folds, openVersion]);
+  const foldLine = (id: string) => {
+    const at = (iso: string | undefined) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+    const count = folds.count.get(id) ?? 1;
     return (
-      <div key={`fold-${fold.id}`} className="my-2 flex items-center gap-2 text-xs text-muted-foreground" data-quests-fold={fold.id}>
+      <div key={`fold-${id}`} className="my-2 flex items-center gap-2 text-xs text-muted-foreground" data-quests-fold={id}>
         <span className="h-px flex-1 bg-border/60" />
         <button
           type="button"
           className="rounded px-2 py-0.5 hover:bg-muted hover:text-foreground"
-          onClick={() => setRowOpen(`fold:${fold.id}`, true)}
-          title="The replies said the same as the one below; click to show them"
+          onClick={() => setRowOpen(`fold:${id}`, true)}
+          title="These replies said the same as the one before them; click to show them"
         >
-          {fold.count} {fold.count === 1 ? 'reply' : 'replies'} with the same state folded, {at(fold.from)} to {at(fold.to)} · show
+          {count} more {count === 1 ? 'reply' : 'replies'} with the same state, {at(folds.from.get(id))} to {at(folds.to.get(id))} · show
         </button>
         <span className="h-px flex-1 bg-border/60" />
       </div>
@@ -521,7 +534,7 @@ function ChatMessagesPane({
 
               const fold = foldOf(item);
               if (fold) {
-                return fold.first ? foldLine(fold) : null;
+                return fold.first ? foldLine(fold.id) : null;
               }
 
               if (isToolGroupItem(item)) {
