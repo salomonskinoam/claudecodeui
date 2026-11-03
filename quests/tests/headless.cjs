@@ -780,9 +780,10 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'focus') {
-    // The default list: the chats that wait for the user plus the chat on screen, then "Live chats (n)" and
-    // "Tickets-Unclaimed (n)" collapsed; a click opens a group; Archive shows everything; the DONE button sits
-    // in the composer and is disabled while something is typed; the trash opens its popup; Cancel closes it.
+    // The default list: "Pending chats" open (the chats that wait for the user plus the chat on screen), then
+    // "Active chats (n)", "On hold (n)", "Tickets-Unclaimed (n)" and "Archived (n)" collapsed; a click opens a
+    // drawer; the active chats running come last; the DONE button sits in the composer and is disabled while
+    // something is typed; the pause opens its popup; Cancel closes it.
     const q = await apiQueue();
     const view = q.view.map((k) => q.entries.find((e) => e.key === k));
     const mine = q.entries.find((e) => e.sessionId === sessionId)?.key;
@@ -790,8 +791,15 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const keys = () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
     const shown = await keys();
     const groupText = (label) => page.locator(`[data-quests-group="${label}"]`).textContent();
-    const live = await groupText('Live chats');
+    const pending = await groupText('Pending chats');
+    const active = await groupText('Active chats');
     const unclaimed = await groupText('Tickets-Unclaimed');
+    await page.locator('[data-quests-group="Active chats"]').click();
+    await page.waitForTimeout(300);
+    const activeKeys = (await keys()).filter((k) => !shown.includes(k));
+    const activeStates = activeKeys.map((k) => q.entries.find((e) => e.key === k)?.state);
+    const runningLast = activeStates.every((s, i) => s !== 'running' || activeStates.slice(i).every((t) => t === 'running'));
+    await page.locator('[data-quests-group="Active chats"]').click();
     await page.locator('[data-quests-group="Tickets-Unclaimed"]').click();
     await page.waitForTimeout(300);
     const opened = (await keys()).length;
@@ -810,14 +818,11 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const popup = await page.locator('[data-quests-queue="dismiss"]').isVisible();
     await page.locator('[data-quests-queue="dismiss"] button', { hasText: 'Cancel' }).click();
     await page.waitForTimeout(300);
-    await page.locator('[data-quests-queue="archive"]').click();
-    await page.waitForTimeout(500);
-    const archiveLines = (await keys()).length;
-    await page.locator('[data-quests-queue="archive"]').click();
     console.log(JSON.stringify({
-      linesAsExpected: JSON.stringify(shown) === JSON.stringify(expected), lines: shown.length, live, unclaimed,
-      openedUnclaimed: opened - shown.length, expectedUnclaimed: view.filter((e) => e.state === 'unclaimed').length,
-      doneEnabled, doneWhileTyped, dismissPopup: popup, archiveLines, viewLines: view.length,
+      linesAsExpected: JSON.stringify(shown) === JSON.stringify(expected), lines: shown.length, pending, active, unclaimed,
+      activeChats: activeKeys.length, expectedActive: view.filter((e) => e.live && !e.waitsForMe && !e.dismissed && !e.archived && e.key !== mine).length, runningLast,
+      openedUnclaimed: opened - shown.length, expectedUnclaimed: view.filter((e) => e.state === 'unclaimed' && !e.archived && !e.dismissed).length,
+      doneEnabled, doneWhileTyped, dismissPopup: popup, viewLines: view.length,
     }));
   }
 

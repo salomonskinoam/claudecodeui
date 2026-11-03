@@ -1,8 +1,8 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 /**
- * quests priority queue: one collapsed group in the list ("Live chats (7)", "Tickets-Unclaimed (14)"): a line
- * with the count, collapsed by default, that opens to its members on a click.
+ * quests priority queue: one drawer of the list ("Pending chats (3)", "Active chats (7)"): a line with the
+ * count that opens to its members on a click.
  */
 export default function QueueGroupLine({ label, count, open, onToggle }: { label: string; count: number; open: boolean; onToggle: () => void }) {
   return (

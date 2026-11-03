@@ -23,13 +23,13 @@ type QueueListProps = {
 };
 
 /**
- * quests priority queue: the session list. In focus mode (the default) the chats that wait for Noam, then three
- * collapsed groups, "Live chats", "On hold", "Tickets-Unclaimed" and "Archived"; in archive mode every entry in queue order, with a
- * separator before the tickets no chat has claimed.
+ * quests priority queue: the session list: the five drawers of queueView.ts ("Pending chats" open by default,
+ * the others collapsed). In archive mode (no button) every entry in queue order, with a separator before the
+ * tickets no chat has claimed, and the Archived drawer.
  */
 export default function QueueList({ onNewSession, onStartTicket }: QueueListProps) {
   const queue = useQueue();
-  const { mode, lines, hold, live, unclaimed, archived } = useQueueView();
+  const { mode, lines, active, hold, unclaimed, archived } = useQueueView();
   const lookOf = useEntryLook();
   const open = useOpenEntry(onStartTicket);
   useEffect(() => setQueueOpener(open));
@@ -39,11 +39,11 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
   // quests: a right-click on a line opens the chat's menu (rename, pin, send to the end, on hold, Cursor, the ticket).
   const [menu, setMenu] = useState<{ sessionId: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<QueueEntry | null>(null);
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(['Pending chats']));
   const toggle = (label: string) => setOpenGroups((g) => { const n = new Set(g); if (n.has(label)) n.delete(label); else n.add(label); return n; });
 
   // Lines the view shows where the stored order has them: not the permission prompts, not the pinned chat.
-  const anchors = new Set([...lines, ...hold, ...live, ...unclaimed, ...archived].filter((e) => e.state !== 'permission' && e.key !== queue.latch).map((e) => e.key));
+  const anchors = new Set([...lines, ...active, ...hold, ...unclaimed, ...archived].filter((e) => e.state !== 'permission' && e.key !== queue.latch).map((e) => e.key));
   const { marker, lineProps, listProps } = useLineDrag(queue.view, anchors);
 
   const line = (e: QueueEntry, separator: boolean) => (
@@ -65,17 +65,15 @@ export default function QueueList({ onNewSession, onStartTicket }: QueueListProp
       onRename={e.sessionId ? () => setRenaming(e) : undefined}
     />
   );
-  // The drawers, in the order Noam set (3 Nov): "the queue, live chats, on hold, tickets unclaimed, archive".
-  // "Archived" is the last group in both modes.
   const groups: Array<[string, QueueEntry[]]> = mode === 'focus'
-    ? [['Live chats', live], ['On hold', hold], ['Tickets-Unclaimed', unclaimed], ['Archived', archived]]
+    ? [['Pending chats', lines], ['Active chats', active], ['On hold', hold], ['Tickets-Unclaimed', unclaimed], ['Archived', archived]]
     : [['Archived', archived]];
 
   return (
     <div className="flex flex-col" data-quests-queue="list" data-quests-mode={mode}>
       <QueueToolbar onNewSession={onNewSession} />
       <div {...listProps}>
-        {lines.map((e, i) => line(e, mode === 'archive' && i > 0 && (lines[i - 1].group === 2) !== (e.group === 2)))}
+        {mode === 'archive' && lines.map((e, i) => line(e, i > 0 && (lines[i - 1].group === 2) !== (e.group === 2)))}
         {groups.map(([label, members]) => (
           <div key={label}>
             <QueueGroupLine label={label} count={members.length} open={openGroups.has(label)} onToggle={() => toggle(label)} />
