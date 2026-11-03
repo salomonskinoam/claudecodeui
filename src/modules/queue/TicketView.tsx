@@ -9,9 +9,10 @@ type TicketPage = { number: number; title: string; url: string; labels: string[]
 
 /**
  * quests priority queue: a ticket's page, in place of a chat. Its title, labels and text (the GitHub issue, as
- * the queue read it), with "Claim this ticket" while no chat has claimed it: a new chat with "claim this ticket
- * <link>" typed in, not sent (Noam, 3 Nov: "i want to see the ticket body in the chat window for reading, with a
- * ready make prompt saying 'claim this ticket'").
+ * the queue read it), with "Claim this ticket": a new chat with "claim this ticket <link>" typed in, not sent
+ * (Noam, 3 Nov: "i want to see the ticket body in the chat window for reading, with a ready make prompt saying
+ * 'claim this ticket'"). A ticket another chat holds can be claimed too: the newest claim counts, so the new
+ * chat takes the ticket over (Noam, 3 Nov: "i want a separate one for 17 and a separate for 63").
  */
 function TicketView({ number }: { number: number }) {
   // What was loaded, with its number: a page for another ticket is not drawn while this one loads.
@@ -39,17 +40,17 @@ function TicketView({ number }: { number: number }) {
       <div className="pb-8 pl-12 pr-8 pt-4">
         <div className="mb-3 flex items-center gap-3">
           <a href={ticket?.url ?? entry?.url ?? '#'} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:underline">#{number} on GitHub</a>
-          {entry && !entry.sessionId && (
+          {entry && (
             <button
               type="button"
               data-quests-ticket-claim={number}
               className="rounded-sm bg-[#3794ff] px-3 py-1 text-[13px] font-medium text-white hover:bg-[#2f7fe0]"
               onClick={() => startTicket(entry)}
             >
-              Claim this ticket
+              {entry.sessionId ? 'Claim this ticket with a new chat' : 'Claim this ticket'}
             </button>
           )}
-          {entry?.sessionId && <span className="text-xs text-muted-foreground">Claimed by "{entry.chatName ?? entry.title}".</span>}
+          {entry?.sessionId && <span className="text-xs text-muted-foreground">Held by "{entry.chatName ?? entry.title}"; a new claim takes it over.</span>}
         </div>
         {ticket && <h1 className="mb-2 text-lg font-semibold">{ticket.title}</h1>}
         {ticket && ticket.labels.length > 0 && (

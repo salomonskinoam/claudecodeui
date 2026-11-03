@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import CloseTicketDialog from '@/modules/queue/CloseTicketDialog';
 import RenameDialog from '@/modules/queue/RenameDialog';
@@ -23,6 +24,7 @@ const item = 'block w-full px-3 py-1 text-left text-[13px] text-[#cccccc] hover:
  */
 export default function TabContextMenu({ sessionId, x, y, onClose, onCloseTab }: TabContextMenuProps) {
   const queue = useQueue();
+  const navigate = useNavigate();
   const entry = entryOfChat(queue.entries, sessionId);
   const [dialog, setDialog] = useState<'ticket' | 'rename' | null>(null);
 
@@ -58,6 +60,9 @@ export default function TabContextMenu({ sessionId, x, y, onClose, onCloseTab }:
           <button type="button" className={item} onClick={() => { void setQueueArchived(entry.key, !entry.archived); onClose(); }}>{entry.archived ? 'Take out of the archive' : 'Archive'}</button>
           {entry.providerSessionId && (
             <a className={item} href={`cursor://anthropic.claude-code/open?session=${entry.providerSessionId}`} onClick={onClose}>Open in Cursor</a>
+          )}
+          {entry.number !== null && (
+            <button type="button" className={item} data-quests-menu="ticket-page" onClick={() => { navigate(`/ticket/${entry.number}`); onClose(); }}>Ticket #{entry.number}: its page</button>
           )}
           {entry.number !== null && (
             <button type="button" className={item} onClick={() => setDialog('ticket')}>Close the ticket #{entry.number}</button>
