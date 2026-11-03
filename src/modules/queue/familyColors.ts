@@ -62,11 +62,18 @@ const remember = (colors: Map<string, string>): void => {
   }
 };
 
-/** The queue's families, the ones in view first (so open chats pick first), with whether they hold an open chat. */
+/**
+ * The queue's families in the order they pick colors: first the families of the lines the focus list shows (the
+ * chats that wait for Noam and the open ones), in queue order, then every other family of the view. So the ten
+ * strong colors go to what Noam sees, never to unclaimed tickets hidden behind "Tickets-Unclaimed" (2 Nov: after a
+ * Recolor the seven chats on screen all wore light shades).
+ */
 export function familiesOf(queue: Queue): Family[] {
-  const rootOf = new Map(queue.entries.map((e) => [e.key, e.rootKey]));
+  const byKey = new Map(queue.entries.map((e) => [e.key, e]));
   const open = new Set(queue.entries.filter((e) => e.group === 0).map((e) => e.rootKey));
-  const keys = [...new Set([...queue.view.map((k) => rootOf.get(k)), ...rootOf.values()])].filter((k): k is string => Boolean(k));
+  const shown = queue.view.filter((k) => { const e = byKey.get(k); return e && (e.waitsForMe || e.group === 0); });
+  const rest = queue.view.filter((k) => !shown.includes(k));
+  const keys = [...new Set([...shown, ...rest].map((k) => byKey.get(k)?.rootKey))].filter((k): k is string => Boolean(k));
   return keys.map((key) => ({ key, open: open.has(key) }));
 }
 
