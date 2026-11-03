@@ -52,17 +52,21 @@ const projectionCache = new WeakMap<NormalizedMessage, CachedMessageProjection>(
  * not something Noam typed, so it shows as a note with the sender, and its body as the model's input, never as his
  * message (Noam, 2 Nov: "it seems like a user message and not a chat message happened last. something is not right").
  */
-function parseInjectedMessage(content: string): { summary: string; body: string } | null {
+function parseInjectedMessage(content: string): { from: string; body: string } | { note: string } | null {
   const head = content.trimStart();
+  // Claude Code's own notices to the model, one line each.
+  if (/^Tools? loaded\b/.test(head)) return { note: head.split('\n', 1)[0].slice(0, 120) };
   if (!head.startsWith('Another Claude session sent a message') && !head.startsWith('<agent-message') && !head.startsWith('<cross-session-message')) {
     return null;
   }
-  const from = /from(?:-name)?="([^"]+)"/.exec(head)?.[1] ?? 'another session';
-  const kind = head.includes('[Subagent hand-back]') ? 'an agent\'s report' : 'a message from another session';
+  const from = /from-name="([^"]+)"/.exec(head)?.[1] ?? /from="([^"]+)"/.exec(head)?.[1] ?? 'another session';
   const open = head.indexOf('>', head.indexOf('<agent-message') >= 0 ? head.indexOf('<agent-message') : head.indexOf('<cross-session-message'));
   const close = Math.max(head.lastIndexOf('</agent-message>'), head.lastIndexOf('</cross-session-message>'));
-  const body = open >= 0 && close > open ? head.slice(open + 1, close).trim() : head;
-  return { summary: `Delivered to the chat: ${kind} (${from})`, body };
+  let body = open >= 0 && close > open ? head.slice(open + 1, close).trim() : head;
+  // The harness preamble ("[Subagent hand-back] The text below is ... The report follows:") is for the model.
+  const follows = body.indexOf('The report follows:');
+  if (body.startsWith('[Subagent hand-back]') && follows >= 0) body = body.slice(follows + 'The report follows:'.length).trim();
+  return { from: head.includes('[Subagent hand-back]') ? `agent ${from}` : from, body };
 }
 
 function parseTaskNotification(content: string): ParsedTaskNotification | null {
@@ -424,9 +428,12 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
 
         if (msg.role === 'user') {
           const injected = parseInjectedMessage(content);
+          if (injected && 'note' in injected) {
+            converted.push({ type: 'assistant', content: injected.note, timestamp: msg.timestamp, isTaskNotification: true, taskNotificationStatus: 'completed', ...sharedMetadata });
+            break;
+          }
           if (injected) {
-            converted.push({ type: 'assistant', content: injected.summary, timestamp: msg.timestamp, isTaskNotification: true, taskNotificationStatus: 'completed', ...sharedMetadata });
-            converted.push({ type: 'assistant', content: formatUsageLimitText(injected.body), timestamp: msg.timestamp, ...sharedMetadata });
+            converted.push({ type: 'assistant', content: formatUsageLimitText(injected.body), timestamp: msg.timestamp, agentReportFrom: injected.from, ...sharedMetadata });
             break;
           }
           // Parse task notifications

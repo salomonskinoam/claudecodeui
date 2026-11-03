@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
@@ -47,6 +47,8 @@ const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
  * transcript entry — user turn, assistant turn, or a tool call and its result.
  */
 const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onForkFromMessage }: MessageComponentProps) => {
+  // quests: a report handed into the chat is closed by default, its frame opens it (Noam, 2 Nov).
+  const [reportOpen, setReportOpen] = useState(false);
   const { t } = useTranslation('chat');
   const isGrouped = prevMessage && prevMessage.type === message.type &&
     ((prevMessage.type === 'assistant') ||
@@ -196,9 +198,26 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
         </div>
       ) : (
         /* Claude/Error/Tool messages on the left */
-        <div className="w-full">
+        <div className={message.agentReportFrom
+          // quests: a report handed into the chat (an agent's, another session's) wears its own frame, the agents'
+          // purple, so it is never read as the chat's own words (Noam, 2 Nov). Closed by default: the header opens it.
+          ? `w-full rounded-sm border border-purple-500/40 border-l-2 border-l-purple-500 bg-purple-500/5 px-3 py-1 ${reportOpen ? 'quests-report-open' : 'quests-report-closed'}`
+          : 'w-full'}
+        >
+          {message.agentReportFrom && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-1 py-0.5 text-left text-[11px] uppercase tracking-wide text-purple-400 hover:text-purple-300"
+              data-quests-report={message.agentReportFrom}
+              aria-expanded={reportOpen}
+              onClick={() => setReportOpen((open) => !open)}
+            >
+              <span className="inline-block w-3">{reportOpen ? '▾' : '▸'}</span>
+              Report handed to the chat by {message.agentReportFrom}
+            </button>
+          )}
           {/* quests: a new response starts with a bold line, no avatar or name. */}
-          {!isGrouped && <hr className="quests-response-line mb-3 border-0 border-t-2 border-foreground/50" />}
+          {!isGrouped && !message.agentReportFrom && <hr className="quests-response-line mb-3 border-0 border-t-2 border-foreground/50" />}
 
           <div className="w-full">
 

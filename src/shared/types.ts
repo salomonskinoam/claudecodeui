@@ -416,6 +416,8 @@ export type ChatMessage = {
   taskStatus?: LiveTaskStatus;
   /** Set on the row that stands for a background task's completion report, with the status it reported. */
   isTaskNotification?: boolean;
+  /** quests: the row is a report handed into the chat by an agent or another session (its id or name): drawn in its own frame, never as the chat's prose. */
+  agentReportFrom?: string;
   taskNotificationStatus?: string;
   /** Stored memory this reply drew on, shown as a footnote beneath it. */
   memoryCitations?: MemoryCitation[];

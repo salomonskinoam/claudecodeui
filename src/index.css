@@ -588,6 +588,11 @@
     clip-path: inset(-8px -8px 0 -8px);
   }
 
+  /* quests: a report handed into the chat shows only its header until opened (the header toggles it). */
+  .quests-report-closed > :not([data-quests-report]) {
+    display: none;
+  }
+
   /* quests: every loaded message is rendered for real. Skipping off-screen rows (content-visibility: auto)
      stood in estimated heights of 96-240px, while a collapsed tool call is 9px, so rows changed height as
      they scrolled into view and the view jumped on a fast scroll up. */
