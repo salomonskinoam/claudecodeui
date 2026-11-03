@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import CloseTicketDialog from '@/modules/queue/CloseTicketDialog';
 import RenameDialog from '@/modules/queue/RenameDialog';
-import { dismissQueueEntry, sendQueueEntryToEnd, setQueueArchived, setQueueLatch, useQueue } from '@/modules/queue/queueStore';
+import { holdQueueEntry, sendQueueEntryToEnd, setQueueArchived, setQueueLatch, useQueue } from '@/modules/queue/queueStore';
 import { entryOfChat } from '@/modules/queue/types';
 
 type TabContextMenuProps = {
@@ -57,8 +57,8 @@ export default function TabContextMenu({ sessionId, entryKey, x, y, onClose, onC
         <>
           {entry.sessionId && <button type="button" className={item} data-quests-menu="rename" onClick={() => setDialog('rename')}>Rename…</button>}
           <button type="button" className={item} onClick={() => { void setQueueLatch(latched ? null : entry.key); onClose(); }}>{latched ? 'Unpin' : 'Pin on top'}</button>
-          <button type="button" className={item} onClick={() => { void sendQueueEntryToEnd(entry.key); onClose(); }}>Send to the end of the queue</button>
-          <button type="button" className={item} onClick={() => { void dismissQueueEntry(entry.key, !entry.dismissed); onClose(); }}>{entry.dismissed ? 'Take off hold' : 'Put on hold until it replies again'}</button>
+          <button type="button" className={item} onClick={() => { void sendQueueEntryToEnd(entry); onClose(); }}>{entry.archived ? 'Out of the archive, to the end of the queue' : entry.dismissed ? 'Off hold, to the end of the queue' : 'Send to the end of the queue'}</button>
+          <button type="button" className={item} onClick={() => { void holdQueueEntry(entry); onClose(); }}>{entry.archived ? 'Out of the archive, to On hold' : entry.dismissed ? 'Take off hold' : 'Put on hold until it replies again'}</button>
           <button type="button" className={item} onClick={() => { void setQueueArchived(entry.key, !entry.archived); onClose(); }}>{entry.archived ? 'Take out of the archive' : 'Archive'}</button>
           {entry.providerSessionId && (
             <a className={item} href={`cursor://anthropic.claude-code/open?session=${entry.providerSessionId}`} onClick={onClose}>Open in Cursor</a>

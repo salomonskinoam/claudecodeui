@@ -643,10 +643,16 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'toend') {
-    // Focus mode, every drawer: the slashed-eye button on a drawer's first line sends it to the end of THAT
-    // drawer (the archive lists the newest first, so its end is the oldest). The drawer's order is then rebuilt
-    // by sending each other line to the end in turn, so the queue is left as it was.
+    // Focus mode. In the pending and active drawers the slashed-eye button on the first line sends it to the end
+    // of the drawer; the order is then rebuilt by sending each other line to the end in turn, so the queue is
+    // left as it was. In "On hold" and "Archived" the button takes the line out, to the end of the queue (the
+    // queue API shows it off hold / out of the archive and last in the stored order); the line is then put back
+    // (on hold again, or archived again: it was the newest, so it returns to the top).
     const out = {};
+    const put = (route, body) => page.evaluate(async ([r, b]) => fetch(`/api/quests/queue${r}`, {
+      method: 'PUT', headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(b),
+    }), [route, body]);
     for (const label of ['Pending chats', 'Active chats', 'On hold', 'Archived']) {
       const header = page.locator(`[data-quests-group="${label}"]`);
       const drawer = header.locator('xpath=..');
@@ -656,13 +662,27 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       const toEnd = async (key) => { await drawer.locator(`[data-queue-key="${key}"] [data-quests-line="to-end"]`).dispatchEvent('click'); await page.waitForTimeout(1000); };
       const movable = [];
       for (const key of before) if (await drawer.locator(`[data-queue-key="${key}"] [data-quests-line="to-end"]`).count()) movable.push(key);
-      if (movable.length < 2) { out[label] = { lines: before.length, movable: movable.length, skipped: true }; continue; }
-      await toEnd(movable[0]);
-      const moved = await order();
-      const sentLast = moved.filter((k) => movable.includes(k)).at(-1) === movable[0];
-      for (const key of movable.slice(1)) await toEnd(key);
-      const after = await order();
-      out[label] = { lines: before.length, movable: movable.length, sentLast, restored: JSON.stringify(after) === JSON.stringify(before), ...(sentLast && JSON.stringify(after) === JSON.stringify(before) ? {} : { before, moved, after }) };
+      if (label === 'On hold' || label === 'Archived') {
+        if (movable.length === 0) { out[label] = { lines: before.length, skipped: true }; continue; }
+        const key = movable[0];
+        await toEnd(key);
+        const q = await apiQueue();
+        const e = q.entries.find((x) => x.key === key);
+        const left = !(await order()).includes(key);
+        await put(label === 'Archived' ? '/archive' : '/dismiss', label === 'Archived' ? { key, archived: true } : { key });
+        await put('/drag', { key, beforeKey: before[1] ?? null });
+        await page.waitForTimeout(2500); // the page learns of a change made behind its back at its next poll
+        const after = await order();
+        out[label] = { lines: before.length, left, out: !e.archived && !e.dismissed, lastInQueue: q.order.at(-1) === key, restored: JSON.stringify(after) === JSON.stringify(before), ...(JSON.stringify(after) === JSON.stringify(before) ? {} : { before: before.slice(0, 3), after: after.slice(0, 3) }) };
+      } else {
+        if (movable.length < 2) { out[label] = { lines: before.length, movable: movable.length, skipped: true }; continue; }
+        await toEnd(movable[0]);
+        const moved = await order();
+        const sentLast = moved.filter((k) => movable.includes(k)).at(-1) === movable[0];
+        for (const key of movable.slice(1)) await toEnd(key);
+        const after = await order();
+        out[label] = { lines: before.length, movable: movable.length, sentLast, restored: JSON.stringify(after) === JSON.stringify(before), ...(sentLast && JSON.stringify(after) === JSON.stringify(before) ? {} : { before, moved, after }) };
+      }
       await header.click();
       await page.waitForTimeout(200);
     }

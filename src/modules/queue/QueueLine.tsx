@@ -11,7 +11,10 @@ import type { QueueEntry } from '@/modules/queue/types';
 import type { LineMarker } from '@/modules/queue/useLineDrag';
 
 /** One of the three icon columns on the right of every line, 16 px wide, empty or not. */
-const SLOT = 'flex w-4 flex-shrink-0 items-center justify-center';
+// quests: each icon column is a 28 px square, the icons 16 px, faint until the line is hovered (Noam, 3 Nov: "make the
+// hoverable area and buttons larger on the list items, they are too small").
+const SLOT = 'flex h-7 w-7 flex-shrink-0 items-center justify-center';
+const BUTTON = 'flex h-7 w-7 items-center justify-center rounded opacity-25 hover:bg-white/10 hover:opacity-100 group-hover:opacity-80';
 
 type QueueLineProps = {
   entry: QueueEntry;
@@ -53,7 +56,7 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       onContextMenu={onMenu}
       title={e.chatName ?? e.title}
       className={cn(
-        'group relative mx-1 flex h-[26px] cursor-pointer items-center gap-2 rounded-sm px-2 text-[15px] text-[#cccccc]',
+        'group relative mx-1 flex h-[32px] cursor-pointer items-center gap-1 rounded-sm px-2 text-[15px] text-[#cccccc]',
         look.shownClass,
         // The shown chat bulges 12 px to the left, past the list's edge; the text keeps its place.
         look.shown && '-ml-2 pl-5',
@@ -74,57 +77,57 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
           nothing for it, so the icons never shift sideways. */}
       <span className={SLOT}>
         {e.sessionId && onRename && (
-          <button type="button" title="Rename" className="opacity-0 hover:opacity-100 group-hover:opacity-70"
+          <button type="button" title="Rename" className={BUTTON}
             data-quests-line="rename" onClick={(event) => { event.stopPropagation(); onRename(); }}>
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-4 w-4" />
           </button>
         )}
       </span>
       <span className={SLOT}>
         {e.sessionId && (
           <button type="button" title={latched ? 'Unpin' : 'Pin on top'}
-            className={cn('hover:opacity-100', latched ? 'opacity-100 text-[#3794ff]' : 'opacity-0 group-hover:opacity-70')}
+            className={cn(BUTTON, latched && 'opacity-100 text-[#3794ff]')}
             data-quests-pin={latched ? 'pinned' : 'pin'}
             onClick={(event) => { event.stopPropagation(); void setQueueLatch(latched ? null : e.key); }}>
-            <Pin className={cn('h-3.5 w-3.5', latched && 'fill-current')} />
+            <Pin className={cn('h-4 w-4', latched && 'fill-current')} />
           </button>
         )}
       </span>
       <span className={SLOT}>
         {e.sessionId && (
-          <button type="button" title="Send to the end of the queue" className="opacity-0 hover:opacity-100 group-hover:opacity-70"
+          <button type="button" title={e.archived ? 'Out of the archive, to the end of the queue' : e.dismissed ? 'Off hold, to the end of the queue' : 'Send to the end of the queue'} className={BUTTON}
             data-quests-line="to-end" onClick={(event) => { event.stopPropagation(); onSendToEnd(); }}>
-            <EyeOff className="h-3 w-3" />
+            <EyeOff className="h-4 w-4" />
           </button>
         )}
       </span>
       <span className={SLOT}>
         {e.sessionId && (
-          <button type="button" title={e.dismissed ? 'Take off hold' : 'Put on hold until it replies again'} className="opacity-0 hover:opacity-100 group-hover:opacity-70"
-            data-quests-line={e.dismissed ? 'undismiss' : 'dismiss'} onClick={(event) => { event.stopPropagation(); onDismiss(); }}>
-            {e.dismissed ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+          <button type="button" title={e.archived ? 'Out of the archive, to On hold' : e.dismissed ? 'Take off hold' : 'Put on hold until it replies again'} className={BUTTON}
+            data-quests-line={e.dismissed && !e.archived ? 'undismiss' : 'dismiss'} onClick={(event) => { event.stopPropagation(); onDismiss(); }}>
+            {e.dismissed && !e.archived ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
           </button>
         )}
       </span>
       <span className={SLOT}>
-        <button type="button" title={e.archived ? 'Take out of the archive' : 'Archive'} className="opacity-0 hover:opacity-100 group-hover:opacity-70"
+        <button type="button" title={e.archived ? 'Take out of the archive' : 'Archive'} className={BUTTON}
           data-quests-line={e.archived ? 'unarchive' : 'archive'} onClick={(event) => { event.stopPropagation(); onArchive(); }}>
-          {e.archived ? <ArchiveRestore className="h-3 w-3" /> : <Archive className="h-3 w-3" />}
+          {e.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
         </button>
       </span>
       <span className={SLOT}>
         {e.providerSessionId && (
           <a href={`cursor://anthropic.claude-code/open?session=${e.providerSessionId}`} title="Open in Cursor"
-            className="opacity-0 group-hover:opacity-70" onClick={(event) => event.stopPropagation()}>
-            <SquareArrowOutUpRight className="h-3 w-3" />
+            className={BUTTON} onClick={(event) => event.stopPropagation()}>
+            <SquareArrowOutUpRight className="h-4 w-4" />
           </a>
         )}
       </span>
       <span className={SLOT}>
         {e.number !== null && (
-          <button type="button" title="Close the ticket" className="opacity-0 group-hover:opacity-70"
+          <button type="button" title="Close the ticket" className={BUTTON}
             onClick={(event) => { event.stopPropagation(); onCloseTicket(); }}>
-            <CircleCheck className="h-3 w-3" />
+            <CircleCheck className="h-4 w-4" />
           </button>
         )}
       </span>

@@ -1,4 +1,4 @@
-import { setArchived, setArchivedOldest } from '@/modules/queue/archived.js';
+import { setArchived } from '@/modules/queue/archived.js';
 import { chatsIn } from '@/modules/queue/chats.js';
 import { dismiss, undismiss } from '@/modules/queue/dismissals.js';
 import { buildEntries, type QueueEntry } from '@/modules/queue/entries.js';
@@ -33,11 +33,9 @@ export function setOrder(order: string[]): Queue {
 }
 
 /** Drag `key` to stand before `beforeKey` (null: last); its family block comes along as the rules require. */
-/** A drop, or "send to the end" (`beforeKey` null): the end of an archived entry's drawer is the oldest archive. */
 export function dragTo(key: string, beforeKey: string | null): Queue {
   const entries = buildEntries();
   writeOrder(drag(repair(readOrder(), entries), entries, key, beforeKey));
-  if (beforeKey === null) setArchivedOldest(key);
   return getQueue();
 }
 

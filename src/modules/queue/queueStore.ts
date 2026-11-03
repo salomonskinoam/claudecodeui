@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 
 import { authenticatedFetch } from '@/shared/api';
 import { isEmbedded } from '@/shared/hooks/useSplitPane';
-import type { Queue, TicketGroup } from '@/modules/queue/types';
+import type { Queue, QueueEntry, TicketGroup } from '@/modules/queue/types';
 
 /**
  * quests priority queue: the page's copy of the queue. Polled every two seconds by the main page (the split-screen
@@ -60,8 +60,20 @@ export const dismissQueueEntry = (key: string, dismissed = true) => request('PUT
 export const setTicketGroups = (groups: TicketGroup[]) => request('PUT', '/groups', { groups });
 /** The archive icon: the entry goes to the "Archived" drawer, or leaves it. */
 export const setQueueArchived = (key: string, archived: boolean) => request('PUT', '/archive', { key, archived });
-/** The slashed eye: the entry goes to the end of the queue. */
-export const sendQueueEntryToEnd = (key: string) => request('PUT', '/drag', { key, beforeKey: null });
+/**
+ * The slashed eye: the entry goes to the end of the queue. From the archive or from hold it leaves first (Noam,
+ * 3 Nov: "HOW TO GET IT OUT OF ARCHIVE AND INTO THE QUEUE OR TO ON HOLD").
+ */
+export async function sendQueueEntryToEnd(e: Pick<QueueEntry, 'key' | 'archived' | 'dismissed'>): Promise<unknown> {
+  if (e.archived) await setQueueArchived(e.key, false);
+  else if (e.dismissed) await dismissQueueEntry(e.key, false);
+  return request('PUT', '/drag', { key: e.key, beforeKey: null });
+}
+/** The pause icon: on hold, or off it; from the archive the entry leaves it for "On hold". */
+export async function holdQueueEntry(e: Pick<QueueEntry, 'key' | 'archived' | 'dismissed'>): Promise<unknown> {
+  if (e.archived) { await setQueueArchived(e.key, false); return dismissQueueEntry(e.key, true); }
+  return dismissQueueEntry(e.key, !e.dismissed);
+}
 export const closeQueueTicket = (number: number, choice: string) => request('POST', '/close', { number, choice });
 /** Puts the chats open in Cursor on top; answers their page session ids, in Cursor's tab order. */
 export const syncQueueFromCursor = async (): Promise<string[]> =>
