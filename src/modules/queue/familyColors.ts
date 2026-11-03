@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 import { useQueue } from '@/modules/queue/queueStore';
 import type { Queue } from '@/modules/queue/types';
 
@@ -68,7 +70,23 @@ export function familiesOf(queue: Queue): Family[] {
   return keys.map((key) => ({ key, open: open.has(key) }));
 }
 
+// The "Recolor" button: the memory is emptied and every family in view picks again, the chats in view first, so
+// they take the ten strong colors (Noam, 2 Nov: "i cleaned up and remained with a lot of secondaries").
+let generation = 0;
+const listeners = new Set<() => void>();
+export function reassignColors(): void {
+  try {
+    localStorage.removeItem(STORE);
+  } catch {
+    /* no storage */
+  }
+  generation += 1;
+  listeners.forEach((l) => l());
+}
+const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
+
 export function useFamilyColors(): Map<string, string> {
+  useSyncExternalStore(subscribe, () => generation);
   const given = recall();
   const colors = assignColors(familiesOf(useQueue()), given);
   if ([...colors].some(([k, c]) => given.get(k) !== c)) remember(colors);

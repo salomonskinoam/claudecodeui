@@ -1,12 +1,13 @@
-import { Archive, Plus, RefreshCw } from 'lucide-react';
+import { Archive, Palette, Plus, RefreshCw } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
+import { reassignColors } from '@/modules/queue/familyColors';
 import { syncTabsFromCursor } from '@/modules/queue/queueNavigation';
 import { setQueueMode, useQueueMode } from '@/modules/queue/queueView';
 
 const BUTTON = 'mx-2 flex h-[26px] items-center gap-2 whitespace-nowrap rounded-sm px-2 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e]';
 
-/** quests priority queue: the buttons above the list, each on its own line: new chat, sync from Cursor, Archive. */
+/** quests priority queue: the buttons above the list, each on its own line: new chat, sync from Cursor, Recolor, Archive. */
 export default function QueueToolbar({ onNewSession }: { onNewSession: () => void }) {
   const mode = useQueueMode();
   return (
@@ -24,6 +25,16 @@ export default function QueueToolbar({ onNewSession }: { onNewSession: () => voi
       >
         <RefreshCw className="h-3.5 w-3.5 flex-shrink-0" />
         Sync from Cursor
+      </button>
+      <button
+        type="button"
+        data-quests-queue="recolor"
+        title="Fresh colors: the chats in view take the ten strong ones"
+        className={BUTTON}
+        onClick={reassignColors}
+      >
+        <Palette className="h-3.5 w-3.5 flex-shrink-0" />
+        Recolor
       </button>
       <button
         type="button"
