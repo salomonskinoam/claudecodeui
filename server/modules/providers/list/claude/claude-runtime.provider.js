@@ -1101,6 +1101,9 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     if (mcpServers) {
       sdkOptions.mcpServers = mcpServers;
     }
+    // quests: the reply is drawn as it is written (Noam, 3 Nov: "i want it displayed live"). The SDK then yields
+    // `stream_event` rows, one per API stream event, before the whole assistant message.
+    sdkOptions.includePartialMessages = true;
 
     // Every turn uses streaming input so stdin stays open past the turn's
     // `result`. The message list is reusable, but each query attempt needs its
@@ -1304,6 +1307,16 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       // messages of earlier turns). The page has them already; forwarding them drew every old message of the
       // chat again, as new, each time a process was started (2 Nov, "wtf are we seeing").
       if (message.isReplay === true) {
+        continue;
+      }
+      // A piece of the reply being written: `content_block_delta` becomes a stream_delta row that grows on the
+      // page, `content_block_stop` closes it. A subagent's own stream stays in its card, not the chat.
+      if (message.type === 'stream_event') {
+        if (!message.parent_tool_use_id) {
+          for (const msg of context.normalizeMessage(message.event, capturedSessionId || sessionId || null)) {
+            ws.send(msg);
+          }
+        }
         continue;
       }
       // Capture session ID from first message

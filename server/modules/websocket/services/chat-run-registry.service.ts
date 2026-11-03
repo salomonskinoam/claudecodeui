@@ -131,9 +131,13 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
     evictRunLater(run);
   }
 
-  run.events.push(outbound);
-  if (run.events.length > MAX_BUFFERED_EVENTS_PER_RUN) {
-    run.events.splice(0, run.events.length - MAX_BUFFERED_EVENTS_PER_RUN);
+  // Pieces of a reply being written are not replayed: the whole reply follows as its own event, and a replay
+  // of the pieces after a reload would draw it twice.
+  if (message.kind !== 'stream_delta' && message.kind !== 'stream_end') {
+    run.events.push(outbound);
+    if (run.events.length > MAX_BUFFERED_EVENTS_PER_RUN) {
+      run.events.splice(0, run.events.length - MAX_BUFFERED_EVENTS_PER_RUN);
+    }
   }
 
   return outbound;

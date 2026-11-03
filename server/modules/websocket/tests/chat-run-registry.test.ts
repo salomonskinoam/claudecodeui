@@ -220,13 +220,16 @@ test('replayEvents returns only events after the requested seq', async () => {
     });
     assert.ok(run);
 
-    run.writer.send({ kind: 'stream_delta', provider: 'claude', sessionId: 'x', content: 'a' });
-    run.writer.send({ kind: 'stream_delta', provider: 'claude', sessionId: 'x', content: 'b' });
-    run.writer.send({ kind: 'stream_delta', provider: 'claude', sessionId: 'x', content: 'c' });
+    run.writer.send({ kind: 'text', role: 'assistant', provider: 'claude', sessionId: 'x', content: 'a' });
+    run.writer.send({ kind: 'text', role: 'assistant', provider: 'claude', sessionId: 'x', content: 'b' });
+    run.writer.send({ kind: 'stream_delta', provider: 'claude', sessionId: 'x', content: 'piece' });
+    run.writer.send({ kind: 'stream_end', provider: 'claude', sessionId: 'x' });
+    run.writer.send({ kind: 'text', role: 'assistant', provider: 'claude', sessionId: 'x', content: 'c' });
 
+    // The pieces of a reply being written take a seq but are not replayed.
     const replayed = chatRunRegistry.replayEvents('app-run-4', 1);
     assert.deepEqual(replayed.map((event) => event.content), ['b', 'c']);
-    assert.deepEqual(replayed.map((event) => event.seq), [2, 3]);
+    assert.deepEqual(replayed.map((event) => event.seq), [2, 5]);
   });
 });
 
