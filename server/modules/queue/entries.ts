@@ -74,12 +74,16 @@ const chatFields = (c: Chat | null) => ({
   replyAt: c?.closingLine?.at ?? null,
 });
 
-export function buildEntries(): QueueEntry[] {
-  const tickets = getTickets();
-  const chats = getChats();
+/**
+ * Who holds which ticket. `claimant`: ticket number -> the chat shown on it. `ticketOf`: chat -> its ticket; a chat
+ * that holds a ticket has that one, so it is never also listed as a chat of its own (Noam, 4 Nov: "a list item IS
+ * A chat, 1:1", of a chat that held 17 and had also claimed 63, which its fork holds).
+ */
+export function resolveClaims(
+  tickets: Pick<Ticket, 'number' | 'claims' | 'parent'>[],
+  over: (sid: string) => boolean,
+): { claimant: Map<number, string>; ticketOf: Map<string, number> } {
   const openTickets = new Set(tickets.map((t) => t.number));
-  const over = (sid: string) => chats.get(sid)?.finalized ?? false;
-
   // A ticket shows its newest claimant whose chat is not over. A claim by a finalized chat does not count: the
   // ticket drops back to the ticket level, as if unclaimed (Noam 2026-10-27). One chat holds one ticket (Noam,
   // 3 Nov: "never allow two tickets to be owned by the same chat again"): a chat that would hold several keeps
@@ -110,6 +114,15 @@ export function buildEntries(): QueueEntry[] {
     const isRoot = !(t.parent && t.parent.state === 'OPEN' && openTickets.has(t.parent.number));
     for (const { sid } of t.claims) if (!ignored.has(`${sid}:${t.number}`) && (!ticketOf.has(sid) || isRoot)) ticketOf.set(sid, t.number);
   }
+  for (const [number, sid] of claimant) ticketOf.set(sid, number);
+  return { claimant, ticketOf };
+}
+
+export function buildEntries(): QueueEntry[] {
+  const tickets = getTickets();
+  const chats = getChats();
+  const openTickets = new Set(tickets.map((t) => t.number));
+  const { claimant, ticketOf } = resolveClaims(tickets, (sid) => chats.get(sid)?.finalized ?? false);
 
   const entries: Omit<QueueEntry, 'rootKey' | 'group' | 'waitsForMe' | 'placement' | 'placedAt'>[] = [];
   for (const t of tickets) {
