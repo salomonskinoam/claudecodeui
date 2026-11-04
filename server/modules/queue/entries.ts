@@ -1,6 +1,5 @@
 import { getChats, isHeldOutside, isOpen, type Chat } from '@/modules/queue/chats.js';
-import { archivedAt } from '@/modules/queue/archived.js';
-import { dismissedAt } from '@/modules/queue/dismissals.js';
+import { readPlacements, resolvePlacement, type Where } from '@/modules/queue/placement.js';
 import { groupOf, rootOf, waitsForMe, type QueueGroup, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import { getTickets, openBlockersOf, type Ticket } from '@/modules/queue/sources/tickets.js';
 
@@ -29,12 +28,10 @@ export type QueueEntry = QueueOrderEntry & {
   waitsForMe: boolean;
   /** The chat has a running process, whatever its state. */
   live: boolean;
-  /** Noam dismissed the chat's current reply (the pause icon); over when it replies again. */
-  dismissed: boolean;
-  /** Noam archived the entry (the archive icon): it waits in the "Archived" drawer, whatever it does, until he takes it out. */
-  archived: boolean;
-  /** When it was archived (epoch ms; 0 for the ones archived before the time was kept), else null. */
-  archivedAt: number | null;
+  /** Where Noam put the entry: the queue, "On hold" or "Archived" (placement.ts). One flag. */
+  placement: Where;
+  /** When it was put on hold or archived (epoch ms; 0 for the ones from before the time was kept); null in the queue. */
+  placedAt: number | null;
   /** The time of the chat's last reply, the dismissal's key. */
   replyAt: string | null;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
@@ -114,7 +111,7 @@ export function buildEntries(): QueueEntry[] {
     for (const { sid } of t.claims) if (!ignored.has(`${sid}:${t.number}`) && (!ticketOf.has(sid) || isRoot)) ticketOf.set(sid, t.number);
   }
 
-  const entries: Omit<QueueEntry, 'rootKey' | 'group' | 'waitsForMe' | 'dismissed' | 'archived' | 'archivedAt'>[] = [];
+  const entries: Omit<QueueEntry, 'rootKey' | 'group' | 'waitsForMe' | 'placement' | 'placedAt'>[] = [];
   for (const t of tickets) {
     const chat = chats.get(claimant.get(t.number) ?? '') ?? null;
     const kind = kindOf(t);
@@ -142,11 +139,10 @@ export function buildEntries(): QueueEntry[] {
     });
   }
   const byKey = new Map(entries.map((e) => [e.key, e as QueueOrderEntry]));
-  // A dismissed reply hides a question or a Done; a permission prompt always waits, dismissed or not.
+  // Only an entry in the queue waits for Noam: a permission prompt, a question or a Done.
+  const placements = readPlacements();
   return entries.map((e) => {
-    const dismissed = dismissedAt(e.key) === (e.replyAt ?? 'none');
-    const at = archivedAt(e.key);
-    const archived = at !== undefined;
-    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), dismissed, archived, archivedAt: at ?? null, waitsForMe: !archived && (e.state === 'permission' || (waitsForMe(e) && !dismissed)) };
+    const { where, at } = resolvePlacement(placements[e.key], e.replyAt ?? 'none');
+    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), placement: where, placedAt: at, waitsForMe: where === 'queue' && (e.state === 'permission' || waitsForMe(e)) };
   });
 }

@@ -8,7 +8,7 @@ import QueueToolbar from '@/modules/queue/QueueToolbar';
 import RenameDialog from '@/modules/queue/RenameDialog';
 import TabContextMenu from '@/modules/queue/TabContextMenu';
 import { setQueueOpener, setTicketStarter } from '@/modules/queue/queueNavigation';
-import { holdQueueEntry, sendQueueEntryToEnd, setQueueArchived, useQueue } from '@/modules/queue/queueStore';
+import { placeQueueEntry, useQueue } from '@/modules/queue/queueStore';
 import { useQueueView } from '@/modules/queue/queueView';
 import TicketGroups, { TicketGroupMenu } from '@/modules/queue/TicketGroups';
 import type { QueueEntry } from '@/modules/queue/types';
@@ -68,9 +68,7 @@ export default function QueueList({ filter, onNewSession, onStartTicket }: Queue
       drag={lineProps(e.key, e.state !== 'permission' && e.key !== queue.latch)}
       onOpen={(event) => open(e, event)}
       onCloseTicket={() => setClosing(e)}
-      onDismiss={() => void holdQueueEntry(e)}
-      onSendToEnd={() => void sendQueueEntryToEnd(e)}
-      onArchive={() => void setQueueArchived(e.key, !e.archived)}
+      onPlace={(where) => void placeQueueEntry(e.key, where)}
       onMenu={e.sessionId ? (event) => { event.preventDefault(); setMenu({ sessionId: e.sessionId as string, entryKey: e.key, x: event.clientX, y: event.clientY }); }
         : e.number !== null && e.state === 'unclaimed' ? (event) => { event.preventDefault(); setTicketMenu({ target: { ticket: e.number as number }, x: event.clientX, y: event.clientY }); } : undefined}
       onRename={e.sessionId ? () => setRenaming(e) : undefined}

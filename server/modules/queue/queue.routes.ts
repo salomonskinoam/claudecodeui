@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 
-import { archiveEntry, dismissEntry, dragTo, getQueue, replaceTicketGroups, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
+import { dragTo, getQueue, placeEntry, replaceTicketGroups, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
 import { closeTicket, getTickets, type CloseChoice } from '@/modules/queue/sources/tickets.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -42,19 +42,12 @@ router.put('/latch', asyncHandler(async (req: Request, res: Response) => {
   res.json(createApiSuccessResponse(setLatch(key)));
 }));
 
-// The pause icon: the entry goes on hold until it replies again; `dismissed: false` takes it off hold now.
-router.put('/dismiss', asyncHandler(async (req: Request, res: Response) => {
-  const { key, dismissed } = req.body ?? {};
-  if (typeof key !== 'string') throw bad('key is required.');
-  if (dismissed !== undefined && typeof dismissed !== 'boolean') throw bad('dismissed must be a boolean.');
-  res.json(createApiSuccessResponse(dismissEntry(key, dismissed ?? true)));
-}));
-
-// The archive icon: the entry goes to the "Archived" drawer, or leaves it.
-router.put('/archive', asyncHandler(async (req: Request, res: Response) => {
-  const { key, archived } = req.body ?? {};
-  if (typeof key !== 'string' || typeof archived !== 'boolean') throw bad('key and archived are required.');
-  res.json(createApiSuccessResponse(archiveEntry(key, archived)));
+// A drawer button: the entry goes to the queue (at its end), "On hold" or "Archived".
+const PLACES = new Set(['queue', 'hold', 'archive']);
+router.put('/place', asyncHandler(async (req: Request, res: Response) => {
+  const { key, where } = req.body ?? {};
+  if (typeof key !== 'string' || !PLACES.has(where)) throw bad('key and where (queue, hold or archive) are required.');
+  res.json(createApiSuccessResponse(placeEntry(key, where)));
 }));
 
 // Noam's groups of unclaimed tickets: the whole list replaces the stored one.

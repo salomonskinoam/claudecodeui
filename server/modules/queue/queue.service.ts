@@ -1,6 +1,5 @@
-import { setArchived } from '@/modules/queue/archived.js';
 import { chatsIn } from '@/modules/queue/chats.js';
-import { dismiss, undismiss } from '@/modules/queue/dismissals.js';
+import { place, type Where } from '@/modules/queue/placement.js';
 import { buildEntries, type QueueEntry } from '@/modules/queue/entries.js';
 import { readLatch, readOrder, writeLatch, writeOrder } from '@/modules/queue/order-store.js';
 import { drag, lift, repair, view } from '@/modules/queue/queue-order.js';
@@ -45,22 +44,15 @@ export function setLatch(key: string | null): Queue {
 }
 
 /**
- * The pause icon: the entry goes to "On hold" until it replies again (its current reply is recorded as
- * dismissed); pressed again (`dismissed` false) it comes back now.
+ * A drawer button: the entry goes to that place. The queue's button always puts it at the end of the queue
+ * (Noam, 3 Nov: "the send to end of queue always send to ... the end of the queue").
  */
-export function dismissEntry(key: string, dismissed = true): Queue {
-  if (!dismissed) undismiss(key);
-  else {
-    const entry = buildEntries().find((e) => e.key === key);
-    if (entry) dismiss(key, entry.replyAt ?? 'none');
-  }
-  return getQueue();
-}
-
-/** The archive icon: the entry goes to the "Archived" drawer (or leaves it), whatever it does. Leaving the archive ends its hold too. */
-export function archiveEntry(key: string, archived: boolean): Queue {
-  setArchived(key, archived);
-  if (!archived) undismiss(key);
+export function placeEntry(key: string, where: Where): Queue {
+  const entries = buildEntries();
+  const entry = entries.find((e) => e.key === key);
+  if (!entry) return getQueue();
+  place(key, where, entry.replyAt ?? 'none');
+  if (where === 'queue') writeOrder(drag(repair(readOrder(), entries), entries, key, null));
   return getQueue();
 }
 

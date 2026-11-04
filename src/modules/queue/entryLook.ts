@@ -41,7 +41,7 @@ export function useEntryLook(): (entry: QueueEntry) => EntryLook {
     const shown = isChat(entry, shownId);
     const hovered = hover === entry.key;
     return {
-      color: entry.dismissed || entry.archived || entry.state === 'unclaimed' ? GRAY : colors.get(entry.rootKey) ?? 'transparent',
+      color: entry.placement !== 'queue' || entry.state === 'unclaimed' ? GRAY : colors.get(entry.rootKey) ?? 'transparent',
       kind: entry.kind,
       shown,
       hovered,

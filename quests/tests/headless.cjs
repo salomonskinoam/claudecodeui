@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'toend'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -42,7 +42,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   await page.addInitScript((t) => localStorage.setItem('auth-token', t), token);
   // The list's default (focus) shows only the chats that wait for the user; every check but `focus` reads the
   // whole list, so they open the page in archive mode.
-  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), ['focus', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'ticketchat', 'switch', 'search', 'toend'].includes(check) ? 'focus' : 'archive');
+  await page.addInitScript((mode) => localStorage.setItem('quests-queue-mode', mode), ['focus', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'ticketchat', 'switch', 'search', 'place'].includes(check) ? 'focus' : 'archive');
   page.on('pageerror', (error) => console.log('page error:', (error.stack || error.message).slice(0, 700)));
   await page.goto(check === 'plan' ? 'http://127.0.0.1:3001/' : `http://127.0.0.1:3001/session/${sessionId}`);
   await page.waitForTimeout(6000);
@@ -296,7 +296,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // opens a new chat with "claim this ticket <link>" typed in, unsent (it names itself at its start). The text
     // is then cleared, so no draft is left behind. Nothing is sent.
     const q = await apiQueue();
-    const t = q.entries.find((e) => e.state === 'unclaimed' && !e.archived && !e.dismissed);
+    const t = q.entries.find((e) => e.state === 'unclaimed' && e.placement === 'queue');
     await page.locator('[data-quests-group="Tickets-Unclaimed"]').click();
     await page.waitForTimeout(300);
     await page.locator(`[data-quests-queue="list"] [data-queue-key="${t.key}"]`).click();
@@ -642,51 +642,47 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     console.log(JSON.stringify(rows, null, 0).replace(/\},\{/g, '},\n{'));
   }
 
-  if (check === 'toend') {
-    // Focus mode. In the pending and active drawers the slashed-eye button on the first line sends it to the end
-    // of the drawer; the order is then rebuilt by sending each other line to the end in turn, so the queue is
-    // left as it was. In "On hold" and "Archived" the button takes the line out, to the end of the queue (the
-    // queue API shows it off hold / out of the archive and last in the stored order); the line is then put back
-    // (on hold again, or archived again: it was the newest, so it returns to the top).
-    const out = {};
+  if (check === 'place') {
+    // Focus mode. One flag says where an entry is; each line has one button per place (the queue, "On hold",
+    // "Archived"), and a button sets the place, never toggles it. On the first line of "Pending chats": hold
+    // (twice: still on hold), then archive from the "On hold" drawer, then the queue button from "Archived"
+    // (it must be out of both and last in the stored order), then the queue button again on a line already in
+    // the queue (still last). At each step the line must sit in exactly one drawer. The place and the order
+    // are put back at the end.
     const put = (route, body) => page.evaluate(async ([r, b]) => fetch(`/api/quests/queue${r}`, {
       method: 'PUT', headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(b),
     }), [route, body]);
-    for (const label of ['Pending chats', 'Active chats', 'On hold', 'Archived']) {
+    const LABELS = ['Pending chats', 'Active chats', 'On hold', 'Tickets-Unclaimed', 'Archived'];
+    for (const label of LABELS) {
       const header = page.locator(`[data-quests-group="${label}"]`);
-      const drawer = header.locator('xpath=..');
-      const order = async () => drawer.locator('[data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
-      if ((await order()).length === 0) { await header.click(); await page.waitForTimeout(400); }
-      const before = await order();
-      const toEnd = async (key) => { await drawer.locator(`[data-queue-key="${key}"] [data-quests-line="to-end"]`).dispatchEvent('click'); await page.waitForTimeout(1000); };
-      const movable = [];
-      for (const key of before) if (await drawer.locator(`[data-queue-key="${key}"] [data-quests-line="to-end"]`).count()) movable.push(key);
-      if (label === 'On hold' || label === 'Archived') {
-        if (movable.length === 0) { out[label] = { lines: before.length, skipped: true }; continue; }
-        const key = movable[0];
-        await toEnd(key);
-        const q = await apiQueue();
-        const e = q.entries.find((x) => x.key === key);
-        const left = !(await order()).includes(key);
-        await put(label === 'Archived' ? '/archive' : '/dismiss', label === 'Archived' ? { key, archived: true } : { key });
-        await put('/drag', { key, beforeKey: before[1] ?? null });
-        await page.waitForTimeout(2500); // the page learns of a change made behind its back at its next poll
-        const after = await order();
-        out[label] = { lines: before.length, left, out: !e.archived && !e.dismissed, lastInQueue: q.order.at(-1) === key, restored: JSON.stringify(after) === JSON.stringify(before), ...(JSON.stringify(after) === JSON.stringify(before) ? {} : { before: before.slice(0, 3), after: after.slice(0, 3) }) };
-      } else {
-        if (movable.length < 2) { out[label] = { lines: before.length, movable: movable.length, skipped: true }; continue; }
-        await toEnd(movable[0]);
-        const moved = await order();
-        const sentLast = moved.filter((k) => movable.includes(k)).at(-1) === movable[0];
-        for (const key of movable.slice(1)) await toEnd(key);
-        const after = await order();
-        out[label] = { lines: before.length, movable: movable.length, sentLast, restored: JSON.stringify(after) === JSON.stringify(before), ...(sentLast && JSON.stringify(after) === JSON.stringify(before) ? {} : { before, moved, after }) };
-      }
-      await header.click();
-      await page.waitForTimeout(200);
+      if ((await header.locator('xpath=..').locator('[data-queue-key]').count()) === 0) { await header.click(); await page.waitForTimeout(300); }
     }
-    console.log(JSON.stringify(out));
+    const drawersOf = (key) => page.evaluate(([k, labels]) => labels.filter((l) => {
+      const h = document.querySelector(`[data-quests-group="${l}"]`);
+      return h && h.parentElement.querySelector(`[data-queue-key="${CSS.escape(k)}"]`);
+    }), [key, LABELS]);
+    const before = await apiQueue();
+    const key = (await page.locator('[data-quests-group="Pending chats"]').locator('xpath=..').locator('[data-queue-key]').first().getAttribute('data-queue-key'));
+    const original = before.entries.find((e) => e.key === key).placement;
+    const press = async (where) => { await page.locator(`[data-quests-queue="list"] [data-queue-key="${key}"] [data-quests-place="${where}"]`).first().dispatchEvent('click'); await page.waitForTimeout(1000); };
+    const state = async () => { const q = await apiQueue(); const e = q.entries.find((x) => x.key === key); return { placement: e.placement, last: q.order.at(-1) === key, drawers: await drawersOf(key), lit: await page.locator(`[data-quests-queue="list"] [data-queue-key="${key}"] [data-quests-here="true"]`).evaluateAll((ns) => ns.map((n) => n.dataset.questsPlace)) }; };
+    const steps = {};
+    await press('hold'); steps.hold = await state();
+    await press('hold'); steps.holdAgain = await state();
+    await press('archive'); steps.archive = await state();
+    await press('queue'); steps.queue = await state();
+    await press('queue'); steps.queueAgain = await state();
+    await put('/place', { key, where: original });
+    await put('/order', { order: before.order });
+    await page.waitForTimeout(2500);
+    const after = await apiQueue();
+    const ok = steps.hold.placement === 'hold' && JSON.stringify(steps.hold.drawers) === '["On hold"]' && JSON.stringify(steps.hold.lit) === '["hold"]'
+      && steps.holdAgain.placement === 'hold'
+      && steps.archive.placement === 'archive' && JSON.stringify(steps.archive.drawers) === '["Archived"]' && JSON.stringify(steps.archive.lit) === '["archive"]'
+      && steps.queue.placement === 'queue' && steps.queue.last && !steps.queue.drawers.includes('On hold') && !steps.queue.drawers.includes('Archived') && steps.queue.lit.length === 0
+      && steps.queueAgain.placement === 'queue' && steps.queueAgain.last;
+    console.log(JSON.stringify({ key, ok, steps, restored: JSON.stringify(after.order) === JSON.stringify(before.order) && after.entries.find((e) => e.key === key).placement === original }, null, 1));
   }
 
   if (check === 'search') {
@@ -698,7 +694,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const textOf = (e) => [e.chatName, e.title, e.number !== null ? `#${e.number}` : '', e.world, e.closingLine].filter(Boolean).join(' ').toLowerCase();
     const box = page.locator('input.nav-search-input:visible').first();
     const before = (await keys()).length;
-    const sample = q.entries.find((e) => !e.archived && e.chatName) ?? q.entries[0];
+    const sample = q.entries.find((e) => e.placement !== 'archive' && e.chatName) ?? q.entries[0];
     const word = (sample.chatName ?? sample.title).split(/\s+/).find((w) => w.length >= 3) ?? sample.title.slice(0, 3);
     await box.fill(word);
     await page.waitForTimeout(500);
@@ -718,7 +714,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // Focus mode: the "On hold" group lists exactly the dismissed entries of the queue, in queue order; a click
     // opens it. Nothing is put on hold here.
     const q = await apiQueue();
-    const dismissed = q.view.filter((k) => { const e = q.entries.find((x) => x.key === k); return e?.dismissed && !e.archived; });
+    const dismissed = q.view.filter((k) => q.entries.find((x) => x.key === k)?.placement === 'hold');
     const group = page.locator('[data-quests-group="On hold"]');
     const label = (await group.innerText().catch(() => '')).replace(/\s+/g, ' ');
     await group.click().catch(() => undefined);
@@ -803,7 +799,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // clicked in turn, A, B, A, B. Per click: the time until the pane shows rows and holds still, the number of
     // message reads sent to the server, whether the pane sits at the bottom, and the row count.
     const q = await apiQueue();
-    const other = q.entries.find((e) => e.sessionId && e.sessionId !== sessionId && !e.heldOutside && !e.archived);
+    const other = q.entries.find((e) => e.sessionId && e.sessionId !== sessionId && !e.heldOutside && e.placement !== 'archive');
     const reads = [];
     page.on('request', (r) => { if (/\/api\/providers\/sessions\/[^/]+\/messages/.test(r.url())) reads.push(r.url()); });
     await page.goto(`http://127.0.0.1:3001/session/${other.sessionId}`);
@@ -837,8 +833,8 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // The "Archived" drawer lists exactly the archived entries of the queue, newest first, and none of them is
     // among the other lines; a click opens it. Nothing is archived here.
     const q = await apiQueue();
-    const archived = q.view.filter((k) => q.entries.find((e) => e.key === k)?.archived)
-      .sort((a, b) => (q.entries.find((e) => e.key === b).archivedAt ?? 0) - (q.entries.find((e) => e.key === a).archivedAt ?? 0));
+    const archived = q.view.filter((k) => q.entries.find((e) => e.key === k)?.placement === 'archive')
+      .sort((a, b) => (q.entries.find((e) => e.key === b).placedAt ?? 0) - (q.entries.find((e) => e.key === a).placedAt ?? 0));
     const drawer = page.locator('[data-quests-group="Archived"]');
     const label = (await drawer.innerText().catch(() => '')).replace(/\s+/g, ' ');
     const before = await page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
@@ -967,8 +963,8 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(300);
     console.log(JSON.stringify({
       linesAsExpected: JSON.stringify(shown) === JSON.stringify(expected), lines: shown.length, pending, active, unclaimed,
-      activeChats: activeKeys.length, expectedActive: view.filter((e) => e.live && !e.waitsForMe && !e.dismissed && !e.archived && e.key !== mine).length, runningLast,
-      openedUnclaimed: opened - shown.length, expectedUnclaimed: view.filter((e) => e.state === 'unclaimed' && !e.archived && !e.dismissed).length,
+      activeChats: activeKeys.length, expectedActive: view.filter((e) => e.live && !e.waitsForMe && e.placement === 'queue' && e.key !== mine).length, runningLast,
+      openedUnclaimed: opened - shown.length, expectedUnclaimed: view.filter((e) => e.state === 'unclaimed' && e.placement === 'queue').length,
       doneEnabled, doneWhileTyped, viewLines: view.length,
     }));
   }

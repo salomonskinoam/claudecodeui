@@ -64,14 +64,14 @@ export function useQueueView(): QueueView {
   const shown = useShownChat();
   const byKey = new Map(queue.entries.map((e) => [e.key, e]));
   const every = queue.view.map((k) => byKey.get(k)).filter((e): e is QueueEntry => Boolean(e));
-  const archived = every.filter((e) => e.archived).sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
-  const all = every.filter((e) => !e.archived);
+  const archived = every.filter((e) => e.placement === 'archive').sort((a, b) => (b.placedAt ?? 0) - (a.placedAt ?? 0));
+  const all = every.filter((e) => e.placement !== 'archive');
   if (current === 'archive') return { mode: current, lines: all, active: [], hold: [], unclaimed: [], archived };
   // Noam, 3 Nov: "i want that section to keep chats i may want to go back to on my own". Its place in the
   // queue is kept; its next reply takes it out of the group.
-  const hold = all.filter((e) => e.dismissed);
-  const rest = all.filter((e) => !e.dismissed);
-  // The chat on screen stays listed, unless its reply was dismissed: then it leaves the list and the forest
+  const hold = all.filter((e) => e.placement === 'hold');
+  const rest = all.filter((e) => e.placement === 'queue');
+  // The chat on screen stays listed, unless it was put on hold: then it leaves the list and the forest
   // while its tab stays open (Noam, 2 Nov: "the chat tab is open, should remain open and leave the queue").
   const lines = rest.filter((e) => e.waitsForMe || isChat(e, shown));
   const open = rest.filter((e) => e.live && !lines.includes(e));

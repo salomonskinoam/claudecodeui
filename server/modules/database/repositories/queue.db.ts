@@ -17,7 +17,8 @@ export type QueueSessionRow = {
 };
 
 /** quests priority queue: the stored order, the pin, the dismissals, and the chats' closing lines. */
-type StateKey = 'order' | 'latch' | 'dismissed' | 'archived' | 'ticket_groups';
+// 'dismissed' and 'archived' are read once, to build 'placement' (server/modules/queue/placement.ts).
+type StateKey = 'order' | 'latch' | 'dismissed' | 'archived' | 'placement' | 'ticket_groups';
 
 export const queueDb = {
   getState<T>(key: StateKey): T | undefined {

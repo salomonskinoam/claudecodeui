@@ -5,6 +5,19 @@ export type QueueState = 'permission' | 'running' | 'question' | 'done' | 'waiti
 /** 0 a chat open right now, 1 a chat closed without /finalize-chat, 2 an unclaimed ticket. Only 2 is a level of the order. */
 export type QueueGroup = 0 | 1 | 2;
 
+export type Where = 'queue' | 'hold' | 'archive';
+
+/**
+ * The three places an entry can be put, one button each on its line and in its menu, in drawer order (Noam,
+ * 3 Nov: "each button should correspond to a drawer"). "Pending chats" and "Active chats" are both the queue,
+ * split by what the chat does; the queue's button always puts the entry at the end of the queue.
+ */
+export const PLACES: Array<{ where: Where; label: string }> = [
+  { where: 'queue', label: 'To the end of the queue' },
+  { where: 'hold', label: 'On hold (until it replies again)' },
+  { where: 'archive', label: 'Archived' },
+];
+
 export type QueueEntry = {
   key: string;
   kind: QueueKind;
@@ -28,12 +41,10 @@ export type QueueEntry = {
   waitsForMe: boolean;
   /** The chat has a running process, whatever its state. */
   live: boolean;
-  /** Noam dismissed the chat's current reply (the pause icon); over when it replies again. */
-  dismissed: boolean;
-  /** Noam archived the entry: it waits in the "Archived" drawer, whatever it does, until he takes it out. */
-  archived: boolean;
-  /** When it was archived (epoch ms; 0 for the ones archived before the time was kept), else null. */
-  archivedAt: number | null;
+  /** Where Noam put the entry, one flag: the queue, "On hold" (until the chat replies again) or "Archived". */
+  placement: Where;
+  /** When it was put on hold or archived (epoch ms); null in the queue. */
+  placedAt: number | null;
   replyAt: string | null;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
   heldOutside: boolean;

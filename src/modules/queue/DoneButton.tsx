@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import { openNextInQueue } from '@/modules/queue/queueNavigation';
-import { dismissQueueEntry, useQueue } from '@/modules/queue/queueStore';
+import { placeQueueEntry, useQueue } from '@/modules/queue/queueStore';
 import { entryOfChat } from '@/modules/queue/types';
 
 const btn = 'rounded-sm border border-[#454647] px-3 py-1 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e] disabled:opacity-50';
@@ -31,7 +31,7 @@ export default function DoneButton({ sessionId, hasInput, onSendText }: DoneButt
   const finish = async (finalizeFirst: boolean) => {
     setAsking(false);
     if (finalizeFirst) onSendText('/finalize-chat');
-    if (entry) await dismissQueueEntry(entry.key).catch((error: unknown) => console.error(error));
+    if (entry) await placeQueueEntry(entry.key, 'hold').catch((error: unknown) => console.error(error));
     openNextInQueue();
   };
 

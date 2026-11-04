@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { Archive, ArchiveRestore, CircleCheck, EyeOff, Pause, Pencil, Pin, Play, SquareArrowOutUpRight } from 'lucide-react';
+import { Archive, CircleCheck, ListEnd, Pause, Pencil, Pin, SquareArrowOutUpRight } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import EntryDot from '@/modules/queue/EntryDot';
@@ -7,7 +7,7 @@ import type { EntryLook } from '@/modules/queue/entryLook';
 import EntryTitle from '@/modules/queue/EntryTitle';
 import KindSign from '@/modules/queue/KindSign';
 import { setQueueLatch } from '@/modules/queue/queueStore';
-import type { QueueEntry } from '@/modules/queue/types';
+import { PLACES, type QueueEntry, type Where } from '@/modules/queue/types';
 import type { LineMarker } from '@/modules/queue/useLineDrag';
 
 /** One of the three icon columns on the right of every line, 16 px wide, empty or not. */
@@ -29,12 +29,8 @@ type QueueLineProps = {
   drag: Record<string, unknown>;
   onOpen: (event: MouseEvent) => void;
   onCloseTicket: () => void;
-  /** The pause icon: put the chat on hold until it replies again (no question asked). */
-  onDismiss: () => void;
-  /** The slashed eye: the entry goes to the end of the queue (no question asked). */
-  onSendToEnd: () => void;
-  /** The archive icon: the entry goes to the "Archived" drawer, or leaves it (no question asked). */
-  onArchive: () => void;
+  /** A drawer button: the entry goes to that place (the queue: at its end). Not a toggle. */
+  onPlace: (where: Where) => void;
   /** A right-click: the chat's menu (rename, pin, on hold, ...). */
   onMenu?: (event: MouseEvent) => void;
   /** The pencil: rename the chat. */
@@ -45,7 +41,9 @@ type QueueLineProps = {
  * quests priority queue: one line of the list. The chat's dot, the kind's sign, the title, and on the right five
  * icon columns: the pin, send to the end, on hold (the pause), archive, the Cursor link, the ticket's close button.
  */
-export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onDismiss, onSendToEnd, onArchive, onMenu, onRename }: QueueLineProps) {
+const ICONS: Record<Where, typeof Archive> = { queue: ListEnd, hold: Pause, archive: Archive };
+
+export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onPlace, onMenu, onRename }: QueueLineProps) {
   return (
     <div
       data-queue-key={e.key}
@@ -93,28 +91,20 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
           </button>
         )}
       </span>
-      <span className={SLOT}>
-        {e.sessionId && (
-          <button type="button" title={e.archived ? 'Out of the archive, to the end of the queue' : e.dismissed ? 'Off hold, to the end of the queue' : 'Send to the end of the queue'} className={BUTTON}
-            data-quests-line="to-end" onClick={(event) => { event.stopPropagation(); onSendToEnd(); }}>
-            <EyeOff className="h-4 w-4" />
-          </button>
-        )}
-      </span>
-      <span className={SLOT}>
-        {e.sessionId && (
-          <button type="button" title={e.archived ? 'Out of the archive, to On hold' : e.dismissed ? 'Take off hold' : 'Put on hold until it replies again'} className={BUTTON}
-            data-quests-line={e.dismissed && !e.archived ? 'undismiss' : 'dismiss'} onClick={(event) => { event.stopPropagation(); onDismiss(); }}>
-            {e.dismissed && !e.archived ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-          </button>
-        )}
-      </span>
-      <span className={SLOT}>
-        <button type="button" title={e.archived ? 'Take out of the archive' : 'Archive'} className={BUTTON}
-          data-quests-line={e.archived ? 'unarchive' : 'archive'} onClick={(event) => { event.stopPropagation(); onArchive(); }}>
-          {e.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-        </button>
-      </span>
+      {PLACES.map(({ where, label }) => {
+        const Icon = ICONS[where];
+        // The button of the place the entry is in now is lit; the queue's button still moves it to the end.
+        const here = e.placement === where && where !== 'queue';
+        return (
+          <span key={where} className={SLOT}>
+            <button type="button" title={here ? `${label}: here now` : label} className={cn(BUTTON, here && 'opacity-100 text-[#3794ff]')}
+              data-quests-place={where} data-quests-here={here ? 'true' : undefined}
+              onClick={(event) => { event.stopPropagation(); onPlace(where); }}>
+              <Icon className="h-4 w-4" />
+            </button>
+          </span>
+        );
+      })}
       <span className={SLOT}>
         {e.providerSessionId && (
           <a href={`cursor://anthropic.claude-code/open?session=${e.providerSessionId}`} title="Open in Cursor"
