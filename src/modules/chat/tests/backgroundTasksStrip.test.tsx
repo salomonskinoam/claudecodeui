@@ -7,6 +7,10 @@ import { BackgroundTasksStrip } from '@/modules/chat/transcript/BackgroundTasksS
 import { visibleCountToReveal } from '@/modules/chat/hooks/useChatSessionState';
 import { SESSION_MESSAGES_PAGE_SIZE } from '@/modules/chat/utils/sessionMessagePagination';
 import type { ChatMessage } from '@/shared/types';
+import { setWorkState } from '@/modules/chat/work/workStateStore';
+
+// The strip asks the server for the chat's live workers; here nothing answers, unless a test says what it said.
+vi.mock('@/shared/api', () => ({ authenticatedFetch: () => new Promise(() => {}) }));
 
 const toolRow = (overrides: Partial<ChatMessage>): ChatMessage => ({
   type: 'assistant',
@@ -17,6 +21,26 @@ const toolRow = (overrides: Partial<ChatMessage>): ChatMessage => ({
 });
 
 describe('the background tasks strip', () => {
+  it('shows only what the server lists as a live worker: an agent drawn running but killed gets no chip', () => {
+    const worker = { taskId: 'agent-live', kind: 'agent' as const, name: 'Survey the repo', step: null, startedAt: null, lastActivityAt: null, tab: null };
+    setWorkState('session-killed', { main: { state: 'question', step: null, text: null, since: null }, workers: [worker] });
+    render(
+      <BackgroundTasksStrip
+        sessionId="session-killed"
+        sendMessage={() => {}}
+        onReveal={() => {}}
+        onLoadAll={() => {}}
+        messages={[
+          toolRow({ toolName: 'Agent', toolId: 'toolu_dead', isSubagentContainer: true,
+            subagent: { id: 'agent-dead', name: 'general-purpose', type: 'general-purpose', description: 'View tickets 17 and 63', status: 'running' } }),
+          toolRow({ toolName: 'Agent', toolId: 'toolu_live', isSubagentContainer: true,
+            subagent: { id: 'agent-live', name: 'general-purpose', type: 'general-purpose', description: 'Survey the repo', status: 'running' } }),
+        ]}
+      />,
+    );
+    expect(screen.getAllByRole('button').map((b) => b.textContent).filter((x) => x?.startsWith('Agent'))).toEqual(['AgentSurvey the repo']);
+  });
+
   it('lists a running workflow and a running agent with what each has got to', () => {
     render(
       <BackgroundTasksStrip

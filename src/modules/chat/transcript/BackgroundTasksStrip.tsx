@@ -15,6 +15,7 @@ import {
 import { parseToolPayload } from '@/modules/chat/utils/messageTransforms';
 import { parseWorkflowMeta } from '@/modules/chat/utils/workflowScriptMeta';
 import { agentRef, openWorkTab, taskRef, type WorkKind } from '@/modules/chat/work/workTabs';
+import { useServerWorkers } from '@/modules/chat/work/workStateStore';
 
 /** quests: the tab a running launch opens as: an agent's transcript, or a command's or watcher's output file. */
 function workTargetOf(message: ChatMessage, sessionId: string | null): { kind: WorkKind; ref: string } | null {
@@ -115,7 +116,12 @@ function describeTask(message: ChatMessage, t: TFunction) {
  */
 export const BackgroundTasksStrip = memo(({ messages, tasks, sessionId, sendMessage, onReveal, onLoadAll }: BackgroundTasksStripProps) => {
   const { t } = useTranslation();
-  const running = listRunningBackgroundLaunches(messages);
+  // quests: a chip only for what the server lists as a live worker of this chat (the workers panel's read). A row
+  // drawn while its task ran says "running" for as long as nothing replaces it, and a killed task is never
+  // reported; the server reads the live process and the task's own files.
+  const serverWorkers = useServerWorkers(sessionId);
+  const live = (...ids: Array<string | undefined | null>) => !serverWorkers || ids.some((id) => id && serverWorkers.has(id));
+  const running = listRunningBackgroundLaunches(messages).filter((m) => live(readBackgroundTaskId(m), m.subagent?.id, m.toolId));
   // A loaded row that has a word on its task — settled or not — is the word;
   // a task whose row is not loaded, or is loaded without one (a backgrounded
   // command's launch row from history says nothing until the poll does), is
@@ -123,7 +129,8 @@ export const BackgroundTasksStrip = memo(({ messages, tasks, sessionId, sendMess
   const settledToolIds = new Set(
     messages.filter((message) => readBackgroundTaskStatus(message) !== undefined).map((message) => message.toolId),
   );
-  const fromMap = ownBackgroundTasks(tasks ?? []).filter((task) => !settledToolIds.has(task.toolUseId));
+  const fromMap = ownBackgroundTasks(tasks ?? []).filter((task) => !settledToolIds.has(task.toolUseId)
+    && (task.nested ? !serverWorkers || serverWorkers.size > 0 : live(task.taskId, task.toolUseId)));
 
   if (running.length === 0 && fromMap.length === 0) {
     return null;

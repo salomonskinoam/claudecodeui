@@ -1,11 +1,10 @@
 import { memo, useEffect, useRef, useState } from 'react';
 
-import { authenticatedFetch } from '@/shared/api';
 import { Shimmer } from '@/shared/ui';
 import type { SessionActivity } from '@/shared/types';
 import { formatTaskDuration } from '@/modules/chat/utils/backgroundTasks';
 import { openWorkTab, type WorkKind } from '@/modules/chat/work/workTabs';
-import { noteWorkState } from '@/modules/chat/work/workStateStore';
+import { useWorkState } from '@/modules/chat/work/workStateStore';
 import { revealLastToolRow } from '@/modules/chat/ledger/rowOpen';
 
 /**
@@ -73,7 +72,7 @@ type WorkersPanelProps = {
  * fills the row (its step, its time, Stop); otherwise the server's state does.
  */
 function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
-  const [state, setState] = useState<WorkState | null>(null);
+  const state = useWorkState(sessionId);
   const [now, setNow] = useState(() => Date.now());
   // The workers fold under the main line (Noam, 30 Oct: "the UI hides the entire screen right now, you have to
   // make this collapsable"); the choice is a per-viewer convenience kept in the browser.
@@ -96,29 +95,9 @@ function WorkersPanel({ sessionId, activity, onAbort }: WorkersPanelProps) {
   };
 
   useEffect(() => {
-    setState(null);
-    if (!sessionId) return undefined;
-    let stopped = false;
-    const load = async () => {
-      const response = await authenticatedFetch(`/api/quests/work/state/${encodeURIComponent(sessionId)}`);
-      if (stopped || !response.ok) return;
-      try {
-        const next = (await response.json()) as WorkState;
-        noteWorkState(sessionId, next.main.state);
-        setState(next);
-      } catch {
-        /* an older server: the panel stays empty */
-      }
-    };
-    void load();
-    const poll = window.setInterval(() => void load(), 3000);
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => {
-      stopped = true;
-      window.clearInterval(poll);
-      window.clearInterval(tick);
-    };
-  }, [sessionId]);
+    return () => window.clearInterval(tick);
+  }, []);
 
   // The server's word on the turn (its run registry) is the truth; the page's own activity map only adds the
   // live step while the server agrees, or for the first seconds after a send, before the server has answered.
