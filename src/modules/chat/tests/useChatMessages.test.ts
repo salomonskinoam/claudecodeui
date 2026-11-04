@@ -132,6 +132,22 @@ test('a task notification is one row, its result inside it, with the record id',
   assert.equal(updated[1]?.id, 'unrelated');
 });
 
+test('an agent call with its own answer is over, though its row was drawn running; an async launch ack ends nothing', () => {
+  const running = { id: 'a1', name: 'general-purpose', type: 'general-purpose', description: 'Pickup summary ticket 17', status: 'running' as const };
+  const call = message('agent-call', { kind: 'tool_use', toolId: 'toolu_agent_1', toolName: 'Agent', toolInput: { description: 'Pickup summary ticket 17' }, subagent: running });
+  const live = message('task-started', { kind: 'task_status', event: 'started', taskId: 'a1', toolUseId: 'toolu_agent_1', taskType: 'local_agent', description: 'Pickup summary ticket 17' });
+  const interrupted = message('agent-result', { kind: 'tool_result', toolId: 'toolu_agent_1', content: '[Tool call interrupted]', isError: true });
+  const [ended] = normalizedToChatMessages([call, live, interrupted]);
+  assert.equal(ended?.subagent?.status, 'failed');
+  assert.equal(ended?.taskStatus?.status, 'failed');
+
+  const answered = message('agent-answer', { kind: 'tool_result', toolId: 'toolu_agent_1', content: 'the report', toolUseResult: { status: 'completed' } });
+  assert.equal(normalizedToChatMessages([call, answered])[0]?.subagent?.status, 'completed');
+
+  const ack = message('agent-ack', { kind: 'tool_result', toolId: 'toolu_agent_1', content: 'Async agent launched successfully', toolUseResult: { isAsync: true, agentId: 'a1' } });
+  assert.equal(normalizedToChatMessages([call, ack])[0]?.subagent?.status, 'running');
+});
+
 test('folds the live task events of a background launch onto the tool row that launched it', () => {
   // The four `system` task subtypes the SDK emits for a running workflow,
   // normalized to `task_status` by the server. `updated` names only the task

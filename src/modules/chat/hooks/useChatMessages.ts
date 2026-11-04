@@ -515,6 +515,16 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           ? liveActivity
           : serverActivity;
 
+        // quests: an agent call that has its own answer is over, whatever its row said when it was drawn. The
+        // ledger keeps a tool row as it first came (a read made while the agent ran stamps it "running"), and a
+        // later read that pages past it never refreshes it; its result row still arrives. Only an async launch's
+        // result is a mere acknowledgement ("Async agent launched"), so that one ends nothing (Noam, 3 Nov: a
+        // killed agent shown as "Running View tickets 17 an..." hours later, "looks like a lie").
+        const agentEnded = isSubagentContainer && Boolean(tr)
+          && (Boolean(tr?.isError) || (tr?.toolUseResult as { isAsync?: unknown } | undefined)?.isAsync !== true);
+        const endedStatus = tr?.isError ? 'failed' as const : 'completed' as const;
+        const liveTask = msg.toolId ? liveTasksByToolUseId.get(msg.toolId) : undefined;
+
         converted.push({
           type: 'assistant',
           content: '',
@@ -526,10 +536,10 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           toolResult,
           toolStatus: typeof msg.status === 'string' ? msg.status : undefined,
           isSubagentContainer,
-          subagent: msg.subagent,
+          subagent: agentEnded && msg.subagent?.status === 'running' ? { ...msg.subagent, status: endedStatus } : msg.subagent,
           subagentActivity,
           workflow: msg.workflow,
-          taskStatus: msg.toolId ? liveTasksByToolUseId.get(msg.toolId) : undefined,
+          taskStatus: agentEnded && liveTask?.status === 'running' ? { ...liveTask, status: endedStatus } : liveTask,
           memoryCitations: msg.memoryCitations,
           ...sharedMetadata,
         });
