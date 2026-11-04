@@ -19,6 +19,8 @@
 //   ledger  the rows by id now and after 90 s of the chat working: nothing missing, nothing moved, nothing twice,
 //           new rows only at the ends (requirement 52)
 //   reload  rows, open tool lines and folds before and after a page reload: all the same (the ledger is persisted)
+//   back    Back is disabled at start; Next opens the next chat and enables Back; Back returns, is disabled again,
+//           and the opened chat's line has the dot and blink it had before Next
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
 //           panes, prints the stored layout after each drag. Restores no layout: use a fresh browser profile.
 const os = require('node:os');
@@ -28,7 +30,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -242,6 +244,31 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const opened = e.sessionId ? await page.evaluate((id) => location.pathname === `/session/${id}`, e.sessionId)
       : await page.evaluate((n) => location.pathname === `/ticket/${n}`, e.number);
     console.log(JSON.stringify({ expected, url: await page.evaluate(() => location.pathname), opened }));
+  }
+
+  if (check === 'back') {
+    // "Back" undoes "Next": disabled on a chat no "Next" opened; after "Next" it is enabled, and pressed it opens
+    // the chat "Next" left and gives the chat "Next" opened its orange dot and blink back, if it had them.
+    const q = await apiQueue();
+    const current = q.entries.find((e) => e.sessionId === sessionId)?.key;
+    const to = q.entries.find((e) => e.key === q.view.find((k) => k !== current && q.entries.find((x) => x.key === k).waitsForMe && q.entries.find((x) => x.key === k).sessionId));
+    const look = (key) => page.evaluate((k) => {
+      const line = document.querySelector(`[data-quests-queue="list"] [data-queue-key="${k}"]`);
+      return line ? { orange: Boolean(line.querySelector('[title="Finished, not seen yet"]')), blink: line.className.includes('animate-pulse') } : null;
+    }, key);
+    const back = page.locator('[data-quests-back="button"]').first();
+    const disabledAtStart = await back.isDisabled();
+    const before = await look(to.key);
+    await page.locator('[data-quests-next="button"]').first().click();
+    await page.waitForTimeout(2500);
+    const afterNext = { url: await page.evaluate(() => location.pathname), enabled: !(await back.isDisabled()) };
+    await back.click();
+    await page.waitForTimeout(2500);
+    const afterBack = { url: await page.evaluate(() => location.pathname), enabled: !(await back.isDisabled()), look: await look(to.key) };
+    const ok = disabledAtStart && afterNext.url === `/session/${to.sessionId}` && afterNext.enabled
+      && afterBack.url === `/session/${sessionId}` && !afterBack.enabled
+      && (!before || (afterBack.look && afterBack.look.orange === before.orange && afterBack.look.blink === before.blink));
+    console.log(JSON.stringify({ ok, to: to.key, before, afterNext, afterBack, disabledAtStart }, null, 1));
   }
 
   if (check === 'latch') {

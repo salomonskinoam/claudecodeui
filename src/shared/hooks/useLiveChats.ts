@@ -25,6 +25,8 @@ type LiveState = 'running' | 'waiting';
 
 let live: Record<string, LiveState> = {};
 const unseen = new Set<string>();
+// Chats to mark unseen again as soon as they are off screen ("Back" undoes the seen that "Next" caused).
+const unseeOnHide = new Set<string>();
 let inView: string[] = [];
 let snapshot: Record<string, ChatDot> = {};
 const listeners = new Set<() => void>();
@@ -60,7 +62,21 @@ async function poll(): Promise<void> {
 export function setChatsInView(ids: Array<string | null | undefined>): void {
   inView = ids.filter((id): id is string => Boolean(id));
   inView.forEach((id) => unseen.delete(id));
+  unseeOnHide.forEach((id) => {
+    if (!inView.includes(id)) {
+      unseen.add(id);
+      unseeOnHide.delete(id);
+    }
+  });
   publish();
+}
+
+export const isChatUnseen = (id: string): boolean => unseen.has(id);
+
+/** Mark a chat unseen again (orange) once it is off screen: "Back" puts back what "Next" changed. */
+export function markUnseenOnceHidden(id: string): void {
+  unseeOnHide.add(id);
+  setChatsInView(inView);
 }
 
 function subscribe(listener: () => void): () => void {

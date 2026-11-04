@@ -37,7 +37,7 @@ import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessageP
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
-import { DoneButton, openNextInQueue } from '@/modules/queue';
+import { BackButton, DoneButton, openNextInQueue } from '@/modules/queue';
 
 type MentionableFile = {
   name: string;
@@ -505,8 +505,11 @@ export default function ChatComposer({
               providerLabel={providerLabel}
             />
 
+            {/* quests: the undo of "Next": back to the chat it left; this chat gets its seen state back. */}
+            <BackButton className="h-[26px] rounded-sm border border-[#505050] px-2 text-[14px] text-[#cccccc]" />
             {/* quests: bring the next chat in line (Alt+Enter also sends what is typed first). */}
             <button
+              data-quests-next="button"
               type="button"
               title="Next chat in line (Alt+Enter sends first)"
               className="h-[26px] rounded-sm border border-[#505050] px-2 text-[14px] text-[#cccccc] hover:bg-[#2a2d2e]"

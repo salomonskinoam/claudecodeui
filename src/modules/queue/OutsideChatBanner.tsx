@@ -1,3 +1,4 @@
+import BackButton from '@/modules/queue/BackButton';
 import { openNextInQueue } from '@/modules/queue/queueNavigation';
 import { useQueue } from '@/modules/queue/queueStore';
 import { entryOfChat } from '@/modules/queue/types';
@@ -18,7 +19,8 @@ export default function OutsideChatBanner({ sessionId, children }: { sessionId: 
       <span>This chat is open in another editor. Answer it there.</span>
       <span className="flex gap-2">
         <a className={btn} href={`cursor://anthropic.claude-code/open?session=${entry.providerSessionId}`}>Open in Cursor to answer</a>
-        <button type="button" className={btn} onClick={() => openNextInQueue()}>Next</button>
+        <BackButton className="rounded-sm border border-[#454647] px-3 py-1 text-[13px] text-[#cccccc]" />
+        <button type="button" data-quests-next="button" className={btn} onClick={() => openNextInQueue()}>Next</button>
       </span>
     </div>
   );

@@ -9,6 +9,7 @@ export { default as TicketView } from '@/modules/queue/TicketView';
 export { default as OutsideChatBanner } from '@/modules/queue/OutsideChatBanner';
 export { default as KindSign } from '@/modules/queue/KindSign';
 export { default as DoneButton } from '@/modules/queue/DoneButton';
+export { default as BackButton } from '@/modules/queue/BackButton';
 export { default as TabContextMenu } from '@/modules/queue/TabContextMenu';
 export { default as RenameDialog } from '@/modules/queue/RenameDialog';
 export { useChatLook } from '@/modules/queue/entryLook';
