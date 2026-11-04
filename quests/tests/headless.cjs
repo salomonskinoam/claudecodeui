@@ -19,6 +19,7 @@
 //   ledger  the rows by id now and after 90 s of the chat working: nothing missing, nothing moved, nothing twice,
 //           new rows only at the ends (requirement 52)
 //   reload  rows, open tool lines and folds before and after a page reload: all the same (the ledger is persisted)
+//   planedit <plan name>: the plan tab's Edit holds the file's text, Cancel goes back (nothing saved)
 //   back    Back is disabled at start; Next opens the next chat and enables Back; Back returns, is disabled again,
 //           and the opened chat's line has the dot and blink it had before Next
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
@@ -30,7 +31,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -161,6 +162,19 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     }));
     console.log(JSON.stringify(r));
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  }
+
+  if (check === 'planedit') {
+    // <sessionId> is a plan name. The plan tab's Edit shows the file's text in a text box; Cancel goes back to the
+    // rendered plan. Nothing is saved (Save writes the file).
+    await page.goto(`http://127.0.0.1:3001/plan/${sessionId}`);
+    await page.waitForTimeout(5000);
+    const file = await page.evaluate(async (n) => (await (await fetch(`/api/quests/plan/${n}`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}` } })).json()).text, sessionId);
+    await page.locator('[data-quests-plan="tab-edit"]').click();
+    const box = await page.locator('[data-quests-plan="tab-text"]').inputValue();
+    await page.getByText('Cancel', { exact: true }).click();
+    const back = await page.locator('[data-quests-plan="tab-text"]').count() === 0 && await page.locator('[data-quests-plan="tab-edit"]').count() === 1;
+    console.log(JSON.stringify({ ok: box === file && back, sameText: box === file, back, chars: box.length }));
   }
 
   const apiQueue = () => page.evaluate(async () => (await (await fetch('/api/quests/queue', {

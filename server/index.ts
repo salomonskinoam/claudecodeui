@@ -267,6 +267,19 @@ app.get('/api/quests/plan/:name', authenticateToken, async (req: Request, res: R
     }
 });
 
+// quests: Noam's edit of a plan file, from the plan tab or the approval card (Noam, 4 Nov: "we should be able to
+// see the plan... and edit it"). The same names as the read, the same folder only.
+app.put('/api/quests/plan/:name', authenticateToken, express.json({ limit: '2mb' }), async (req: Request, res: Response) => {
+    const name = String(req.params.name);
+    const text = (req.body as { text?: unknown } | undefined)?.text;
+    if (!/^[A-Za-z0-9_-]+$/.test(name) || typeof text !== 'string') {
+        res.status(400).json({ error: 'bad plan name or text' });
+        return;
+    }
+    await fsPromises.writeFile(path.join(os.homedir(), '.claude', 'plans', `${name}.md`), text, 'utf8');
+    res.json({ ok: true });
+});
+
 // quests: the work tabs. An agent's transcript (its whole timeline and figures), and the tail of a backgrounded
 // command's output file (Claude Code writes it under /tmp/claude-<uid>/<cwd>/<session id>/tasks/<task id>.output
 // and names it in the tool result). Both read-only, re-read by the tab while it is open.

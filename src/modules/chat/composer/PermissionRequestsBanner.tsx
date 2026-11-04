@@ -2,6 +2,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ShieldAlertIcon } from 'lucide-react';
 
+import PlanApprovalCard from '@/modules/chat/composer/PlanApprovalCard';
+
 import type { PendingPermissionRequest } from '@/shared/types';
 import { buildClaudeToolPermissionEntry, formatToolInputForDisplay } from '@/modules/chat/utils/chatPermissions';
 import { getClaudeSettings } from '@/modules/chat/utils/chatStorage';
@@ -50,26 +52,7 @@ export default function PermissionRequestsBanner({
   return (
     <div className="mb-3 space-y-2">
       {planRequests.map((request) => (
-        <Confirmation key={request.requestId} approval="pending" data-quests-plan="approval">
-          <ConfirmationTitle className="flex items-start gap-3">
-            <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <ConfirmationRequest>
-              <span className="font-medium text-foreground">The plan waits for your approval</span>
-              <span className="ml-2 text-muted-foreground">Build it, or ask for changes. The chat waits until you decide.</span>
-            </ConfirmationRequest>
-          </ConfirmationTitle>
-          <ConfirmationActions>
-            <ConfirmationAction
-              variant="outline"
-              onClick={() => handlePermissionDecision(request.requestId, { allow: false, message: t('chat:misc.userAskedRevise') })}
-            >
-              Revise
-            </ConfirmationAction>
-            <ConfirmationAction variant="default" onClick={() => handlePermissionDecision(request.requestId, { allow: true })}>
-              Build the plan
-            </ConfirmationAction>
-          </ConfirmationActions>
-        </Confirmation>
+        <PlanApprovalCard key={request.requestId} request={request} onDecision={(d) => handlePermissionDecision(request.requestId, d)} />
       ))}
       {filteredRequests.map((request) => {
         const CustomPanel = getPermissionPanel(request.toolName);

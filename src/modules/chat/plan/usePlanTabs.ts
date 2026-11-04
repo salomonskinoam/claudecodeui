@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { isEmbedded, openTabAfter, planTabId } from '@/shared/hooks/useSplitPane';
 import type { ChatMessage } from '@/shared/types';
+import { planNameOfPath } from '@/modules/chat/plan/planFile';
 
 /** The plan file name of an ExitPlanMode call (planFilePath ~/.claude/plans/<name>.md), else null. */
 const planNameOf = (message: ChatMessage): string | null => {
@@ -15,9 +16,7 @@ const planNameOf = (message: ChatMessage): string | null => {
   } catch {
     return null;
   }
-  const filePath = input && typeof input === 'object' ? (input as { planFilePath?: unknown }).planFilePath : undefined;
-  const match = typeof filePath === 'string' ? /\/\.claude\/plans\/([A-Za-z0-9_-]+)\.md$/.exec(filePath) : null;
-  return match ? match[1] : null;
+  return planNameOfPath(input && typeof input === 'object' ? (input as { planFilePath?: unknown }).planFilePath : undefined);
 };
 
 /**
