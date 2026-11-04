@@ -75,46 +75,24 @@ const chatFields = (c: Chat | null) => ({
 });
 
 /**
- * Who holds which ticket. `claimant`: ticket number -> the chat shown on it. `ticketOf`: chat -> its ticket; a chat
- * that holds a ticket has that one, so it is never also listed as a chat of its own (Noam, 4 Nov: "a list item IS
- * A chat, 1:1", of a chat that held 17 and had also claimed 63, which its fork holds).
+ * Who holds which ticket, one to one (Noam, 4 Nov: "a chat can't hold 2 tickets and 1 ticket cant be in 2 chats.
+ * it's always 1:1. tickets can be created by a ticket chat, but never claimed. and chats may have 0 tickets but not
+ * 2"). The claims count in the order they were made: a claim counts only when its chat holds no ticket yet and the
+ * ticket has no holder. A finalized chat holds nothing, so its ticket goes to the next claim that counts, or back to
+ * the ticket level. `claimant`: ticket number -> its chat. `ticketOf`: chat -> its ticket, the same pairs reversed.
  */
 export function resolveClaims(
-  tickets: Pick<Ticket, 'number' | 'claims' | 'parent'>[],
+  tickets: Pick<Ticket, 'number' | 'claims'>[],
   over: (sid: string) => boolean,
 ): { claimant: Map<number, string>; ticketOf: Map<string, number> } {
-  const openTickets = new Set(tickets.map((t) => t.number));
-  // A ticket shows its newest claimant whose chat is not over. A claim by a finalized chat does not count: the
-  // ticket drops back to the ticket level, as if unclaimed (Noam 2026-10-27). One chat holds one ticket (Noam,
-  // 3 Nov: "never allow two tickets to be owned by the same chat again"): a chat that would hold several keeps
-  // the one it claimed first, its claims on the others do not count, and the others go to their next claimant,
-  // or to the ticket level. A chat's own ticket is the open one it claimed without an open parent, else the
-  // first it claimed (the tickets' session start hook).
   const claimant = new Map<number, string>();
   const ticketOf = new Map<string, number>();
-  const ignored = new Set<string>(); // `${sid}:${number}`: a claim that does not count
-  for (;;) {
-    claimant.clear();
-    for (const t of tickets) {
-      const c = t.claims.filter((x) => !over(x.sid) && !ignored.has(`${x.sid}:${t.number}`)).pop();
-      if (c) claimant.set(t.number, c.sid);
-    }
-    const held = new Map<string, number[]>();
-    for (const [number, sid] of claimant) held.set(sid, [...(held.get(sid) ?? []), number]);
-    let changed = false;
-    for (const [sid, numbers] of held) {
-      if (numbers.length < 2) continue;
-      const first = (n: number) => tickets.find((t) => t.number === n)!.claims.find((x) => x.sid === sid)!.at;
-      const keep = numbers.reduce((a, b) => (first(b) < first(a) ? b : a));
-      for (const n of numbers) if (n !== keep) { ignored.add(`${sid}:${n}`); changed = true; }
-    }
-    if (!changed) break;
+  const claims = tickets.flatMap((t) => t.claims.map((c) => ({ number: t.number, sid: c.sid, at: c.at }))).sort((a, b) => a.at - b.at);
+  for (const { number, sid } of claims) {
+    if (over(sid) || claimant.has(number) || ticketOf.has(sid)) continue;
+    claimant.set(number, sid);
+    ticketOf.set(sid, number);
   }
-  for (const t of tickets) {
-    const isRoot = !(t.parent && t.parent.state === 'OPEN' && openTickets.has(t.parent.number));
-    for (const { sid } of t.claims) if (!ignored.has(`${sid}:${t.number}`) && (!ticketOf.has(sid) || isRoot)) ticketOf.set(sid, t.number);
-  }
-  for (const [number, sid] of claimant) ticketOf.set(sid, number);
   return { claimant, ticketOf };
 }
 
@@ -143,7 +121,7 @@ export function buildEntries(): QueueEntry[] {
   // A chat is in the queue while it is open, or until it is finalized once its last reply left a closing line.
   for (const c of chats.values()) {
     if (!(isOpen(c) || (c.closingLine && !c.finalized))) continue;
-    if (ticketOf.has(c.sid) && claimant.get(ticketOf.get(c.sid)!) === c.sid) continue;
+    if (ticketOf.has(c.sid)) continue;
     const st = stateOf(c);
     entries.push({
       key: `chat:${c.sid}`, kind: 'chat', title: c.name, url: null, number: null, parentKey: null, blocks: [],
