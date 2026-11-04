@@ -46,6 +46,7 @@ const submit = async (provider: LLMProvider) => {
       provider,
       permissionMode: 'default',
       cyclePermissionMode: () => undefined,
+      selectPermissionMode: () => undefined,
       resolvePermissionModeForProvider: () => 'default' as PermissionMode,
       currentProviderModel: 'test-model',
       currentProviderEffort: 'medium',

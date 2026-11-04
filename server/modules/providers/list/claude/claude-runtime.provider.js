@@ -92,6 +92,8 @@ const TOOL_APPROVAL_TIMEOUT_MS = parseInt(process.env.CLAUDE_TOOL_APPROVAL_TIMEO
 const BG_WAIT_CEILING_MS = 30 * 60 * 1000;
 
 const TOOLS_REQUIRING_INTERACTION = new Set(['AskUserQuestion', 'ExitPlanMode']);
+// quests: the modes an approval may switch the chat to (plan mode is left, never entered, by an approval).
+const APPROVAL_MODES = new Set(['default', 'acceptEdits', 'auto', 'bypassPermissions']);
 
 // Ultracode is a session-scoped setting rather than an SDK effort level: it pairs xhigh
 // effort with standing dynamic-workflow orchestration, and the CLI only honours it when
@@ -1211,6 +1213,17 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
           if (Array.isArray(sdkOptions.disallowedTools)) {
             sdkOptions.disallowedTools = sdkOptions.disallowedTools.filter(entry => entry !== decision.rememberEntry);
           }
+        }
+        // quests: an approval can set the mode the chat goes on in. An approved plan otherwise leaves the process
+        // in the mode it had before plan mode ("default" for a chat started in plan mode), where every tool asks,
+        // whatever the page's mode button says (Noam, 4 Nov: "it keeps asking me permissions in auto mode").
+        if (APPROVAL_MODES.has(decision.mode)) {
+          sdkOptions.permissionMode = decision.mode;
+          return {
+            behavior: 'allow',
+            updatedInput: decision.updatedInput ?? input,
+            updatedPermissions: [{ type: 'setMode', mode: decision.mode, destination: 'session' }],
+          };
         }
         return { behavior: 'allow', updatedInput: decision.updatedInput ?? input };
       }

@@ -4,7 +4,7 @@ import { ShieldAlertIcon } from 'lucide-react';
 
 import PlanApprovalCard from '@/modules/chat/composer/PlanApprovalCard';
 
-import type { PendingPermissionRequest } from '@/shared/types';
+import type { PendingPermissionRequest, PermissionMode } from '@/shared/types';
 import { buildClaudeToolPermissionEntry, formatToolInputForDisplay } from '@/modules/chat/utils/chatPermissions';
 import { getClaudeSettings } from '@/modules/chat/utils/chatStorage';
 import { getPermissionPanel, registerPermissionPanel } from '@/modules/chat/tools/configs/permissionPanelRegistry';
@@ -23,7 +23,7 @@ type PermissionRequestsBannerProps = {
   pendingPermissionRequests: PendingPermissionRequest[];
   handlePermissionDecision: (
     requestIds: string | string[],
-    decision: { allow?: boolean; message?: string; rememberEntry?: string | null; updatedInput?: unknown },
+    decision: { allow?: boolean; message?: string; rememberEntry?: string | null; updatedInput?: unknown; mode?: PermissionMode },
   ) => void;
   handleGrantToolPermission: (suggestion: { entry: string; toolName: string }) => { success: boolean };
 };

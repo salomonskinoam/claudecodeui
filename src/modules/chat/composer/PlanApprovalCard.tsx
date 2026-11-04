@@ -13,14 +13,16 @@ import {
   ConfirmationTitle,
 } from '@/modules/chat/composer/Confirmation';
 
-type Decision = { allow?: boolean; message?: string; updatedInput?: unknown };
+type Decision = { allow?: boolean; message?: string; updatedInput?: unknown; mode?: 'auto' };
 
 /**
  * quests: a plan that waits for approval, above the input box (requirement 33). The plan itself is in the card,
  * and Noam can edit it there before he decides (Noam, 4 Nov: "it built a plan, gave the approval prompt, and then
  * did not show the plan. i clicked revise and it started thinking (about what?)"; "we should be able to see the
  * plan... and edit it").
- *   Build the plan  approves; an edited plan is saved to the plan file and handed to the chat as the plan
+ *   Build the plan  approves, and the chat builds in Auto mode (the process and the mode button); an edited plan
+ *                   is saved to the plan file and handed to the chat as the plan (Noam, 4 Nov, after a build that
+ *                   asked for every tool: "it keeps asking me permissions in auto mode")
  *   Revise          sends what should change, and the edit if there is one; it needs one of the two, so the chat
  *                   always knows what to revise
  */
@@ -42,7 +44,7 @@ export default function PlanApprovalCard({ request, onDecision }: { request: Pen
       return;
     }
     if (allow) {
-      onDecision(edited ? { allow: true, updatedInput: { ...input, plan: text } } : { allow: true });
+      onDecision(edited ? { allow: true, mode: 'auto', updatedInput: { ...input, plan: text } } : { allow: true, mode: 'auto' });
       return;
     }
     const parts = ['The user asked to revise the plan.'];
@@ -100,7 +102,7 @@ export default function PlanApprovalCard({ request, onDecision }: { request: Pen
         >
           Revise
         </ConfirmationAction>
-        <ConfirmationAction variant="default" onClick={() => void decide(true)}>
+        <ConfirmationAction variant="default" title="Approve the plan; the chat builds it in Auto mode" onClick={() => void decide(true)}>
           Build the plan
         </ConfirmationAction>
       </ConfirmationActions>

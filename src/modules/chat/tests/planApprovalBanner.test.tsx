@@ -25,7 +25,7 @@ it('a plan waiting for approval gets a card with the plan, Revise and Build the 
   fireEvent.click(screen.getByText('Revise'));
   await waitFor(() => expect(decide).toHaveBeenLastCalledWith('req-1', expect.objectContaining({ allow: false, message: expect.stringContaining('add a test step') })));
   fireEvent.click(screen.getByText('Build the plan'));
-  await waitFor(() => expect(decide).toHaveBeenLastCalledWith('req-1', { allow: true }));
+  await waitFor(() => expect(decide).toHaveBeenLastCalledWith('req-1', { allow: true, mode: 'auto' }));
 });
 
 it('an edited plan is handed to the chat as the plan when it is built', async () => {
@@ -41,5 +41,5 @@ it('an edited plan is handed to the chat as the plan when it is built', async ()
   fireEvent.click(screen.getByText('Edit the plan'));
   fireEvent.change(screen.getByDisplayValue('Step 1'), { target: { value: 'Step 1\nStep 2' } });
   fireEvent.click(screen.getByText('Build the plan'));
-  await waitFor(() => expect(decide).toHaveBeenLastCalledWith('req-2', { allow: true, updatedInput: { plan: 'Step 1\nStep 2' } }));
+  await waitFor(() => expect(decide).toHaveBeenLastCalledWith('req-2', { allow: true, mode: 'auto', updatedInput: { plan: 'Step 1\nStep 2' } }));
 });

@@ -629,6 +629,8 @@ export type ProviderPermissionDecision = {
   updatedInput?: unknown;
   message?: string;
   rememberEntry?: unknown;
+  /** quests: the permission mode the chat goes on in, set with the approval (an approved plan leaves plan mode). */
+  mode?: string;
 };
 
 export type ProviderRuntimePermissionGateway = {

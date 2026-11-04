@@ -40,6 +40,8 @@ type UseChatComposerStateArgs = {
   provider: LLMProvider;
   permissionMode: PermissionMode | string;
   cyclePermissionMode: () => void;
+  /** Sets the chat's mode button (an approved plan switches the chat out of plan mode). */
+  selectPermissionMode: (mode: PermissionMode) => void;
   resolvePermissionModeForProvider: (provider: LLMProvider, requestedMode: PermissionMode | string) => PermissionMode;
   /**
    * Model every send and command carries: the open session's model when there
@@ -175,6 +177,7 @@ export function useChatComposerState({
   provider,
   permissionMode,
   cyclePermissionMode,
+  selectPermissionMode,
   resolvePermissionModeForProvider,
   currentProviderModel,
   currentProviderEffort,
@@ -1294,7 +1297,7 @@ export function useChatComposerState({
   const handlePermissionDecision = useCallback(
     (
       requestIds: string | string[],
-      decision: { allow?: boolean; message?: string; rememberEntry?: string | null; updatedInput?: unknown },
+      decision: { allow?: boolean; message?: string; rememberEntry?: string | null; updatedInput?: unknown; mode?: PermissionMode },
     ) => {
       const ids = Array.isArray(requestIds) ? requestIds : [requestIds];
       const validIds = ids.filter(Boolean);
@@ -1310,14 +1313,16 @@ export function useChatComposerState({
           updatedInput: decision?.updatedInput,
           message: decision?.message,
           rememberEntry: decision?.rememberEntry,
+          mode: decision?.mode,
         });
       });
+      if (decision?.allow && decision.mode) selectPermissionMode(decision.mode);
 
       setPendingPermissionRequests((previous) =>
         previous.filter((request) => !validIds.includes(request.requestId)),
       );
     },
-    [sendMessage, setPendingPermissionRequests],
+    [sendMessage, setPendingPermissionRequests, selectPermissionMode],
   );
 
   const [isInputFocused, setIsInputFocused] = useState(false);

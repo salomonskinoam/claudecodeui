@@ -249,6 +249,7 @@ function ChatInterface({
     provider,
     permissionMode,
     cyclePermissionMode,
+    selectPermissionMode,
     currentProviderModel,
     currentProviderEffort,
     isLoading: isProcessing,
