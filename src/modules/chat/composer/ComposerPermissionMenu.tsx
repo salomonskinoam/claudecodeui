@@ -55,8 +55,11 @@ const MODE_APPEARANCE: Record<PermissionMode, ModeAppearance> = {
   },
   plan: {
     icon: ClipboardList,
-    trigger: 'border-primary/20 bg-primary/5 text-primary hover:bg-primary/10',
-    item: 'text-primary',
+    // quests: own colors; the classes bg-primary/5 + border-primary/20 are the open sidebar chat's (filled
+    // blue in public/cloudcli-custom.css), which hid the "Plan Mode" text (Noam, 5 Nov).
+    trigger:
+      'border-violet-300/60 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-600/40 dark:bg-violet-900/15 dark:text-violet-300 dark:hover:bg-violet-900/25',
+    item: 'text-violet-700 dark:text-violet-300',
   },
 };
 

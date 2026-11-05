@@ -20,6 +20,8 @@
 //           new rows only at the ends (requirement 52)
 //   reload  rows, open tool lines and folds before and after a page reload: all the same (the ledger is persisted)
 //   planedit <plan name>: the plan tab's Edit holds the file's text, Cancel goes back (nothing saved)
+//   modecolors Shift+Tab through every mode and back to the start: each mode's name, text color and background
+//           color on the mode button (the text must be readable in every mode)
 //   back    Back is disabled at start; Next opens the next chat and enables Back; Back returns, is disabled again,
 //           and the opened chat's line has the dot and blink it had before Next
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
@@ -31,7 +33,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit', 'modecolors'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -1160,6 +1162,20 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.mouse.dblclick(row.right - 30, row.top + row.height / 2);
     await page.waitForTimeout(2000);
     console.log(JSON.stringify({ plus, doubleClick: await state() }));
+  }
+
+  if (check === 'modecolors') {
+    const button = page.locator('button[title$="(Shift+Tab)"]');
+    await page.locator('[data-slot="prompt-input-textarea"]').first().focus();
+    const start = await button.innerText();
+    for (let i = 0; i < 8; i += 1) {
+      const look = await button.evaluate((b) => { const c = getComputedStyle(b); return { color: c.color, background: c.backgroundColor }; });
+      console.log(JSON.stringify({ mode: await button.innerText(), ...look }));
+      await page.keyboard.press('Shift+Tab');
+      await page.waitForTimeout(300);
+      if ((await button.innerText()) === start) break;
+    }
+    console.log('back at start:', (await button.innerText()) === start);
   }
 
   if (check === 'mode') {
