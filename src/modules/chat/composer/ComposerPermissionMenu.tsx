@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
-  Bot,
   ClipboardList,
   Hand,
   ShieldQuestion,
   Smile,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -35,11 +35,13 @@ const MODE_APPEARANCE: Record<PermissionMode, ModeAppearance> = {
     trigger: 'border-border/60 bg-muted/50 text-muted-foreground hover:bg-muted',
     item: 'text-foreground',
   },
+  // quests: Auto is orange with a lightning icon and Plan is blue, as in Cursor (Noam, 5 Nov); Bypass Permissions
+  // moves to red.
   auto: {
-    icon: Bot,
+    icon: Zap,
     trigger:
-      'border-blue-300/60 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-600/40 dark:bg-blue-900/15 dark:text-blue-300 dark:hover:bg-blue-900/25',
-    item: 'text-blue-700 dark:text-blue-300',
+      'border-orange-300/60 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-600/40 dark:bg-orange-900/15 dark:text-orange-300 dark:hover:bg-orange-900/25',
+    item: 'text-orange-600 dark:text-orange-400',
   },
   acceptEdits: {
     icon: Smile,
@@ -50,16 +52,16 @@ const MODE_APPEARANCE: Record<PermissionMode, ModeAppearance> = {
   bypassPermissions: {
     icon: AlertTriangle,
     trigger:
-      'border-orange-300/60 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-600/40 dark:bg-orange-900/15 dark:text-orange-300 dark:hover:bg-orange-900/25',
-    item: 'text-orange-600 dark:text-orange-400',
+      'border-red-300/60 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-600/40 dark:bg-red-900/15 dark:text-red-300 dark:hover:bg-red-900/25',
+    item: 'text-red-600 dark:text-red-400',
   },
   plan: {
     icon: ClipboardList,
     // quests: own colors; the classes bg-primary/5 + border-primary/20 are the open sidebar chat's (filled
     // blue in public/cloudcli-custom.css), which hid the "Plan Mode" text (Noam, 5 Nov).
     trigger:
-      'border-violet-300/60 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-600/40 dark:bg-violet-900/15 dark:text-violet-300 dark:hover:bg-violet-900/25',
-    item: 'text-violet-700 dark:text-violet-300',
+      'border-blue-300/60 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-600/40 dark:bg-blue-900/15 dark:text-blue-300 dark:hover:bg-blue-900/25',
+    item: 'text-blue-700 dark:text-blue-300',
   },
 };
 
