@@ -335,7 +335,7 @@ function mapCliOptionsToSDK(options = {}) {
  * @param {Object} writer - WebSocket writer for reconnect support
  * @param {Function} releaseInput - Closes the held stdin stream so the CLI can exit
  */
-function addSession(sessionId, queryInstance, writer = null, releaseInput = null, beginTurn = null) {
+function addSession(sessionId, queryInstance, writer = null, releaseInput = null, beginTurn = null, killIfStarting = null) {
   const existing = activeSessions.get(sessionId);
   // A different live instance under the same key means an earlier run was
   // superseded without being stopped (e.g. an abort that raced run setup and
@@ -368,7 +368,9 @@ function addSession(sessionId, queryInstance, writer = null, releaseInput = null
     // Re-registered mid-run once the provider session id lands; keep the closer.
     releaseInput: releaseInput || carried?.releaseInput || null,
     // quests: takes a new user turn into this process while it is held (null once it winds down).
-    beginTurn: beginTurn || carried?.beginTurn || null
+    beginTurn: beginTurn || carried?.beginTurn || null,
+    // quests: ends the process when it has not answered yet (still starting); false once it has.
+    killIfStarting: killIfStarting || carried?.killIfStarting || null
   });
   // The history reader reports a background agent as running or stopped by
   // whether this entry exists, and the cached history does not see this map.
@@ -1234,6 +1236,17 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     // The SDK's own `query`, unless the caller supplies one (tests script the
     // stream to drive the hold logic below without a CLI process).
     const createQuery = context.createQuery ?? query;
+    // quests: Stop while the CLI is still starting (a resume can take 20 s) waited for it: interrupt() is a control
+    // request the CLI answers only once it is up, so on 5 Nov 18:31 eighteen clicks did nothing for 18 s and the
+    // stop then cancelled the message the user had just sent. Until the CLI's first message, Stop ends the process.
+    const killer = new AbortController();
+    sdkOptions.abortController = killer;
+    let cliAnswered = false;
+    const killIfStarting = () => {
+      if (cliAnswered) return false;
+      killer.abort();
+      return true;
+    };
     let heldPrompt = createHeldPromptStream(promptMessages);
     releasePromptStream = heldPrompt.release;
     try {
@@ -1310,12 +1323,13 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     };
 
     if (sessionKey()) {
-      addSession(sessionKey(), queryInstance, ws, releasePromptStream, beginTurn);
+      addSession(sessionKey(), queryInstance, ws, releasePromptStream, beginTurn, killIfStarting);
     }
 
     // Process streaming messages
     console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
     for await (const message of queryInstance) {
+      cliAnswered = true;
       // quests: the SDK echoes user messages back with isReplay (the prompt just sent, and on a resume the
       // messages of earlier turns). The page has them already; forwarding them drew every old message of the
       // chat again, as new, each time a process was started (2 Nov, "wtf are we seeing").
@@ -1336,7 +1350,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       if (message.session_id && !capturedSessionId) {
 
         capturedSessionId = message.session_id;
-        addSession(sessionKey(), queryInstance, ws, releasePromptStream, beginTurn);
+        addSession(sessionKey(), queryInstance, ws, releasePromptStream, beginTurn, killIfStarting);
 
         // Set session ID on writer
         if (ws.setSessionId && typeof ws.setSessionId === 'function') {
@@ -1631,8 +1645,10 @@ async function abortClaudeSDKSession(sessionId) {
     // terminal complete (the abort handler sends the aborted one).
     abortedSessionIds.add(sessionId);
 
-    // Call interrupt() on the query instance
-    await session.instance.interrupt();
+    // A CLI still starting cannot take the interrupt yet: it is ended instead. Otherwise interrupt() the turn.
+    if (!session.killIfStarting?.()) {
+      await session.instance.interrupt();
+    }
 
     // Release the held stdin stream; without this the CLI stays up for the rest
     // of the post-turn hold even though the user cancelled.
