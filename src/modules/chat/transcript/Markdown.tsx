@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useMemo, useState, type ReactElement } from 'react';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { MermaidDiagram } from '@/modules/code-editor';
 import { MarkdownImage } from '@/modules/chat/transcript/MarkdownImage';
-import { markdownTree, renderMarkdownTree } from '@/modules/chat/transcript/markdownCache';
+import { highlightedBlock, markdownTree, renderMarkdownTree } from '@/modules/chat/transcript/markdownCache';
 import { normalizeInlineCodeFences } from '@/modules/chat/utils/chatFormatting';
 import { normalizeLatexDelimiters } from '@/modules/chat/utils/latexDelimiters';
 import { copyTextToClipboard } from '@/shared/utils';
@@ -160,10 +160,11 @@ const CodeBlock = ({ node: _node, className, children, forceBlock, ...props }: C
         </button>
       </div>
 
-      <SyntaxHighlighter
-        language={language}
-        style={syntaxTheme.style}
-        customStyle={{
+      {/* The highlighter is a plain function (no hooks): called here, its elements are cached per text. */}
+      {highlightedBlock(language, raw, () => (SyntaxHighlighter as unknown as (props: Record<string, unknown>) => ReactElement)({
+        language,
+        style: syntaxTheme.style,
+        customStyle: {
           margin: 0,
           borderRadius: 0,
           fontSize: '0.8125rem',
@@ -171,17 +172,16 @@ const CodeBlock = ({ node: _node, className, children, forceBlock, ...props }: C
           padding: '0.5rem 1rem 1rem',
           // The container owns the background so the label row and code read as one panel.
           background: 'transparent',
-        }}
-        codeTagProps={{
+        },
+        codeTagProps: {
           style: {
             fontFamily:
               'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             background: 'transparent',
           },
-        }}
-      >
-        {raw}
-      </SyntaxHighlighter>
+        },
+        children: raw,
+      }))}
     </div>
   );
 };

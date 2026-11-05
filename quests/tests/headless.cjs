@@ -845,6 +845,9 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const other = q.entries.find((e) => e.sessionId && e.sessionId !== sessionId && !e.heldOutside && e.placement !== 'archive');
     const reads = [];
     page.on('request', (r) => { if (/\/api\/providers\/sessions\/[^/]+\/messages/.test(r.url())) reads.push(r.url()); });
+    // Every request during a click, with its start and end time after the click (ms).
+    const timeline = []; let clickAt = 0;
+    page.on('requestfinished', (r) => { if (clickAt) { const t = r.timing(); timeline.push({ url: r.url().replace('http://127.0.0.1:3001', '').slice(0, 90), start: Math.round(t.startTime - clickAt), end: Math.round(t.startTime + t.responseEnd - clickAt) }); } });
     await page.goto(`http://127.0.0.1:3001/session/${other.sessionId}`);
     await page.waitForTimeout(6000);
     const dialog = await page.evaluate(() => { const n = document.querySelector('.fixed.inset-0.z-50'); return n ? n.outerHTML.replace(/\s+/g, ' ').slice(0, 900) : ''; });
@@ -854,20 +857,35 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const tabs = page.locator('[data-quests-tabs="row"] div[draggable="true"][title]');
     const names = await tabs.evaluateAll((ns) => ns.map((n) => n.getAttribute('title')));
     const results = [];
+    // Long main-thread tasks (over 50 ms) per click: the page is frozen while they run.
+    await page.evaluate(() => { window.__long = []; new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long.push(Math.round(e.duration)); }).observe({ type: 'longtask', buffered: false }); });
+    const ids = () => page.locator('.chat-messages-pane [data-row-id]').evaluateAll((ns) => ns.map((n) => n.dataset.rowId));
     for (const target of [0, 1, 0, 1]) {
       const before = reads.length;
-      const t0 = Date.now();
+      const old = new Set(await ids());
+      await page.evaluate(() => { window.__long = []; });
+      // PROFILE=<file>: a CPU profile of the slowest kind of click (the second tab, first time) is written there.
+      const cdp = process.env.PROFILE && target === 1 && results.length === 1 ? await page.context().newCDPSession(page) : null;
+      if (cdp) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
+      timeline.length = 0;
+      const t0 = Date.now(); clickAt = t0;
       await tabs.nth(target).dispatchEvent('click');
-      let rows = 0; let stableSince = 0; let settled = 0;
+      let rows = 0; let stableSince = 0; let settled = 0; let first = 0;
       while (Date.now() - t0 < 15000) {
         await page.waitForTimeout(50);
-        const n = await page.locator('.chat-messages-pane [data-row-id]').count();
+        const now = await ids();
+        if (!first && now.length > 0 && !now.some((id) => old.has(id))) first = Date.now() - t0;
+        const n = now.length;
         if (n !== rows) { rows = n; stableSince = Date.now(); }
         else if (n > 0 && Date.now() - stableSince >= 400) { settled = Date.now() - t0 - 400; break; }
       }
+      const longTasks = await page.evaluate(() => window.__long.slice());
+      if (cdp) require('node:fs').writeFileSync(process.env.PROFILE, JSON.stringify((await cdp.send('Profiler.stop')).profile));
       await page.waitForTimeout(1500);
       const atBottom = await page.locator('.chat-messages-pane').evaluate((p) => p.scrollHeight - p.scrollTop - p.clientHeight < 50);
-      results.push({ tab: names[target], ms: settled || null, rows, reads: reads.length - before, atBottom });
+      // Elements in the pane, and how many of them sit inside a closed (display none) part.
+      const nodes = await page.locator('.chat-messages-pane').evaluate((p) => { const all = p.querySelectorAll('*'); let hidden = 0; for (const n of all) if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') hidden += 1; return { all: all.length, hidden }; });
+      results.push({ requests: timeline.filter((x) => x.start < 3000).slice(), nodes, tab: names[target], firstMs: first || null, ms: settled || null, rows, reads: reads.length - before, atBottom, longTasks });
     }
     console.log(JSON.stringify({ dialog, tabs: names, results }, null, 1));
   }

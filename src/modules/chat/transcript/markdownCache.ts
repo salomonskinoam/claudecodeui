@@ -2,6 +2,7 @@ import type { Root } from 'hast';
 import { toJsxRuntime } from 'hast-util-to-jsx-runtime';
 import { urlAttributes } from 'html-url-attributes';
 import { defaultUrlTransform } from 'react-markdown';
+import type { ReactElement } from 'react';
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime';
 import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
@@ -54,6 +55,27 @@ export function markdownTree(key: string, content: string, remarkPlugins: Plugga
 /** The elements of a tree, with the given component overrides (react-markdown's post step). */
 export function renderMarkdownTree(tree: Root, components: Record<string, unknown>) {
   return toJsxRuntime(tree, { Fragment, components: components as never, ignoreInvalidStyle: true, jsx, jsxs, passKeys: true, passNode: true });
+}
+
+/**
+ * The highlighted elements of one code block, kept by language and text: Prism's tokens turned into elements
+ * were the largest script cost of a tab switch (0.43 s of 0.9 s for a chat of 114 rows, measured with the
+ * headless check `switch` and a CPU profile). Elements are plain values, so one copy serves every mount.
+ */
+const blocks = new Map<string, ReactElement>();
+
+export function highlightedBlock(language: string, code: string, render: () => ReactElement): ReactElement {
+  const key = `${language}\n${code}`;
+  const hit = blocks.get(key);
+  if (hit) {
+    blocks.delete(key);
+    blocks.set(key, hit);
+    return hit;
+  }
+  const made = render();
+  blocks.set(key, made);
+  if (blocks.size > CAP) blocks.delete(blocks.keys().next().value as string);
+  return made;
 }
 
 /** Tests: the number of trees kept. */
