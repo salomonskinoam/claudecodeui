@@ -3,6 +3,8 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import EntryDot from '@/modules/queue/EntryDot';
+import { entryHint } from '@/modules/queue/entryHint';
+import { useChatDots } from '@/shared/hooks/useLiveChats';
 import { useEntryLook } from '@/modules/queue/entryLook';
 import EntryTitle from '@/modules/queue/EntryTitle';
 import KindSign from '@/modules/queue/KindSign';
@@ -37,6 +39,7 @@ export default function QueueForest() {
   }
   const roots = queue.entries.filter((e) => e.rootKey === e.key && visible.has(e.key)).sort(byRank);
 
+  const dots = useChatDots();
   const node = (e: QueueEntry, depth: number) => {
     const kids = (children.get(e.key) ?? []).sort(byRank);
     const look = lookOf(e);
@@ -45,7 +48,7 @@ export default function QueueForest() {
       <div key={e.key} style={{ marginLeft: depth ? 10 : 0 }}>
         <div
           data-forest-key={e.key}
-          title={e.title}
+          title={`${e.title}\n${entryHint(e, e.sessionId ? dots[e.sessionId] : undefined)}`}
           onMouseEnter={look.onMouseEnter}
           onMouseLeave={look.onMouseLeave}
           onClick={() => openQueueEntry(e)}

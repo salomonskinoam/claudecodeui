@@ -38,6 +38,8 @@ export type QueueEntry = QueueOrderEntry & {
   placedAt: number | null;
   /** The time of the chat's last reply, the dismissal's key. */
   replyAt: string | null;
+  /** The chat's last activity (epoch ms, 0 for none): its process's last status change, or its last reply. */
+  activityAt: number;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
   heldOutside: boolean;
   closingLine: string | null;
@@ -75,6 +77,7 @@ const chatFields = (c: Chat | null) => ({
   open: c ? isOpen(c) : false,
   live: c?.process != null,
   replyAt: c?.closingLine?.at ?? null,
+  activityAt: Math.max(c?.process?.statusUpdatedAt ?? 0, time(c?.closingLine?.at)),
 });
 
 /**
@@ -136,7 +139,7 @@ export function buildEntries(): QueueEntry[] {
   // Only an entry in the queue waits for Noam: a permission prompt, a question or a Done.
   const placements = readPlacements();
   return entries.map((e) => {
-    const { where, at } = resolvePlacement(placements[e.key], e.replyAt ?? 'none');
+    const { where, at } = resolvePlacement(placements[e.key], e.replyAt ?? 'none', e.activityAt);
     return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), placement: where, placedAt: at, waitsForMe: where === 'queue' && (e.state === 'permission' || waitsForMe(e)) };
   });
 }

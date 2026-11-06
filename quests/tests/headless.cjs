@@ -1042,7 +1042,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(4000);
     const pairs = await page.evaluate(() => [...document.querySelectorAll('[data-tab-id]')].map((tab) => {
       const line = document.querySelector(`[data-session-id="${tab.getAttribute('data-tab-id')}"]`);
-      return { tab: tab.getAttribute('title'), line: line ? line.getAttribute('title') : null };
+      return { tab: tab.getAttribute('title'), line: line ? line.getAttribute('title').split('\n')[0] : null };
     }));
     console.log(JSON.stringify({ pairs, differ: pairs.filter((p) => p.line !== null && p.line !== p.tab).length }));
   }

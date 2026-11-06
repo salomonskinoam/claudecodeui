@@ -3,6 +3,8 @@ import { Archive, CircleCheck, ListEnd, Pause, Pencil, Pin, SquareArrowOutUpRigh
 
 import { cn } from '@/shared/utils';
 import EntryDot from '@/modules/queue/EntryDot';
+import { entryHint } from '@/modules/queue/entryHint';
+import { useChatDots } from '@/shared/hooks/useLiveChats';
 import type { EntryLook } from '@/modules/queue/entryLook';
 import EntryTitle from '@/modules/queue/EntryTitle';
 import KindSign from '@/modules/queue/KindSign';
@@ -44,6 +46,8 @@ type QueueLineProps = {
 const ICONS: Record<Where, typeof Archive> = { queue: ListEnd, hold: Pause, archive: Archive };
 
 export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onPlace, onMenu, onRename }: QueueLineProps) {
+  const dots = useChatDots();
+  const dot = e.sessionId ? dots[e.sessionId] : undefined;
   return (
     <div
       data-queue-key={e.key}
@@ -53,7 +57,7 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
       onMouseLeave={look.onMouseLeave}
       onClick={onOpen}
       onContextMenu={onMenu}
-      title={e.title}
+      title={`${e.title}\n${entryHint(e, dot)}`}
       className={cn(
         'group relative mx-1 flex h-[32px] cursor-pointer items-center gap-1 rounded-sm px-2 text-[15px] text-[#cccccc]',
         look.shownClass,

@@ -7,8 +7,11 @@ import { queueDb } from '@/modules/database/index.js';
  * correspond to a drawer"). Inside the queue the page splits the lines by what the chat does: "Pending chats"
  * (waits for Noam) and "Active chats" (runs); a ticket no chat claimed is "Tickets-Unclaimed".
  *
- * A hold keeps the reply it was set on: a newer reply puts the chat back in the queue ("it can exit if the chat
- * speaks", Noam, 3 Nov). An archive stays until Noam moves the entry.
+ * Any activity of the chat after it was placed puts it back in the queue, from "On hold" and from "Archived"
+ * alike: a message Noam sends, a turn that starts or ends, a reply (Noam, 6 Nov: "any action, agent triggered
+ * or human triggered, gets chats out of on hold and back to the main queue states (pending or active). the same
+ * goes for archived chats"). A hold also ends when the chat's reply changes ("it can exit if the chat speaks",
+ * 3 Nov).
  */
 
 export type Where = 'queue' | 'hold' | 'archive';
@@ -17,10 +20,14 @@ type Stored = Record<string, Placed>;
 
 const KEY = 'placement';
 
-/** The place of an entry whose current reply is `replyAt`, and since when (epoch ms; null in the queue). */
-export function resolvePlacement(placed: Placed | undefined, replyAt: string): { where: Where; at: number | null } {
+/**
+ * The place of an entry whose current reply is `replyAt` and whose chat was last active at `activityAt` (epoch
+ * ms, 0 for none), and since when (epoch ms; null in the queue).
+ */
+export function resolvePlacement(placed: Placed | undefined, replyAt: string, activityAt = 0): { where: Where; at: number | null } {
   if (!placed) return { where: 'queue', at: null };
   if (placed.where === 'hold' && placed.replyAt !== replyAt) return { where: 'queue', at: null };
+  if (activityAt > placed.at) return { where: 'queue', at: null };
   return { where: placed.where, at: placed.at };
 }
 
@@ -37,6 +44,13 @@ export function migratePlacement(archived: Record<string, number | true>, dismis
 
 function read(): Stored {
   const stored = queueDb.getState<Stored>(KEY);
+  // Placements from before their time was kept (at 0) count from now: older activity must not undo them.
+  if (stored && Object.values(stored).some((p) => p.at === 0)) {
+    const now = Date.now();
+    const dated = Object.fromEntries(Object.entries(stored).map(([k, p]) => [k, p.at === 0 ? { ...p, at: now } : p])) as Stored;
+    queueDb.setState(KEY, dated);
+    return dated;
+  }
   if (stored) return stored;
   const migrated = migratePlacement(queueDb.getState('archived') ?? {}, queueDb.getState('dismissed') ?? {});
   queueDb.setState(KEY, migrated);
