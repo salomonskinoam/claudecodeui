@@ -30,6 +30,8 @@ const unseeOnHide = new Set<string>();
 let inView: string[] = [];
 let snapshot: Record<string, ChatDot> = {};
 const listeners = new Set<() => void>();
+// Called when a chat starts, stops or asks: the queue reads itself again at once, so the two never disagree.
+const liveChanged = new Set<() => void>();
 let timer: number | null = null;
 
 function publish(): void {
@@ -54,9 +56,20 @@ async function poll(): Promise<void> {
       unseen.add(id);
     }
   });
+  const changed = JSON.stringify(next) !== JSON.stringify(live);
   live = next;
   publish();
+  if (changed) liveChanged.forEach((f) => f());
 }
+
+/** Runs `f` whenever a chat's live state changes (running, waiting, idle). */
+export function onLiveChange(f: () => void): () => void {
+  liveChanged.add(f);
+  return () => liveChanged.delete(f);
+}
+
+/** Reads the live states now, not at the next 2 s tick (a message was just sent). */
+export const pollChatDotsNow = (): void => void poll();
 
 /** The chats on screen right now (each pane's active tab). Showing a chat marks it seen. */
 export function setChatsInView(ids: Array<string | null | undefined>): void {

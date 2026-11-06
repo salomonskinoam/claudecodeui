@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { authenticatedFetch } from '@/shared/api';
+import { onLiveChange } from '@/shared/hooks/useLiveChats';
 import { isEmbedded } from '@/shared/hooks/useSplitPane';
 import type { Queue, TicketGroup, Where } from '@/modules/queue/types';
 
@@ -67,18 +68,23 @@ export const syncQueueFromCursor = async (): Promise<string[]> =>
 /** The current queue, without subscribing (for key handlers). */
 export const currentQueue = () => queue;
 
+let offLive: (() => void) | null = null;
+
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   if (timer === null && !isEmbedded) {
     const poll = () => void refresh().catch((error: unknown) => console.error(error));
     poll();
     timer = window.setInterval(poll, POLL_MS);
+    offLive = onLiveChange(poll);
   }
   return () => {
     listeners.delete(listener);
     if (listeners.size === 0 && timer !== null) {
       window.clearInterval(timer);
       timer = null;
+      offLive?.();
+      offLive = null;
     }
   };
 }

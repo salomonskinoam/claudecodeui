@@ -1,8 +1,10 @@
 import { queueDb } from '@/modules/database/index.js';
+import { providerRuntimeService } from '@/modules/providers/index.js';
 import { getCursorTabs } from '@/modules/queue/sources/cursor-tabs.js';
 import { getLive, type LiveProcess } from '@/modules/queue/sources/live.js';
 import { getPageTabs } from '@/modules/queue/sources/page-tabs.js';
 import { getTitles } from '@/modules/queue/sources/transcripts.js';
+import { chatRunRegistry } from '@/modules/websocket/index.js';
 
 /**
  * quests: the chats, as they are. One record per chat this machine knows (the page's sessions, the transcripts
@@ -49,8 +51,24 @@ function tabsOf(): Record<'cursor' | 'page', string[]> {
   return { cursor: getCursorTabs(), page: getPageTabs().map((id) => byPageId.get(id) ?? id) };
 }
 
+/**
+ * A turn this page runs is running from the moment it is sent: the page's run registry knows it at once, while
+ * the CLI writes its registry file only once it has started (a resume can take 20 s). The tab dots read the same
+ * runs, so the queue and the tabs agree (Noam, 6 Nov: "the queueue and tabs dont agree on active chats").
+ */
+function withPageRun(p: LiveProcess | null, sid: string, run: { sessionId: string; startedAt: number } | undefined): LiveProcess | null {
+  if (!run) return p;
+  const asks = providerRuntimeService.getPendingApprovalsForSession(run.sessionId).length > 0;
+  return {
+    sessionId: sid, status: asks ? 'waiting' : 'busy', waitingFor: asks ? 'permission prompt' : null,
+    entrypoint: p?.entrypoint ?? null, name: p?.name ?? null,
+    statusUpdatedAt: Math.max(p?.statusUpdatedAt ?? 0, run.startedAt), startedAt: p?.startedAt ?? run.startedAt,
+  };
+}
+
 export function getChats(): Map<string, Chat> {
   const live = getLive();
+  const pageRuns = new Map(chatRunRegistry.listRunningRuns().map((r) => [r.sessionId, r]));
   const titles = getTitles();
   const sessions = new Map(queueDb.listClaudeSessions().map((s) => [s.provider_session_id, s]));
   const lines = new Map(queueDb.listChats().map((c) => [c.provider_session_id, c]));
@@ -61,7 +79,7 @@ export function getChats(): Map<string, Chat> {
   for (const sid of new Set([...sessions.keys(), ...lines.keys(), ...live.keys(), ...cursor, ...page])) {
     const s = sessions.get(sid);
     const l = lines.get(sid);
-    const p = live.get(sid) ?? null;
+    const p = withPageRun(live.get(sid) ?? null, sid, s ? pageRuns.get(s.session_id) : undefined);
     const places: Place[] = [];
     if (cursor.has(sid)) places.push('cursor');
     if (page.has(sid)) places.push('page');
