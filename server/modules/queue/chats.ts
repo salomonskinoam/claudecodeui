@@ -1,9 +1,9 @@
 import { queueDb } from '@/modules/database/index.js';
-import { providerRuntimeService } from '@/modules/providers/index.js';
+import { isClaudeSDKTurnInFlight, providerRuntimeService } from '@/modules/providers/index.js';
 import { getCursorTabs } from '@/modules/queue/sources/cursor-tabs.js';
 import { getLive, type LiveProcess } from '@/modules/queue/sources/live.js';
 import { getPageTabs } from '@/modules/queue/sources/page-tabs.js';
-import { getTitles } from '@/modules/queue/sources/transcripts.js';
+import { getOpenTasks, getTitles, type OpenTask } from '@/modules/queue/sources/transcripts.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 
 /**
@@ -56,8 +56,9 @@ function tabsOf(): Record<'cursor' | 'page', string[]> {
  * the CLI writes its registry file only once it has started (a resume can take 20 s). The tab dots read the same
  * runs, so the queue and the tabs agree (Noam, 6 Nov: "the queueue and tabs dont agree on active chats").
  */
-function withPageRun(p: LiveProcess | null, sid: string, run: { sessionId: string; startedAt: number } | undefined): LiveProcess | null {
-  if (!run) return p;
+function withPageRun(p: LiveProcess | null, sid: string, pageId: string | undefined, run: { sessionId: string; startedAt: number } | undefined): LiveProcess | null {
+  // The page's process stays "busy" in the CLI's registry between turns (work-state.ts): the page knows better.
+  if (!run) return p?.entrypoint === 'sdk-ts' && p.status === 'busy' && pageId && !isClaudeSDKTurnInFlight(pageId) ? { ...p, status: 'idle' } : p;
   const asks = providerRuntimeService.getPendingApprovalsForSession(run.sessionId).length > 0;
   return {
     sessionId: sid, status: asks ? 'waiting' : 'busy', waitingFor: asks ? 'permission prompt' : null,
@@ -79,7 +80,7 @@ export function getChats(): Map<string, Chat> {
   for (const sid of new Set([...sessions.keys(), ...lines.keys(), ...live.keys(), ...cursor, ...page])) {
     const s = sessions.get(sid);
     const l = lines.get(sid);
-    const p = withPageRun(live.get(sid) ?? null, sid, s ? pageRuns.get(s.session_id) : undefined);
+    const p = withPageRun(live.get(sid) ?? null, sid, s?.session_id, s ? pageRuns.get(s.session_id) : undefined);
     const places: Place[] = [];
     if (cursor.has(sid)) places.push('cursor');
     if (page.has(sid)) places.push('page');
@@ -108,12 +109,27 @@ export function chatsIn(place: Place): Chat[] {
   return [...new Set([...tabs, ...held])].map((sid) => chats.get(sid)).filter((c): c is Chat => Boolean(c));
 }
 
-/** The chats with a running process, by the page's id: what the status dots show. */
-export function processStates(): Record<string, 'running' | 'waiting'> {
-  const states: Record<string, 'running' | 'waiting'> = {};
+/**
+ * The chat's workers alive now (agents, backgrounded commands, monitors, workflows): launched and not reported,
+ * in its current process. A worker lives inside the chat's process: no process, no worker, and a task launched
+ * before the current process started died with the process that launched it.
+ */
+export function liveTasks(c: Chat): OpenTask[] {
+  const p = c.process;
+  return p ? getOpenTasks(c.sid).filter((t) => !t.startedAt || Date.parse(t.startedAt) >= p.startedAt - 5000) : [];
+}
+
+/**
+ * The status dots, by the page's id: running (the chat itself works), waiting (it asks), workers (the chat itself
+ * is idle while its workers run; Noam, 6 Nov: "i want another circle to show the chat has workers or sub agent
+ * that are live but not the main chat").
+ */
+export function processStates(): Record<string, 'running' | 'waiting' | 'workers'> {
+  const states: Record<string, 'running' | 'waiting' | 'workers'> = {};
   for (const c of getChats().values()) {
     if (c.process?.status === 'busy') states[c.pageSessionId ?? c.sid] = 'running';
     else if (c.process?.status === 'waiting') states[c.pageSessionId ?? c.sid] = 'waiting';
+    else if (liveTasks(c).length > 0) states[c.pageSessionId ?? c.sid] = 'workers';
   }
   return states;
 }

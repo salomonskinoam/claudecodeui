@@ -11,7 +11,7 @@ export default function EntryDot({ sessionId, className }: { sessionId: string |
   return (
     <span
       title={dot && CHAT_DOT_STYLE[dot].label}
-      className={cn('flex-shrink-0 rounded-full', dot === 'running' && 'animate-pulse', className)}
+      className={cn('flex-shrink-0 rounded-full', (dot === 'running' || dot === 'workers') && 'animate-pulse', className)}
       style={{ backgroundColor: dot ? CHAT_DOT_STYLE[dot].color : 'transparent' }}
     />
   );

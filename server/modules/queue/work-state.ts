@@ -3,9 +3,9 @@ import path from 'node:path';
 
 import { sessionsDb } from '@/modules/database/index.js';
 import { describeToolCall, getClaudeSDKLastStep, isClaudeSDKTurnInFlight } from '@/modules/providers/index.js';
-import { getChats } from '@/modules/queue/chats.js';
+import { getChats, liveTasks } from '@/modules/queue/chats.js';
 import { stateOf } from '@/modules/queue/entries.js';
-import { getOpenTasks, type OpenTask } from '@/modules/queue/sources/transcripts.js';
+import type { OpenTask } from '@/modules/queue/sources/transcripts.js';
 import { findTaskOutputFile } from '@/modules/queue/work.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 
@@ -114,11 +114,8 @@ export async function readWorkState(appSessionId: string): Promise<WorkState | n
     text: state !== 'answering' && state !== 'permission' ? chat?.closingLine?.text ?? null : null,
     since: state === 'answering' ? (pageRun ? run?.startedAt ?? null : queueState.since || null) : state === 'permission' ? queueState.since || null : chat?.closingLine?.at ? Date.parse(chat.closingLine.at) : null,
   };
-  // A worker lives inside the chat's process: no live process, no worker, and a task launched before the
-  // current process started died with the process that launched it (Noam, 30 Oct: "only live ones should be
-  // shown. i see stale ones").
-  const process = chat?.process;
-  const open = process ? getOpenTasks(sid).filter((t) => !t.startedAt || Date.parse(t.startedAt) >= process.startedAt - 5000) : [];
+  // Only live workers (Noam, 30 Oct: "only live ones should be shown. i see stale ones"): chats.ts liveTasks.
+  const open = chat ? liveTasks(chat) : [];
   const workers = (await Promise.all(open.map((task) => workerOf(task, appSessionId, sid, row.jsonl_path ?? null))))
     // A command whose output ends with "[killed]" was stopped by Claude Code without a report.
     .filter((w) => w.step !== '[killed]');

@@ -151,7 +151,7 @@ function SidebarSessionItem({
             <div
               role="status"
               aria-label={CHAT_DOT_STYLE[dot].label}
-              className={cn('h-2 w-2 rounded-full', dot === 'running' && 'animate-pulse')}
+              className={cn('h-2 w-2 rounded-full', (dot === 'running' || dot === 'workers') && 'animate-pulse')}
               style={{ backgroundColor: CHAT_DOT_STYLE[dot].color }}
             />
           </Tooltip>

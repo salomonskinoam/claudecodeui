@@ -24,6 +24,11 @@ describe('entryHint', () => {
     expect(entryHint(entry({ state: 'none', live: false, placement: 'archive' }), undefined)).toBe('Archived until its next activity. No process');
   });
 
+  it('says when the chat itself is idle and its workers run', () => {
+    expect(entryHint(entry({ state: 'waiting', closingLine: 'waiting for the agents' }), 'workers'))
+      .toBe('Its workers run. Waits for something else, not you: the agents');
+  });
+
   it('says when a waiting chat has no process to wake it', () => {
     expect(entryHint(entry({ state: 'waiting', live: false, closingLine: 'waiting for the debug run' }), undefined))
       .toBe('Waits for something else, not you: the debug run. No process: nothing will wake it');

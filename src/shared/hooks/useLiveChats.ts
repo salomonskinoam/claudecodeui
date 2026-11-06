@@ -6,22 +6,25 @@ import { authenticatedFetch } from '@/shared/api';
  * quests: one status dot per chat, the same on the tabs and in the sidebar.
  *   waiting  blue    a prompt waits on the user
  *   running  green   the chat is working
+ *   workers  purple  the chat itself is idle, its workers (agents, background commands) run
  *   done     orange  it stopped while out of view, and has not been shown since
  * No dot: idle and already seen.
  * Live states come from GET /api/quests/live (every chat on this machine: Cursor, terminal and this page),
  * polled every two seconds, in the main page and in the split-screen pane (whose approval banner needs it).
  */
-export type ChatDot = 'waiting' | 'running' | 'done';
+export type ChatDot = 'waiting' | 'running' | 'workers' | 'done';
 
 // Blue and orange are the Claude Code extension's own tab dots (resources/claude-logo-pending.svg,
 // claude-logo-done.svg); green is its timeline "success" dot.
 export const CHAT_DOT_STYLE: Record<ChatDot, { color: string; label: string }> = {
   waiting: { color: '#3B82F6', label: 'Waiting for you' },
   running: { color: '#74c991', label: 'Running' },
+  // The purple of the agent boxes in the chat (Noam, 6 Nov: "the same purple agent boxes in chat have makes sense here").
+  workers: { color: '#a855f7', label: 'Its workers run; the chat itself is idle' },
   done: { color: '#D97757', label: 'Finished, not seen yet' },
 };
 
-type LiveState = 'running' | 'waiting';
+type LiveState = 'running' | 'waiting' | 'workers';
 
 let live: Record<string, LiveState> = {};
 const unseen = new Set<string>();

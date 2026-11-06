@@ -22,6 +22,6 @@ export function entryHint(e: QueueEntry, dot: ChatDot | undefined): string {
   const asleep = !e.live && (e.state === 'waiting' || e.state === 'blocker') ? '. No process: nothing will wake it' : '';
   const where = e.placement === 'hold' ? 'On hold until its next activity. '
     : e.placement === 'archive' ? 'Archived until its next activity. ' : '';
-  const seen = dot === 'done' ? 'Turn ended, not seen yet. ' : '';
+  const seen = dot === 'done' ? 'Turn ended, not seen yet. ' : dot === 'workers' ? 'Its workers run. ' : '';
   return `${where}${seen}${why}${asleep}`;
 }
