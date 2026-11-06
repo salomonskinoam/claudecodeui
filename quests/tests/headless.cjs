@@ -860,16 +860,35 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // Long main-thread tasks (over 50 ms) per click: the page is frozen while they run.
     await page.evaluate(() => { window.__long = []; new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long.push(Math.round(e.duration)); }).observe({ type: 'longtask', buffered: false }); });
     const ids = () => page.locator('.chat-messages-pane [data-row-id]').evaluateAll((ns) => ns.map((n) => n.dataset.rowId));
-    for (const target of [0, 1, 0, 1]) {
+    // ROUNDS=<n>: n rounds of A, B (default 2); the summary gives the median per tab.
+    for (const target of Array.from({ length: 2 * Number(process.env.ROUNDS || 2) }, (_, i) => i % 2)) {
       const before = reads.length;
       const old = new Set(await ids());
       await page.evaluate(() => { window.__long = []; });
-      // PROFILE=<file>: a CPU profile of the slowest kind of click (the second tab, first time) is written there.
-      const cdp = process.env.PROFILE && target === 1 && results.length === 1 ? await page.context().newCDPSession(page) : null;
-      if (cdp) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
+      // PROFILE=<prefix>: a CPU profile of each click is written to <prefix><click number>.cpuprofile (sampled every 1 ms).
+      const cdp = process.env.PROFILE ? await page.context().newCDPSession(page) : null;
+      if (cdp) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
       timeline.length = 0;
       const t0 = Date.now(); clickAt = t0;
-      await tabs.nth(target).dispatchEvent('click');
+      // In the page: the click, then every animation frame until the pane holds the new chat's rows and none of
+      // the old one's (paintMs: the frame that paints the new chat first) and until the row count stops growing.
+      await tabs.nth(target).evaluate((tab, oldIds) => {
+        const old = new Set(oldIds);
+        const s = { t0: performance.now(), paintMs: null, lastGrowMs: null, rows: 0 };
+        window.__sw = s;
+        const tick = () => {
+          const ids = Array.from(document.querySelectorAll('.chat-messages-pane [data-row-id]'), (n) => n.dataset.rowId);
+          const now = performance.now() - s.t0;
+          if (s.paintMs === null && ids.length > 0 && !ids.some((id) => old.has(id))) s.paintMs = Math.round(now);
+          if (s.paintMs !== null && ids.length !== s.rows) { s.rows = ids.length; s.lastGrowMs = Math.round(now); }
+          // FRAMES=1: what the pane shows at each frame (scroll position, rows, a loading text), to see jumps.
+          const pane = document.querySelector('.chat-messages-pane');
+          if (pane && (s.frames ||= []).length < 80) s.frames.push([Math.round(now), ids.length, Math.round(pane.scrollTop), pane.scrollHeight, pane.clientHeight, /Loading/i.test(pane.innerText.slice(0, 300)) ? 'loading' : '']);
+          if (now < 5000) requestAnimationFrame(tick);
+        };
+        tab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        requestAnimationFrame(tick);
+      }, [...old]);
       let rows = 0; let stableSince = 0; let settled = 0; let first = 0;
       while (Date.now() - t0 < 15000) {
         await page.waitForTimeout(50);
@@ -880,14 +899,21 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
         else if (n > 0 && Date.now() - stableSince >= 400) { settled = Date.now() - t0 - 400; break; }
       }
       const longTasks = await page.evaluate(() => window.__long.slice());
-      if (cdp) require('node:fs').writeFileSync(process.env.PROFILE, JSON.stringify((await cdp.send('Profiler.stop')).profile));
+      if (cdp) require('node:fs').writeFileSync(`${process.env.PROFILE}${results.length}.cpuprofile`, JSON.stringify({ ...(await cdp.send('Profiler.stop')).profile, clickAt: t0 }));
       await page.waitForTimeout(1500);
       const atBottom = await page.locator('.chat-messages-pane').evaluate((p) => p.scrollHeight - p.scrollTop - p.clientHeight < 50);
       // Elements in the pane, and how many of them sit inside a closed (display none) part.
       const nodes = await page.locator('.chat-messages-pane').evaluate((p) => { const all = p.querySelectorAll('*'); let hidden = 0; for (const n of all) if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') hidden += 1; return { all: all.length, hidden }; });
-      results.push({ requests: timeline.filter((x) => x.start < 3000).slice(), nodes, tab: names[target], firstMs: first || null, ms: settled || null, rows, reads: reads.length - before, atBottom, longTasks });
+      const inPage = await page.evaluate(() => window.__sw);
+      if (process.env.FRAMES) console.log(names[target], JSON.stringify(inPage.frames.filter((f, i, a) => i === 0 || f.slice(1).join() !== a[i - 1].slice(1).join())));
+      results.push({ paintMs: inPage.paintMs, allRowsMs: inPage.lastGrowMs, requests: timeline.filter((x) => x.start < 3000).slice(), nodes, tab: names[target], firstMs: first || null, ms: settled || null, rows, reads: reads.length - before, atBottom, longTasks });
     }
-    console.log(JSON.stringify({ dialog, tabs: names, results }, null, 1));
+    // The page's JavaScript heap after the clicks (what one more copy of the app in an iframe would add).
+    { const cdp = await page.context().newCDPSession(page); const h = await cdp.send('Runtime.getHeapUsage'); console.log(JSON.stringify({ heapMB: Math.round(h.usedSize / 1e6), domNodes: await page.evaluate(() => document.getElementsByTagName('*').length) })); }
+    const median = (xs) => { const v = xs.filter((x) => x !== null).sort((a, b) => a - b); return v[Math.floor(v.length / 2)] ?? null; };
+    const summary = names.slice(0, 2).map((tab) => ({ tab, rows: results.find((r) => r.tab === tab)?.rows, medianFirstMs: median(results.filter((r) => r.tab === tab).map((r) => r.firstMs)), medianMs: median(results.filter((r) => r.tab === tab).map((r) => r.ms)), medianPaintMs: median(results.filter((r) => r.tab === tab).map((r) => r.paintMs)), medianAllRowsMs: median(results.filter((r) => r.tab === tab).map((r) => r.allRowsMs)) }));
+    if (process.env.ROUNDS) console.log(JSON.stringify({ summary, paintMs: results.map((r) => r.paintMs) }));
+    else console.log(JSON.stringify({ dialog, tabs: names, results }, null, 1));
   }
 
   if (check === 'archived') {
