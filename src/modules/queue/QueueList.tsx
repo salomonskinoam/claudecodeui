@@ -72,6 +72,7 @@ export default function QueueList({ filter, onNewSession, onStartTicket }: Queue
       onMenu={e.sessionId ? (event) => { event.preventDefault(); setMenu({ sessionId: e.sessionId as string, entryKey: e.key, x: event.clientX, y: event.clientY }); }
         : e.number !== null && e.state === 'unclaimed' ? (event) => { event.preventDefault(); setTicketMenu({ target: { ticket: e.number as number }, x: event.clientX, y: event.clientY }); } : undefined}
       onRename={e.sessionId ? () => setRenaming(e) : undefined}
+      onGroup={e.number !== null && e.state === 'unclaimed' ? (event) => setTicketMenu({ target: { ticket: e.number as number }, x: event.clientX, y: event.clientY }) : undefined}
     />
   );
   const groups: Array<[string, QueueEntry[]]> = (mode === 'focus'
@@ -88,7 +89,7 @@ export default function QueueList({ filter, onNewSession, onStartTicket }: Queue
           <div key={label}>
             <QueueGroupLine label={label} count={members.length} open={isOpen(label)} onToggle={() => toggle(label)} />
             {isOpen(label) && (label === 'Tickets-Unclaimed'
-              ? <TicketGroups members={members} hideEmpty={Boolean(q)} line={(e) => line(e, false)} renaming={renamingGroup} onRenamed={() => setRenamingGroup(null)}
+              ? <TicketGroups members={members} hideEmpty={Boolean(q)} line={(e) => line(e, false)} renaming={renamingGroup} onRenamed={() => setRenamingGroup(null)} onRename={setRenamingGroup}
                   onHeaderMenu={(index, event) => setTicketMenu({ target: { group: index }, x: event.clientX, y: event.clientY })} />
               : members.map((e) => line(e, false)))}
           </div>

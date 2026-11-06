@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import { setTicketGroups, useQueue } from '@/modules/queue/queueStore';
@@ -9,10 +9,21 @@ import type { QueueEntry, TicketGroup } from '@/modules/queue/types';
  * quests priority queue: Noam's own groups inside the "Tickets-Unclaimed" drawer (3 Nov: "i want tickets unclaimed
  * to have a +group and allow me to group tickets myself with names i give myself"). Each group is a named header
  * with its tickets under it, in queue order; tickets in no group come last, under "Ungrouped" when groups exist.
- * "+ group" at the end asks for a name. A right-click on a ticket moves it to a group (TicketGroupMenu); a
- * right-click on a header renames or deletes the group (its tickets become ungrouped). The list is kept on the
- * server, whole.
+ * "+ group" at the end asks for a name. Everything is editable with visible buttons (Noam, 6 Nov: "it has to be
+ * editable, the goups, the association. they should be collapsable too"): a header's pencil renames the group,
+ * its trash deletes it (its tickets become ungrouped), a click on the header folds or opens it; a ticket's
+ * folder button (and its right-click) moves it to a group. The list is kept on the server, whole; which groups
+ * are folded is this browser's own.
  */
+const FOLDED_KEY = 'quests-ticket-groups-folded';
+const readFolded = (): Set<string> => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) ?? '[]') as string[]);
+  } catch {
+    return new Set();
+  }
+};
+const ICON = 'flex h-5 w-5 items-center justify-center rounded opacity-0 hover:bg-white/10 group-hover/header:opacity-80';
 const HEADER = 'mx-1 ml-5 mt-1 flex h-[22px] items-center gap-2 rounded-sm px-2 text-[13px] text-[#9d9d9d]';
 const ITEM = 'block w-full px-3 py-1 text-left text-[13px] text-[#cccccc] hover:bg-[#2a2d2e]';
 
@@ -45,17 +56,48 @@ type Props = {
   line: (entry: QueueEntry) => ReactNode;
   /** A right-click on a header: the group's menu (rename, delete). */
   onHeaderMenu: (index: number, event: MouseEvent) => void;
-  /** The header being renamed (its index), if any; `onRenamed` ends it. */
+  /** The header being renamed (its index), if any; `onRenamed` ends it, `onRename` starts it (the pencil). */
   renaming: number | null;
   onRenamed: () => void;
+  onRename: (index: number) => void;
 };
 
-export default function TicketGroups({ members, hideEmpty, line, onHeaderMenu, renaming, onRenamed }: Props) {
+export default function TicketGroups({ members, hideEmpty, line, onHeaderMenu, renaming, onRenamed, onRename }: Props) {
   const groups = useQueue().ticketGroups;
   const [adding, setAdding] = useState(false);
+  const [folded, setFolded] = useState(readFolded);
+  const fold = (name: string) => setFolded((f) => {
+    const next = new Set(f);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    try { localStorage.setItem(FOLDED_KEY, JSON.stringify([...next])); } catch { /* this page load only */ }
+    return next;
+  });
   const inSome = new Set(groups.flatMap((g) => g.tickets));
   const ungrouped = members.filter((e) => e.number === null || !inSome.has(e.number));
   const save = (next: TicketGroup[]) => void setTicketGroups(next).catch((error: unknown) => console.error(error));
+  // A search shows every match, folded or not.
+  const isFolded = (name: string) => !hideEmpty && folded.has(name);
+  const header = (name: string, label: string, count: number, edit: { index: number } | null) => (
+    <div className={cn(HEADER, 'group/header cursor-pointer hover:bg-[#2a2d2e]')} data-quests-ticket-group={name} data-quests-ticket-group-count={count}
+      data-quests-ticket-group-folded={isFolded(name) ? 'true' : undefined}
+      onClick={() => fold(name)}
+      onContextMenu={edit ? (event) => { event.preventDefault(); onHeaderMenu(edit.index, event); } : undefined}>
+      {isFolded(name) ? <ChevronRight className="h-3 w-3 flex-shrink-0" /> : <ChevronDown className="h-3 w-3 flex-shrink-0" />}
+      <span className="min-w-0 flex-1 truncate">{label} ({count})</span>
+      {edit && (
+        <>
+          <button type="button" title="Rename the group" className={ICON} data-quests-ticket-group-rename=""
+            onClick={(event) => { event.stopPropagation(); onRename(edit.index); }}>
+            <Pencil className="h-3 w-3" />
+          </button>
+          <button type="button" title="Delete the group (its tickets stay, ungrouped)" className={ICON} data-quests-ticket-group-delete=""
+            onClick={(event) => { event.stopPropagation(); save(groups.filter((_, j) => j !== edit.index)); }}>
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </>
+      )}
+    </div>
+  );
   return (
     <>
       {groups.map((g, i) => {
@@ -65,18 +107,13 @@ export default function TicketGroups({ members, hideEmpty, line, onHeaderMenu, r
           <div key={g.name}>
             {renaming === i ? (
               <NameInput initial={g.name} onDone={(name) => { onRenamed(); if (name && name !== g.name) save(groups.map((x, j) => (j === i ? { ...x, name } : x))); }} />
-            ) : (
-              <div className={cn(HEADER, 'hover:bg-[#2a2d2e]')} data-quests-ticket-group={g.name} data-quests-ticket-group-count={own.length}
-                onContextMenu={(event) => { event.preventDefault(); onHeaderMenu(i, event); }}>
-                {g.name} ({own.length})
-              </div>
-            )}
-            {own.map(line)}
+            ) : header(g.name, g.name, own.length, { index: i })}
+            {!isFolded(g.name) && own.map(line)}
           </div>
         );
       })}
-      {groups.length > 0 && ungrouped.length > 0 && <div className={HEADER} data-quests-ticket-group="" data-quests-ticket-group-count={ungrouped.length}>Ungrouped ({ungrouped.length})</div>}
-      {ungrouped.map(line)}
+      {groups.length > 0 && ungrouped.length > 0 && header('', 'Ungrouped', ungrouped.length, null)}
+      {!(groups.length > 0 && isFolded('')) && ungrouped.map(line)}
       {adding ? (
         <NameInput initial="" onDone={(name) => { setAdding(false); if (name && !groups.some((g) => g.name === name)) save([...groups, { name, tickets: [] }]); }} />
       ) : (

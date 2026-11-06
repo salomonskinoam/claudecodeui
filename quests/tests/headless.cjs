@@ -837,7 +837,28 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const inSome = new Set(q.ticketGroups.flatMap((g) => g.tickets));
     const ungrouped = numbers.filter((n) => !inSome.has(n)).length;
     if (expected.length && ungrouped) expected.push(['', ungrouped]);
-    console.log(JSON.stringify({ headers, asExpected: JSON.stringify(headers) === JSON.stringify(expected), tickets: shown.length, addLine: await drawer.locator('[data-quests-ticket-group-add]').count() }));
+    // Requirement 96: a click on a header folds its tickets away and a second one brings them back; every group
+    // header has a pencil and a trash; a ticket's folder button opens the menu of groups (closed with Escape).
+    const first = drawer.locator('[data-quests-ticket-group]').first();
+    let fold = null;
+    if (headers.length) {
+      const count = () => drawer.locator('[data-queue-key]').count();
+      const before = await count();
+      await first.click(); await page.waitForTimeout(300);
+      const folded = await count();
+      const mark = await first.getAttribute('data-quests-ticket-group-folded');
+      await first.click(); await page.waitForTimeout(300);
+      fold = { before, folded, hidden: before - folded, firstCount: headers[0][1], mark, after: await count() };
+    }
+    const groupButton = drawer.locator('[data-quests-line="group"]').first();
+    let menu = null;
+    if (await groupButton.count()) {
+      await groupButton.click(); await page.waitForTimeout(300);
+      menu = await page.locator('[data-quests-ticket-group-menu] button').evaluateAll((ns) => ns.map((n) => n.textContent));
+      await page.keyboard.press('Escape');
+    }
+    console.log(JSON.stringify({ headers, asExpected: JSON.stringify(headers) === JSON.stringify(expected), tickets: shown.length, addLine: await drawer.locator('[data-quests-ticket-group-add]').count(),
+      pencils: await drawer.locator('[data-quests-ticket-group-rename]').count(), trashes: await drawer.locator('[data-quests-ticket-group-delete]').count(), groups: q.ticketGroups.length, fold, menu }));
   }
 
   if (check === 'switch') {

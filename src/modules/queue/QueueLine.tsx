@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { Archive, CircleCheck, ListEnd, Pause, Pencil, Pin, SquareArrowOutUpRight } from 'lucide-react';
+import { Archive, CircleCheck, FolderInput, ListEnd, Pause, Pencil, Pin, SquareArrowOutUpRight } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import EntryDot from '@/modules/queue/EntryDot';
@@ -37,6 +37,8 @@ type QueueLineProps = {
   onMenu?: (event: MouseEvent) => void;
   /** The pencil: rename the chat. */
   onRename?: () => void;
+  /** An unclaimed ticket's folder button, in the pencil's column: the menu of groups to put it in. */
+  onGroup?: (event: MouseEvent) => void;
 };
 
 /**
@@ -45,7 +47,7 @@ type QueueLineProps = {
  */
 const ICONS: Record<Where, typeof Archive> = { queue: ListEnd, hold: Pause, archive: Archive };
 
-export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onPlace, onMenu, onRename }: QueueLineProps) {
+export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onPlace, onMenu, onRename, onGroup }: QueueLineProps) {
   const dots = useChatDots();
   const dot = e.sessionId ? dots[e.sessionId] : undefined;
   return (
@@ -83,6 +85,12 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
           <button type="button" title="Rename" className={BUTTON}
             data-quests-line="rename" onClick={(event) => { event.stopPropagation(); onRename(); }}>
             <Pencil className="h-4 w-4" />
+          </button>
+        )}
+        {!e.sessionId && onGroup && (
+          <button type="button" title="Put in a group" className={BUTTON}
+            data-quests-line="group" onClick={(event) => { event.stopPropagation(); onGroup(event); }}>
+            <FolderInput className="h-4 w-4" />
           </button>
         )}
       </span>
