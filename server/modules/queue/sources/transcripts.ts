@@ -153,7 +153,8 @@ function closingLine(lines: string[]): { kind: string | null; text: string | nul
     if (!row || row.type !== 'assistant' || row.isSidechain) continue;
     const said = (row.message?.content ?? []).filter((b: { type: string }) => b.type === 'text').map((b: { text: string }) => b.text).join('\n');
     if (!said.trim()) continue;
-    const last = said.split('\n').map((l: string) => l.trim()).filter(Boolean).pop() ?? '';
+    // Bold labels count: "**Done:** ..." (the closing lines are bold, Noam 6 Nov).
+    const last = said.split('\n').map((l: string) => l.replaceAll('**', '').trim()).filter(Boolean).pop() ?? '';
     const m = last.match(CLOSING);
     return { kind: m ? m[1].toLowerCase() : null, text: m ? m[2] : null, at: row.timestamp ?? null };
   }

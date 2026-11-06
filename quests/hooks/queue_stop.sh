@@ -4,7 +4,8 @@
 in="$(cat)"
 [ "$(jq -r '.stop_hook_active // false' <<<"$in")" = "true" ] && exit 0  # the second try passes
 # Claude Code hands the reply to the hook; the transcript may not hold it yet when the hook runs.
-last="$(jq -r '.last_assistant_message // ""' <<<"$in" | sed '/^[[:space:]]*$/d' | tail -n 1)"
+# Bold labels count ("**Done:** ..."; Noam, 6 Nov: "bolden and put in separate lines the required from me and running").
+last="$(jq -r '.last_assistant_message // ""' <<<"$in" | sed '/^[[:space:]]*$/d' | tail -n 1 | sed 's/\*\*//g')"
 grep -Eiq '^(waiting for|question|blocker|done)\b[ :]*.+' <<<"$last" && exit 0
 cat >&2 <<EOF
 Your reply has no queue closing line. Its last line was: ${last:0:200}
