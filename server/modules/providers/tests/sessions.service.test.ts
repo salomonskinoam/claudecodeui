@@ -8,6 +8,8 @@ import { closeConnection, initializeDatabase, projectsDb, sessionsDb } from '@/m
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
+import { providerRuntimeService } from '@/modules/providers/index.js';
+import { EMPTY_RUNTIME_STATE, setRuntimeState } from '@/shared/runtime-state.js';
 import type { IProvider } from '@/shared/interfaces.js';
 import type { BackgroundTaskSummary } from '@/shared/types.js';
 
@@ -208,11 +210,14 @@ async function withProviders(
   const realListProviders = providerRegistry.listProviders;
   providerRegistry.listProviders = () =>
     Object.entries(runtimes).map(([id, runtime]) => ({ id, runtime }) as IProvider);
+  // The page server reads runs and background work from the runner's state; here the runner is this process.
+  setRuntimeState({ ...EMPTY_RUNTIME_STATE, runs: chatRunRegistry.listRuns(), background: providerRuntimeService.listBackgroundWork() });
   try {
     await runTest();
   } finally {
     providerRegistry.listProviders = realListProviders;
     chatRunRegistry.clearAll();
+    setRuntimeState(EMPTY_RUNTIME_STATE);
   }
 }
 

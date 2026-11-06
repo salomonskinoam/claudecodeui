@@ -1,0 +1,17 @@
+[Unit]
+Description=Quests chat runner: owns the page's chats' Claude processes (salomonskinoam/claudecodeui server/runner.ts)
+Before=quests-ui.service
+
+[Service]
+Environment=PATH=/home/noam/.nvm/versions/node/v22.23.3/bin:/home/noam/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/noam/src/quests/claudecodeui/scripts/start-runner.sh
+# A restart drains: SIGTERM goes to the runner alone, which refuses new turns and exits once no turn runs and no
+# Claude process is held for background work. Nothing is killed while it waits. A shutting-down machine, or a
+# second SIGTERM, ends it at once.
+KillMode=mixed
+TimeoutStopSec=infinity
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

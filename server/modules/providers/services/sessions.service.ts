@@ -5,7 +5,8 @@ import path from 'node:path';
 import { renameSession as renameClaudeSession } from '@anthropic-ai/claude-agent-sdk';
 
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
-import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
+import { broadcastSessionUpserted } from '@/modules/websocket/index.js';
+import { runOf, runningRuns, runtimeState } from '@/shared/runtime-state.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { listBusyClaudeCliSessions } from '@/modules/providers/services/claude-cli-liveness.service.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
@@ -163,28 +164,27 @@ export const sessionsService = {
    * indicators should not attach to chat streams or request replayed messages.
    */
   async listRunningSessions(): Promise<RunningSessionEntry[]> {
-    const entries: RunningSessionEntry[] = chatRunRegistry.listRunningRuns();
+    // quests: the runner's runs and background work (server/runner.ts), read from its state copy.
+    const entries: RunningSessionEntry[] = runningRuns().map(({ sessionId, provider, startedAt, lastSeq }) => ({ sessionId, provider, startedAt, lastSeq }));
     const runningById = new Map(entries.map((entry) => [entry.sessionId, entry]));
 
-    for (const provider of providerRegistry.listProviders()) {
-      for (const { sessionId, tasks } of provider.runtime.listBackgroundWork?.() ?? []) {
-        const running = runningById.get(sessionId);
-        if (running) {
-          running.tasks = tasks;
-          continue;
-        }
-        entries.push({
-          sessionId,
-          provider: provider.id,
-          startedAt: Math.min(...tasks.map((task) => task.startedAt)),
-          // The completed run stays in the registry for a while, and a client
-          // that subscribes with its lastSeq replays the tail it missed.
-          lastSeq: chatRunRegistry.getRun(sessionId)?.lastSeq ?? 0,
-          background: true,
-          canInterrupt: false,
-          tasks,
-        });
+    for (const { sessionId, provider, tasks } of runtimeState().background) {
+      const running = runningById.get(sessionId);
+      if (running) {
+        running.tasks = tasks;
+        continue;
       }
+      entries.push({
+        sessionId,
+        provider,
+        startedAt: Math.min(...tasks.map((task) => task.startedAt)),
+        // The completed run stays in the registry for a while, and a client
+        // that subscribes with its lastSeq replays the tail it missed.
+        lastSeq: runOf(sessionId)?.lastSeq ?? 0,
+        background: true,
+        canInterrupt: false,
+        tasks,
+      });
     }
 
     // The chat-run registry only knows about turns CloudCLI drives itself, so
@@ -201,7 +201,7 @@ export const sessionsService = {
         sessionId: session.session_id,
         provider: session.provider as LLMProvider,
         startedAt: live.startedAt,
-        lastSeq: chatRunRegistry.getRun(session.session_id)?.lastSeq ?? 0,
+        lastSeq: runOf(session.session_id)?.lastSeq ?? 0,
         // There is no run here to abort: the turn belongs to a CLI process
         // CloudCLI does not own, so it can be reported but not interrupted.
         canInterrupt: false,

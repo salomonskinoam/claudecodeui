@@ -115,6 +115,9 @@ export function getConnection(): Database.Database {
   migrateLegacyDatabase(dbPath);
 
   instance = new Database(dbPath);
+  // quests: two processes share this file, the page server and the chat runner (server/runner.ts): readers and a
+  // writer must not block each other. better-sqlite3 waits up to 5 s for a lock.
+  instance.pragma('journal_mode = WAL');
 
   // app_config must exist immediately — the auth middleware reads
   // the JWT secret at module-load time, before initializeDatabase() runs.

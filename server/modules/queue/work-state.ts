@@ -2,12 +2,12 @@ import { promises as fsp } from 'node:fs';
 import path from 'node:path';
 
 import { sessionsDb } from '@/modules/database/index.js';
-import { describeToolCall, getClaudeSDKLastStep, isClaudeSDKTurnInFlight } from '@/modules/providers/index.js';
+import { describeToolCall } from '@/modules/providers/index.js';
 import { getChats, liveTasks } from '@/modules/queue/chats.js';
 import { stateOf } from '@/modules/queue/entries.js';
 import type { OpenTask } from '@/modules/queue/sources/transcripts.js';
 import { findTaskOutputFile } from '@/modules/queue/work.js';
-import { chatRunRegistry } from '@/modules/websocket/index.js';
+import { isTurnInFlight, lastStepOf, runOf } from '@/shared/runtime-state.js';
 
 /**
  * quests: the state of the main chat apart from the states of its workers (requirement 40), read from what is
@@ -97,15 +97,15 @@ export async function readWorkState(appSessionId: string): Promise<WorkState | n
   const sid = row.provider_session_id ?? appSessionId;
   const chat = getChats().get(sid);
   const queueState = chat ? stateOf(chat) : { state: 'none' as const, since: 0 };
-  const step = getClaudeSDKLastStep(appSessionId);
+  const step = lastStepOf(appSessionId);
   // A chat the page runs: its turn is in flight when this server has a run going for it. The registry's "busy"
   // is not the word for such a process: it stayed "busy" between turns (the catalogue chat, 19:45, ten minutes
   // after its reply). A chat run elsewhere (Cursor, a terminal) has only the registry.
-  const run = chatRunRegistry.getRun(appSessionId);
+  const run = runOf(appSessionId);
   const pageRun = chat?.process?.entrypoint === 'sdk-ts';
   // A page-run chat answers while this server runs a turn for it, or while the CLI runs one on its own (a
   // task's report, a message from another session): the runtime sees every turn's messages and its result.
-  const answering = pageRun ? run?.status === 'running' || isClaudeSDKTurnInFlight(appSessionId) : queueState.state === 'running';
+  const answering = pageRun ? run?.status === 'running' || isTurnInFlight(appSessionId) : queueState.state === 'running';
   const lineState = chat?.closingLine ? (({ question: 'question', done: 'done', 'waiting for': 'waiting', blocker: 'blocker' } as const)[chat.closingLine.kind] ?? 'idle') : 'idle';
   const state: MainState['state'] = queueState.state === 'permission' ? 'permission' : answering ? 'answering' : lineState;
   const main: MainState = {

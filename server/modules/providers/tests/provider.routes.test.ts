@@ -14,6 +14,8 @@ import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import type { IProvider } from '@/shared/interfaces.js';
 import type { BackgroundTaskSummary, WorkflowAgentActivity } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
+import { EMPTY_RUNTIME_STATE, setRuntimeState } from '@/shared/runtime-state.js';
+
 
 async function withProviderServer(
   run: (baseUrl: string, workspacePath: string) => Promise<void>,
@@ -359,6 +361,8 @@ test('the running-sessions route reports a session held open for background work
     id: 'claude',
     runtime: { listBackgroundWork: () => [{ sessionId: 'held-session', tasks }] },
   } as unknown as IProvider];
+  // The page server reads background work from the runner's state; here the runner is this process.
+  setRuntimeState({ ...EMPTY_RUNTIME_STATE, background: [{ sessionId: 'held-session', provider: 'claude', tasks }] });
 
   try {
     await withProviderServer(async (baseUrl) => {
@@ -378,6 +382,7 @@ test('the running-sessions route reports a session held open for background work
     });
   } finally {
     providerRegistry.listProviders = realListProviders;
+    setRuntimeState(EMPTY_RUNTIME_STATE);
   }
 });
 

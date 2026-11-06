@@ -2,16 +2,19 @@ import type { Server as HttpServer } from 'node:http';
 
 import { WebSocket, WebSocketServer, type VerifyClientCallbackSync } from 'ws';
 
-import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
 import { verifyWebSocketClient } from '@/modules/websocket/services/websocket-auth.service.js';
 import { handlePluginWsProxy } from '@/modules/websocket/services/plugin-websocket-proxy.service.js';
 import { handleShellConnection } from '@/modules/websocket/services/shell-websocket.service.js';
-import { handleDesktopNotificationsConnection } from '@/modules/notifications/index.js';
 import type { AuthenticatedWebSocketRequest } from '@/shared/types.js';
 
 type WebSocketServerDependencies = {
   verifyClient: Parameters<typeof verifyWebSocketClient>[1];
-  chat: Parameters<typeof handleChatConnection>[2];
+  /**
+   * quests: the chat socket (`/ws`) and the notification socket (`/desktop-notifications`). The page server
+   * passes both through to the runner (server/modules/runner/runner-proxy.ts); the runner handles them itself.
+   */
+  chat: (ws: WebSocket, request: AuthenticatedWebSocketRequest) => void;
+  notifications: (ws: WebSocket, request: AuthenticatedWebSocketRequest) => void;
   shell: Parameters<typeof handleShellConnection>[1];
   getPluginPort: Parameters<typeof handlePluginWsProxy>[2];
 };
@@ -104,12 +107,12 @@ export function createWebSocketServer(
     }
 
     if (pathname === '/ws') {
-      handleChatConnection(ws, incomingRequest, dependencies.chat);
+      dependencies.chat(ws, incomingRequest);
       return;
     }
 
     if (pathname === '/desktop-notifications') {
-      handleDesktopNotificationsConnection(ws, incomingRequest);
+      dependencies.notifications(ws, incomingRequest);
       return;
     }
 

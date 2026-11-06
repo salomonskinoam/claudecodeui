@@ -55,6 +55,9 @@ const turnsInFlight = new Set();
 function isClaudeSDKTurnInFlight(sessionId) {
   return turnsInFlight.has(sessionId);
 }
+// quests: the runner hands these to the page server in one object (server/runner.ts).
+const listClaudeSDKTurnsInFlight = () => [...turnsInFlight];
+const listClaudeSDKLastSteps = () => Object.fromEntries(lastSteps);
 
 // Outstanding background tasks per live session, keyed like activeSessions. An
 // entry lives exactly as long as the map entry it shadows: cleared when the
@@ -1750,6 +1753,16 @@ function getActiveClaudeSDKSessions() {
   return getAllSessions();
 }
 
+/** quests: the start time of every active session, by every key it is held under. */
+function listClaudeSDKSessionStartTimes() {
+  const out = {};
+  for (const id of getAllSessions()) {
+    const start = getClaudeSDKSessionStartTime(id);
+    if (start !== null) out[id] = start;
+  }
+  return out;
+}
+
 /**
  * Get pending tool approvals for a specific session.
  * @param {string} sessionId - The session ID
@@ -1811,6 +1824,9 @@ export {
   isClaudeSDKSessionActive,
   getClaudeSDKSessionStartTime,
   getActiveClaudeSDKSessions,
+  listClaudeSDKTurnsInFlight,
+  listClaudeSDKLastSteps,
+  listClaudeSDKSessionStartTimes,
   resolveToolApproval,
   getPendingApprovalsForSession,
   reconnectSessionWriter,

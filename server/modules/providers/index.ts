@@ -14,4 +14,7 @@ export { initializeSessionsWatcher } from './services/sessions-watcher.service.j
 export { closeSessionsWatcher } from './services/sessions-watcher.service.js';
 // quests: for the workers panel (server/modules/queue/work-state.ts).
 export { describeToolCall } from './list/claude/describe-tool-call.js';
-export { getClaudeSDKLastStep, isClaudeSDKTurnInFlight } from './list/claude/claude-runtime.provider.js';
+// quests: the runner's state for the page server (server/runner.ts).
+export { listClaudeSDKLastSteps, listClaudeSDKSessionStartTimes, listClaudeSDKTurnsInFlight } from './list/claude/claude-runtime.provider.js';
+// quests: the runner's state copy drops a session's cached history when its process starts or ends.
+export { sessionHistoryCache } from './services/session-history-cache.service.js';

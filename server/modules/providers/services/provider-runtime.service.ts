@@ -4,6 +4,7 @@ import { sessionsService } from '@/modules/providers/services/sessions.service.j
 import type { IProvider } from '@/shared/interfaces.js';
 import type {
   AnyRecord,
+  BackgroundTaskSummary,
   LLMProvider,
   ProviderPermissionDecision,
   ProviderRunFunction,
@@ -99,6 +100,12 @@ export function createProviderRuntimeService(
 
     canJoinTurn(providerName: LLMProvider, sessionId: string): boolean {
       return Boolean(dependencies.resolveProvider(providerName).runtime.canJoinTurn?.(sessionId));
+    },
+
+    /** quests: every provider's sessions with background work still going, for the runner's state. */
+    listBackgroundWork(): Array<{ sessionId: string; provider: LLMProvider; tasks: BackgroundTaskSummary[] }> {
+      return dependencies.listProviders().flatMap((provider) =>
+        (provider.runtime.listBackgroundWork?.() ?? []).map((entry) => ({ ...entry, provider: provider.id })));
     },
 
     hasBackgroundWork(sessionId: string): boolean {

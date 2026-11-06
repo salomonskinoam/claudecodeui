@@ -14,8 +14,11 @@ import {
     closeSessionsWatcher,
     initializeSessionsWatcher,
     providerRuntimeService,
+    sessionHistoryCache,
 } from '@/modules/providers/index.js';
-import { chatRunRegistry, createWebSocketServer } from '@/modules/websocket/index.js';
+import { createWebSocketServer } from '@/modules/websocket/index.js';
+import { proxyToRunner } from '@/modules/runner/index.js';
+import { approvalsOf, runningRuns, setOnProcessChange, startRuntimeStatePoll } from '@/shared/runtime-state.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
@@ -44,7 +47,6 @@ import providerRoutes from './modules/providers/provider.routes.js';
 import { voiceRoutes } from './modules/voice/index.js';
 import {
     closeScheduledMessageDispatcher,
-    initializeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
 import { closeQueue, initializeQueue, processStates, queueRoutes } from './modules/queue/index.js';
@@ -102,19 +104,16 @@ const agentRoutes = createAgentModule({
     queryOpenCode,
 });
 
-// Single WebSocket server that handles chat, shell, and plugin proxy paths.
-// A completed run stays subscribable while its session's background work
-// (agents, workflows, backgrounded commands) is still reporting through it.
-chatRunRegistry.setRetentionGuard((sessionId) => providerRuntimeService.hasBackgroundWork(sessionId));
-
+// Single WebSocket server that handles chat, shell, and plugin proxy paths. quests: the chats run in the runner
+// (server/runner.ts, its own service), so a restart of this server stops no chat: the chat and notification
+// sockets pass through to it.
 createWebSocketServer(server, {
     verifyClient: {
         isPlatform: IS_PLATFORM,
         authenticateWebSocket,
     },
-    chat: {
-        runtime: providerRuntimeService,
-    },
+    chat: (ws, request) => proxyToRunner(ws, request, true),
+    notifications: (ws, request) => proxyToRunner(ws, request, false),
     shell: {
         resolveProviderSessionId: (sessionId, provider) => {
             const dbSession = sessionsDb.getSessionById(sessionId);
@@ -335,13 +334,13 @@ app.get('/api/quests/work/output/*', authenticateToken, async (req: Request, res
     }
 });
 
-// quests: live state of every chat, for the tab dots. { appSessionId: 'running' | 'waiting' }; idle chats are absent.
-// Chats in an IDE or terminal come from the chats model (Claude Code's registry, read every 2 seconds). Chats run
-// from this page are not in that registry: their state comes from this server's runs and pending permission prompts.
+// quests: live state of every chat, for the tab dots. { appSessionId: 'running' | 'waiting' | 'workers' }; idle
+// chats are absent. From the chats model (Claude Code's registry and the runner's state), plus the runner's runs
+// of chats the chats model does not know yet (a new chat before Claude names it).
 app.get('/api/quests/live', authenticateToken, async (_req: Request, res: Response) => {
-    const states = processStates();
-    for (const run of chatRunRegistry.listRunningRuns()) {
-        states[run.sessionId] = providerRuntimeService.getPendingApprovalsForSession(run.sessionId).length > 0 ? 'waiting' : 'running';
+    const states: Record<string, string> = processStates();
+    for (const run of runningRuns()) {
+        states[run.sessionId] = approvalsOf(run.sessionId).length > 0 ? 'waiting' : 'running';
     }
     res.json(states);
 });
@@ -512,10 +511,10 @@ async function startServer() {
 
             // Start watching the projects folder for changes
             await initializeSessionsWatcher();
-            // Sends anything that came due while the server was not running,
-            // then keeps polling.
-            initializeScheduledMessageDispatcher(providerRuntimeService);
-            // quests: the priority queue's polls (tickets, live chats, closing lines)
+            // quests: scheduled messages are sent by the runner (server/runner.ts). The runner's state, read every
+            // second, then the priority queue's polls (tickets, live chats, closing lines).
+            setOnProcessChange((id) => sessionHistoryCache.invalidate(id));
+            startRuntimeStatePoll();
             initializeQueue();
 
             // Start server-side plugin processes for enabled plugins

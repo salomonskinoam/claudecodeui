@@ -1,10 +1,9 @@
 import { queueDb } from '@/modules/database/index.js';
-import { isClaudeSDKTurnInFlight, providerRuntimeService } from '@/modules/providers/index.js';
 import { getCursorTabs } from '@/modules/queue/sources/cursor-tabs.js';
 import { getLive, type LiveProcess } from '@/modules/queue/sources/live.js';
 import { getPageTabs } from '@/modules/queue/sources/page-tabs.js';
 import { getOpenTasks, getTitles, type OpenTask } from '@/modules/queue/sources/transcripts.js';
-import { chatRunRegistry } from '@/modules/websocket/index.js';
+import { approvalsOf, isTurnInFlight, runningRuns } from '@/shared/runtime-state.js';
 
 /**
  * quests: the chats, as they are. One record per chat this machine knows (the page's sessions, the transcripts
@@ -52,14 +51,14 @@ function tabsOf(): Record<'cursor' | 'page', string[]> {
 }
 
 /**
- * A turn this page runs is running from the moment it is sent: the page's run registry knows it at once, while
+ * A turn this page runs is running from the moment it is sent: the runner's run registry knows it at once, while
  * the CLI writes its registry file only once it has started (a resume can take 20 s). The tab dots read the same
  * runs, so the queue and the tabs agree (Noam, 6 Nov: "the queueue and tabs dont agree on active chats").
  */
 function withPageRun(p: LiveProcess | null, sid: string, pageId: string | undefined, run: { sessionId: string; startedAt: number } | undefined): LiveProcess | null {
   // The page's process stays "busy" in the CLI's registry between turns (work-state.ts): the page knows better.
-  if (!run) return p?.entrypoint === 'sdk-ts' && p.status === 'busy' && pageId && !isClaudeSDKTurnInFlight(pageId) ? { ...p, status: 'idle' } : p;
-  const asks = providerRuntimeService.getPendingApprovalsForSession(run.sessionId).length > 0;
+  if (!run) return p?.entrypoint === 'sdk-ts' && p.status === 'busy' && pageId && !isTurnInFlight(pageId) ? { ...p, status: 'idle' } : p;
+  const asks = approvalsOf(run.sessionId).length > 0;
   return {
     sessionId: sid, status: asks ? 'waiting' : 'busy', waitingFor: asks ? 'permission prompt' : null,
     entrypoint: p?.entrypoint ?? null, name: p?.name ?? null,
@@ -69,7 +68,7 @@ function withPageRun(p: LiveProcess | null, sid: string, pageId: string | undefi
 
 export function getChats(): Map<string, Chat> {
   const live = getLive();
-  const pageRuns = new Map(chatRunRegistry.listRunningRuns().map((r) => [r.sessionId, r]));
+  const pageRuns = new Map(runningRuns().map((r) => [r.sessionId, r]));
   const titles = getTitles();
   const sessions = new Map(queueDb.listClaudeSessions().map((s) => [s.provider_session_id, s]));
   const lines = new Map(queueDb.listChats().map((c) => [c.provider_session_id, c]));

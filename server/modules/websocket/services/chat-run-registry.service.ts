@@ -267,6 +267,18 @@ export const chatRunRegistry = {
       }));
   },
 
+  /** quests: every registered run, running or recently completed: the runner's state for the page server. */
+  listRuns(): Array<{ sessionId: string; runId: string; provider: LLMProvider; status: ChatRunStatus; startedAt: number; lastSeq: number }> {
+    return Array.from(runs.values()).map((run) => ({
+      sessionId: run.appSessionId,
+      runId: run.runId,
+      provider: run.provider,
+      status: run.status,
+      startedAt: run.startedAt,
+      lastSeq: run.lastSeq,
+    }));
+  },
+
   /**
    * Adds a websocket connection to a run's live audience.
    *

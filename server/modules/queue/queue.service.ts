@@ -6,6 +6,7 @@ import { drag, lift, repair, view } from '@/modules/queue/queue-order.js';
 import { setPageTabs } from '@/modules/queue/sources/page-tabs.js';
 import { noteTranscript, noteTranscriptOnce } from '@/modules/queue/sources/transcripts.js';
 import { refreshLive } from '@/modules/queue/sources/live.js';
+import { refreshRuntimeState } from '@/shared/runtime-state.js';
 import { queueDb } from '@/modules/database/index.js';
 import { notePageClaim } from '@/modules/queue/page-claims.js';
 import { getTicketGroups, setTicketGroups, type TicketGroup } from '@/modules/queue/ticket-groups.js';
@@ -92,7 +93,7 @@ export function claimFromPage(number: number, sessionId: string): Queue {
  */
 export async function settleChat(sessionId: string): Promise<Queue> {
   const row = queueDb.listClaudeSessions().find((s) => s.session_id === sessionId || s.provider_session_id === sessionId);
-  await refreshLive();
+  await Promise.all([refreshLive(), refreshRuntimeState()]);
   if (row?.jsonl_path) await noteTranscript(row.jsonl_path);
   return getQueue();
 }
