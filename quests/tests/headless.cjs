@@ -1092,15 +1092,15 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'focus') {
-    // The default list: "Pending chats" open (the chats that wait for the user, plus the chat on screen when it
-    // has no process; with one it is an active chat, requirement 95), then
+    // The default list: "Pending chats" open (the chats that wait for the user; the chat on screen is placed like
+    // any other, requirement 100), then
     // "Active chats (n)", "On hold (n)", "Tickets-Unclaimed (n)" and "Archived (n)" collapsed; a click opens a
     // drawer; the active chats running come last; the DONE button sits in the composer and is disabled while
     // something is typed.
     const q = await apiQueue();
     const view = q.view.map((k) => q.entries.find((e) => e.key === k));
     const mine = q.entries.find((e) => e.sessionId === sessionId)?.key;
-    const expected = view.filter((e) => e.placement === 'queue' && (e.waitsForMe || (e.key === mine && !e.live))).map((e) => e.key);
+    const expected = view.filter((e) => e.placement === 'queue' && e.waitsForMe).map((e) => e.key);
     const keys = () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
     const shown = await keys();
     const groupText = (label) => page.locator(`[data-quests-group="${label}"]`).textContent();

@@ -1,14 +1,14 @@
 import { useSyncExternalStore } from 'react';
 
 import { useQueue } from '@/modules/queue/queueStore';
-import { useShownChat } from '@/modules/queue/shownChat';
-import { isChat, type QueueEntry } from '@/modules/queue/types';
+import type { QueueEntry } from '@/modules/queue/types';
 
 /**
  * quests priority queue: what the list shows. Five drawers, each entry in exactly one, in this order:
- *   Pending chats      what needs Noam: a permission prompt, a question, a Done he has not approved; plus the
- *                      chat on screen when it has no process (else it would be in no drawer). The only drawer
- *                      open by default.
+ *   Pending chats      what needs Noam: a permission prompt, a question, a Done he has not approved. The only
+ *                      drawer open by default.
+ * The chat on screen is placed like any other: being open never moves it (Noam, 6 Nov: "it's \"focused\" status
+ * should not affect its queue or drawer association status at all").
  *   Active chats       every other chat with a process. The ones running come last: "they require no
  *                      attention by definition" (Noam, 3 Nov). Idle ones first, each half in queue order.
  *   On hold            the chats Noam put on hold, until they reply again.
@@ -62,7 +62,6 @@ export type QueueView = {
 export function useQueueView(): QueueView {
   const queue = useQueue();
   const current = useQueueMode();
-  const shown = useShownChat();
   const byKey = new Map(queue.entries.map((e) => [e.key, e]));
   const every = queue.view.map((k) => byKey.get(k)).filter((e): e is QueueEntry => Boolean(e));
   const archived = every.filter((e) => e.placement === 'archive').sort((a, b) => (b.placedAt ?? 0) - (a.placedAt ?? 0));
@@ -72,11 +71,9 @@ export function useQueueView(): QueueView {
   // queue is kept; its next reply takes it out of the group.
   const hold = all.filter((e) => e.placement === 'hold');
   const rest = all.filter((e) => e.placement === 'queue');
-  // The chat on screen sits where its status puts it: running or idle with a process, it is an active chat
-  // (Noam, 6 Nov: "after i click enter on a chat, i still see it in pending chats ... it should go to active
-  // chats, to reflect the actual status"). Only without a process does it stay in Pending, to stay listed. Put
-  // on hold, it leaves the list and the forest while its tab stays open (2 Nov).
-  const lines = rest.filter((e) => e.waitsForMe || (isChat(e, shown) && !e.live));
+  // Status alone decides the drawer; the chat on screen gets no place of its own (requirement 100). Put on hold,
+  // it leaves the list and the forest while its tab stays open (2 Nov).
+  const lines = rest.filter((e) => e.waitsForMe);
   const open = rest.filter((e) => e.live && !lines.includes(e));
   return {
     mode: current,
