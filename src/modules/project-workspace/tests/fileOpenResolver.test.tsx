@@ -18,7 +18,7 @@ import type { Project } from '@/shared/types';
 const getFiles = vi.fn();
 
 vi.mock('@/shared/api', () => ({
-  api: { getFiles: (...args: unknown[]) => getFiles(...args) },
+  api: { getFileList: (...args: unknown[]) => getFiles(...args) },
 }));
 
 const { useFileOpenResolver } = await import('@/modules/project-workspace/hooks/useFileOpenResolver');
@@ -26,15 +26,8 @@ const { useFileOpenResolver } = await import('@/modules/project-workspace/hooks/
 const ROOT = '/home/odoo/workspace/personal';
 const project: Project = { projectId: 'p1', displayName: 'personal', fullPath: ROOT };
 
-const tree = [
-  { type: 'file', name: 'CLAUDE.md', path: `${ROOT}/CLAUDE.md` },
-  {
-    type: 'directory',
-    name: 'src',
-    path: `${ROOT}/src`,
-    children: [{ type: 'file', name: 'foo.ts', path: `${ROOT}/src/foo.ts` }],
-  },
-];
+// The project's flat file list, as api.getFileList answers it.
+const tree = { root: ROOT, paths: ['CLAUDE.md', 'src/foo.ts'] };
 
 const setup = () => {
   getFiles.mockReset();

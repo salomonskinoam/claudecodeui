@@ -334,6 +334,7 @@ export default function ChatComposer({
         {showFileDropdown && filteredFiles.length > 0 && (
           <div
             ref={fileDropdownRef}
+            data-quests-mentions="list"
             className="absolute bottom-full left-0 right-0 z-50 mb-2 max-h-48 overflow-y-auto rounded-xl border border-border/50 bg-card/95 shadow-lg backdrop-blur-md"
           >
             {filteredFiles.map((file, index) => (

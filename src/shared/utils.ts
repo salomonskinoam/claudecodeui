@@ -250,3 +250,8 @@ export const getQuickSettingsTabId = (tab: QuickSettingsTab): string => `quick-s
 
 /** DOM id of the tabpanel a quick settings tab controls; pairs with `getQuickSettingsTabId`. */
 export const getQuickSettingsTabPanelId = (tab: QuickSettingsTab): string => `quick-settings-tabpanel-${tab}`;
+/** quests: the answer of api.getFileList as file nodes: name, absolute path, path from the project root. */
+export const fileNodesOf = (data: unknown): Array<{ type: 'file'; name: string; path: string; relative: string }> => {
+  const { root, paths } = data as { root: string; paths: string[] };
+  return paths.map((relative) => ({ type: 'file', name: relative.slice(relative.lastIndexOf('/') + 1), path: `${root}/${relative}`, relative }));
+};

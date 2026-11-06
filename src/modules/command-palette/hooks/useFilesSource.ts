@@ -1,4 +1,5 @@
 import { api } from '@/shared/api';
+import { fileNodesOf } from '@/shared/utils';
 import { useApiSource } from '@/modules/command-palette/hooks/useApiSource';
 
 export type FileResult = {
@@ -30,9 +31,9 @@ export function useFilesSource(projectId: string | undefined, enabled: boolean) 
   return useApiSource<FileResult, unknown>({
     enabled: enabled && !!projectId,
     deps: [projectId],
-    fetcher: (signal) => api.getFiles(projectId!, { signal }),
+    fetcher: (signal) => api.getFileList(projectId!, { signal }),
     parse: (data) => {
-      const tree: FileNode[] = Array.isArray(data) ? (data as FileNode[]) : [];
+      const tree: FileNode[] = fileNodesOf(data);
       const flat: FileResult[] = [];
       flatten(tree, flat);
       return flat;

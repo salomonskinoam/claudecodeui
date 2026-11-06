@@ -161,6 +161,10 @@ export function createFileTreeRouter(
     response.json(await services.saveTextFile(readProjectId(request), filePath, body.content));
   }, logger));
 
+  router.get('/projects/:projectId/files/list', createRouteHandler(async (request, response) => {
+    response.json(await services.listProjectFilePaths(readProjectId(request)));
+  }, logger));
+
   router.get('/projects/:projectId/files', createRouteHandler(async (request, response) => {
     response.json(await services.listProjectFiles(readProjectId(request), {
       respectGitignore: request.query.respectGitignore === 'true',

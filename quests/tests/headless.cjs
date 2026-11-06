@@ -24,6 +24,7 @@
 //           color on the mode button (the text must be readable in every mode)
 //   back    Back is disabled at start; Next opens the next chat and enables Back; Back returns, is disabled again,
 //           and the opened chat's line has the dot and blink it had before Next
+//   mention "@" plus QUERY in the input box: the files the dropdown lists (the box is emptied after)
 //   preload after a reload, the other open tab is built in the background; ms per switch (click to 2nd frame)
 //   names   every open tab whose chat has a line in the list shows the same name as that line
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
@@ -35,7 +36,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit', 'modecolors', 'names', 'preload'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit', 'modecolors', 'names', 'preload', 'mention'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -254,7 +255,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const q = await apiQueue();
     const current = q.entries.find((e) => e.sessionId === sessionId)?.key;
     const expected = q.view.find((k) => k !== current && q.entries.find((e) => e.key === k).waitsForMe);
-    await page.locator('[data-slot="prompt-input-textarea"]').first().focus();
+    await page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').first().focus();
     await page.keyboard.press('Alt+Enter');
     await page.waitForTimeout(2500);
     const e = q.entries.find((x) => x.key === expected);
@@ -312,7 +313,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   if (check === 'readonly') {
     console.log(JSON.stringify({
       banner: await page.locator('[data-quests-queue="outside"]').isVisible(),
-      inputBox: await page.locator('[data-slot="prompt-input-textarea"]').count(),
+      inputBox: await page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').count(),
     }));
   }
 
@@ -352,7 +353,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const bodyChars = (await view.locator('.prose').textContent().catch(() => '')).length;
     await page.locator(`[data-quests-ticket-claim="${t.number}"]`).click();
     await page.waitForTimeout(3000);
-    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    const box = page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').first();
     const text = await box.inputValue();
     console.log(JSON.stringify({ ticket: t.key, pageUrl, title, titleOk: title === t.title, bodyChars, text, ok: text === `claim this ticket ${t.url}` }));
     await box.fill('');
@@ -469,7 +470,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       return { scrollTop: p.scrollTop, clientHeight: p.clientHeight, height: p.scrollHeight, markerTop: marker ? Math.round(marker.getBoundingClientRect().top - top) : null, downArrow: Boolean(document.querySelector('[aria-label="Scroll to bottom"]')) };
     });
     // As Noam had it: a draft of several lines already in the box, the view at the end, then one more character.
-    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    const box = page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').first();
     await box.fill('46.2 yes. and all false positive rulings that repeat.\ndoes that mean some classifications change?\n\n\nwe dont want to DO any fixes in this chat.\nInstead, I want a ticket per task and i will fix each one in its own chat.\n');
     await page.waitForTimeout(800);
     await pane.evaluate((p) => { p.scrollTop = p.scrollHeight; });
@@ -496,7 +497,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const texts = () => page.locator('[data-message-timestamp]').evaluateAll((rows) => rows.slice(-6).map((r) => r.textContent.replace(/\s+/g, ' ').slice(0, 90)));
     await page.locator('[data-quests-tab="new"]').first().click();
     await page.waitForTimeout(2500);
-    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    const box = page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').first();
     const t0 = Date.now();
     await box.fill('Use Bash to run exactly: sleep 45; echo finished. Then reply with exactly: first done');
     await page.keyboard.press('Enter');
@@ -998,6 +999,22 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     console.log(JSON.stringify({ start, up, down, reset, upBy: Math.round((up.chatPx - start.chatPx) * 100) / 100, downBy: Math.round((down.chatPx - up.chatPx) * 100) / 100, sidebarSame: up.sidebarPx === start.sidebarPx, rootUntouched: !up.root, toastGone: reset.toast === null }));
   }
 
+  if (check === 'mention') {
+    // "@" in the input box lists the project's files, as in Cursor (requirement 92): type "@" plus QUERY (default
+    // "read"), wait, read the dropdown, then empty the box again (nothing is sent). Also the file-list request.
+    const lists = [];
+    page.on('requestfinished', async (r) => { if (r.url().includes('/api/file-tree/')) { const t = r.timing(); lists.push({ url: r.url().replace('http://127.0.0.1:3001', '').slice(0, 120), ms: Math.round(t.responseEnd), status: (await r.response())?.status(), bytes: (await r.response().then((x) => x.body()).catch(() => Buffer.alloc(0))).length }); } });
+    const box = page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').first();
+    await box.waitFor({ timeout: 40000 });
+    await page.waitForTimeout(3000);
+    await box.click();
+    await page.keyboard.type(`@${process.env.QUERY ?? 'read'}`, { delay: 60 });
+    await page.waitForTimeout(Number(process.env.WAIT || 5000));
+    const items = await page.locator('[data-chat-view="shown"] [data-quests-mentions] .font-mono').evaluateAll((ns) => ns.map((n) => n.textContent).slice(0, 10));
+    const typed = await box.inputValue();
+    await box.fill('');
+    console.log(JSON.stringify({ typed, items, lists }));
+  }
   if (check === 'preload') {
     // Open tabs stay built (requirement 89): after a reload, the other open tab is built in the background, and
     // the first switch to it, like every later one, takes about a frame or two (ms from the click to the second
@@ -1080,7 +1097,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.locator('[data-quests-group="Tickets-Unclaimed"]').click();
     const done = page.locator('[data-quests-done="button"]');
     const doneEnabled = await done.isEnabled();
-    const box = page.locator('[data-slot="prompt-input-textarea"]').first();
+    const box = page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').first();
     await box.fill('x');
     await page.waitForTimeout(300);
     const doneWhileTyped = await done.isEnabled();
@@ -1233,7 +1250,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const state = async () => page.evaluate(() => ({
       url: location.pathname,
       tabs: JSON.parse(localStorage.getItem('quests-panes') || '{}').left,
-      input: Boolean(document.querySelector('[data-slot="prompt-input-textarea"]')),
+      input: Boolean(document.querySelector('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]')),
     }));
     await page.locator('[data-quests-tab="new"]').first().click();
     await page.waitForTimeout(2000);
@@ -1248,7 +1265,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
 
   if (check === 'modecolors') {
     const button = page.locator('button[title$="(Shift+Tab)"]');
-    await page.locator('[data-slot="prompt-input-textarea"]').first().focus();
+    await page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').first().focus();
     const start = await button.innerText();
     for (let i = 0; i < 8; i += 1) {
       const look = await button.evaluate((b) => { const c = getComputedStyle(b); return { color: c.color, background: c.backgroundColor }; });
@@ -1263,7 +1280,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   if (check === 'mode') {
     const button = page.locator('button[title$="(Shift+Tab)"]');
     console.log('mode shown:', await button.innerText());
-    await page.locator('[data-slot="prompt-input-textarea"]').first().focus();
+    await page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').first().focus();
     await page.keyboard.press('Shift+Tab');
     await page.waitForTimeout(300);
     console.log('after Shift+Tab:', await button.innerText());

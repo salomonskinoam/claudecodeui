@@ -1,4 +1,7 @@
+import { execFile } from 'node:child_process';
 import path from 'node:path';
+
+import { rgPath } from '@vscode/ripgrep';
 
 import ignore from 'ignore';
 
@@ -491,6 +494,34 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
       }
 
       return { success: true, path: resolvedPath, message: 'File saved successfully' };
+    },
+
+    /**
+     * quests: every file of the project as one flat list, for name search ("@" in the input box, the command
+     * palette, file references in the chat). ripgrep lists them with the ignore rules, hidden files included and
+     * no entry cap: the tree walk above stops at 10,000 entries (noam_worlds has about 22,000 files), and then
+     * "@" found nothing.
+     */
+    async listProjectFilePaths(projectId) {
+      const projectRoot = await resolveProjectRoot(projectId);
+      const relativePaths = await new Promise<string[]>((resolve, reject) => {
+        execFile(
+          rgPath,
+          ['--files', '--hidden', '--no-require-git', '--glob', '!.git', '--glob', '!node_modules'],
+          { cwd: projectRoot, maxBuffer: 256 * 1024 * 1024 },
+          (error, stdout) => {
+            // Exit code 1: no file; 2: some directory was unreadable, the rest is listed.
+            const code = (error as { code?: unknown } | null)?.code;
+            if (error && code !== 1 && code !== 2) {
+              reject(createFileTreeError(`Cannot list the files of ${projectRoot}: ${error.message}`, 500, 'FILE_LIST_FAILED'));
+              return;
+            }
+            resolve(stdout.split('\n').filter(Boolean));
+          },
+        );
+      });
+      // Relative paths only, the root once: 22,000 files are 1.5 MB this way, 7 MB with absolute paths beside.
+      return { root: projectRoot, paths: relativePaths.sort() };
     },
 
     async listProjectFiles(projectId, options) {

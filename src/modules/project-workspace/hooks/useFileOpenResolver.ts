@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 
 import { api } from '@/shared/api';
+import { fileNodesOf } from '@/shared/utils';
 import type { Project } from '@/shared/types';
 
 type FileNode = {
@@ -82,12 +83,11 @@ export function useFileOpenResolver(
 
     const filesPromise = (async () => {
       try {
-        const response = await api.getFiles(projectId);
+        const response = await api.getFileList(projectId);
         if (!response.ok) {
           return [];
         }
-        const data = await response.json();
-        const tree: FileNode[] = Array.isArray(data) ? data : [];
+        const tree: FileNode[] = fileNodesOf(await response.json());
         const flat: FlatFile[] = [];
         flatten(tree, flat);
         return flat;

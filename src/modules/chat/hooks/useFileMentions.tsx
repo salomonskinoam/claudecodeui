@@ -2,15 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, KeyboardEvent, RefObject, SetStateAction } from 'react';
 
 import { api } from '@/shared/api';
+import { fileNodesOf } from '@/shared/utils';
 import { escapeRegExp } from '@/modules/chat/utils/chatFormatting';
 import type { Project } from '@/shared/types';
 
-type ProjectFileNode = {
-  name: string;
-  type: 'file' | 'directory';
-  path?: string;
-  children?: ProjectFileNode[];
-};
 
 export type MentionableFile = {
   name: string;
@@ -25,26 +20,24 @@ type UseFileMentionsOptions = {
   textareaRef: RefObject<HTMLTextAreaElement>;
 };
 
-const flattenFileTree = (files: ProjectFileNode[], basePath = ''): MentionableFile[] => {
-  let flattened: MentionableFile[] = [];
-
-  files.forEach((file) => {
-    const fullPath = basePath ? `${basePath}/${file.name}` : file.name;
-    if (file.type === 'directory' && file.children) {
-      flattened = flattened.concat(flattenFileTree(file.children, fullPath));
-      return;
-    }
-
-    if (file.type === 'file') {
-      flattened.push({
-        name: file.name,
-        path: fullPath,
-        relativePath: file.path,
-      });
-    }
-  });
-
-  return flattened;
+/**
+ * quests: the files that match what follows "@", best first, as Cursor ranks them: the name starting with it,
+ * then the name holding it, then the path holding it; a shorter path first among equals.
+ */
+export const rankFiles = (files: MentionableFile[], query: string, limit: number): MentionableFile[] => {
+  const q = query.toLowerCase();
+  const rankOf = (file: MentionableFile) => {
+    const name = file.name.toLowerCase();
+    if (name.startsWith(q)) return 0;
+    if (name.includes(q)) return 1;
+    return file.path.toLowerCase().includes(q) ? 2 : -1;
+  };
+  return files
+    .map((file) => ({ file, rank: rankOf(file) }))
+    .filter((entry) => entry.rank >= 0)
+    .sort((a, b) => a.rank - b.rank || a.file.path.length - b.file.path.length)
+    .slice(0, limit)
+    .map((entry) => entry.file);
 };
 
 // True when both flattened lists hold the same files in the same order.
@@ -75,18 +68,18 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
     try {
       // File list is keyed by DB projectId now; the backend resolves it to
       // the project's path before reading.
-      const response = await api.getFiles(targetProjectId, {
+      const response = await api.getFileList(targetProjectId, {
         signal: abortController.signal,
       });
       if (!response.ok) {
         return;
       }
 
-      const files = (await response.json()) as ProjectFileNode[];
+      const files = fileNodesOf(await response.json());
       if (abortController.signal.aborted) {
         return;
       }
-      const nextFileList = flattenFileTree(files);
+      const nextFileList = files.map((file) => ({ name: file.name, path: file.relative, relativePath: file.path }));
       // Keeping the same array when nothing changed stops the filter effect
       // below from re-running and resetting the highlighted row.
       setFileList((previousFileList) =>
@@ -156,15 +149,7 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
     setShowFileDropdown(true);
     setSelectedFileIndex(-1);
 
-    const matchingFiles = fileList
-      .filter(
-        (file) =>
-          file.name.toLowerCase().includes(textAfterAt.toLowerCase()) ||
-          file.path.toLowerCase().includes(textAfterAt.toLowerCase()),
-      )
-      .slice(0, 10);
-
-    setFilteredFiles(matchingFiles);
+    setFilteredFiles(rankFiles(fileList, textAfterAt, 10));
   }, [input, cursorPosition, fileList]);
 
   const activeFileMentions = useMemo(() => {

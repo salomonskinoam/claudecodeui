@@ -301,6 +301,9 @@ export const api = {
     put(`/api/file-tree/projects/${projectId}/file`, { filePath, content }),
   getFiles: (projectId: string, options: ApiRequestOptions = {}) =>
     get(`/api/file-tree/projects/${projectId}/files${query({ respectGitignore: true })}`, options),
+  // quests: every file of the project, flat, no entry cap: { root, paths } (relative paths); read with fileNodesOf.
+  getFileList: (projectId: string, options: ApiRequestOptions = {}) =>
+    get(`/api/file-tree/projects/${projectId}/files/list`, options),
 
   // File operations
   createFile: (

@@ -16,16 +16,15 @@ import type { Project } from '@/shared/types';
 const getFiles = vi.fn();
 
 vi.mock('@/shared/api', () => ({
-  api: { getFiles: (...args: unknown[]) => getFiles(...args) },
+  api: { getFileList: (...args: unknown[]) => getFiles(...args) },
 }));
 
-const { useFileMentions } = await import('@/modules/chat/hooks/useFileMentions');
+const { rankFiles, useFileMentions } = await import('@/modules/chat/hooks/useFileMentions');
 
 const ROOT = '/home/user/project';
 const project: Project = { projectId: 'p1', displayName: 'project', fullPath: ROOT };
 
-const fileNode = (name: string) => ({ type: 'file', name, path: `${ROOT}/${name}` });
-const treeResponse = (names: string[]) => ({ ok: true, json: async () => names.map(fileNode) });
+const treeResponse = (names: string[]) => ({ ok: true, json: async () => ({ root: ROOT, paths: names }) });
 
 // A getFiles response the test resolves by hand, to hold a request in flight.
 const deferredTreeResponse = () => {
@@ -217,4 +216,12 @@ test('Escape before any file matched stops a late refetch from showing the dropd
     enterHandled = result.current.handleFileMentionsKeyDown(keyEvent('Enter'));
   });
   assert.equal(enterHandled, false);
+});
+
+test('rankFiles puts a name that starts with the query first, then a name holding it, then a path holding it', () => {
+  const f = (path: string) => ({ name: path.split('/').pop() as string, path });
+  const files = [f('docs/old/readme_notes.md'), f('src/thread.ts'), f('readme/a.md'), f('README.md'), f('x/README.md')];
+  assert.deepEqual(rankFiles(files, 'read', 10).map((file) => file.path), ['README.md', 'x/README.md', 'docs/old/readme_notes.md', 'src/thread.ts', 'readme/a.md']);
+  assert.deepEqual(rankFiles(files, 'zzz', 10), []);
+  assert.equal(rankFiles(files, 'r', 2).length, 2);
 });
