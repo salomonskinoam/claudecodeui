@@ -53,7 +53,7 @@ export function reportPageTabs(sessionIds: string[]): void {
 
 export const dragQueue = (key: string, beforeKey: string | null) => request('PUT', '/drag', { key, beforeKey });
 export const setQueueLatch = (key: string | null) => request('PUT', '/latch', { key });
-/** The pause icon: put the entry's chat on hold until it replies again. */
+/** The pause icon: put the entry's chat on hold until its next activity. */
 /** The pause icon: on hold until the chat replies again; `false` takes it off hold now. */
 /** Noam's groups of unclaimed tickets: the whole list. */
 export const setTicketGroups = (groups: TicketGroup[]) => request('PUT', '/groups', { groups });

@@ -14,7 +14,7 @@ export type Where = 'queue' | 'hold' | 'archive';
  */
 export const PLACES: Array<{ where: Where; label: string }> = [
   { where: 'queue', label: 'To the end of the queue' },
-  { where: 'hold', label: 'On hold (until it replies again)' },
+  { where: 'hold', label: 'On hold (until its next activity)' },
   { where: 'archive', label: 'Archived' },
 ];
 

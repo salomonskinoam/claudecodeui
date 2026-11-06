@@ -13,7 +13,7 @@ import type { QueueEntry } from '@/modules/queue/types';
  *                      attention by definition" (Noam, 3 Nov). Idle ones first, each half in queue order.
  *   On hold            the chats Noam put on hold, until they reply again.
  *   Tickets-Unclaimed  the tickets no chat claimed, in the order Noam drags.
- *   Archived           what Noam archived, whatever it does; the most recently archived first.
+ *   Archived           what Noam archived, until its chat does anything; the most recently archived first.
  * Noam, 28 Oct: "the philosophy is to filter for the user only chats that require attention. the rest is spam."
  * The "archive" mode (everything flat, as the stored order has it) has no button since 3 Nov; the headless
  * checks set it in the browser's storage.

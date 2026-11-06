@@ -6,8 +6,7 @@ import type { QueueEntry } from '@/modules/queue/types';
 
 /**
  * quests priority queue: opening an entry. Its chat becomes a left-pane tab (Ctrl/Cmd: a right-pane tab); a ticket
- * no chat has claimed opens its page, for reading, with "Claim this ticket" on it (Noam, 3 Nov: "when clicking a
- * ticket in tickets unclaimed, i want to see the ticket body in the chat window for reading").
+ * no chat has claimed opens its tab, a new chat for it with the ticket's page (TicketView).
  */
 export function useOpenEntry() {
   const navigate = useNavigate();
