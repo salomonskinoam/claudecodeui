@@ -37,3 +37,5 @@ fi
 git push origin main || echo "WARNING: the merge is done here, but pushing to the fork failed. Run: git push origin main"
 echo "Updated to $release with our features on top. Restarting."
 systemctl --user restart --no-block quests-ui.service
+# The chat runner restarts by draining: it takes the new code once no chat has a turn or background work running.
+systemctl --user restart --no-block quests-runner.service
