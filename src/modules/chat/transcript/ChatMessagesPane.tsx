@@ -20,6 +20,7 @@ import ToolGroupContainer from '@/modules/chat/transcript/ToolGroupContainer';
 import LoadAllMessagesOverlay from '@/modules/chat/transcript/LoadAllMessagesOverlay';
 import ChatExportMenu from '@/modules/chat/transcript/ChatExportMenu';
 import { BackgroundTasksStrip } from '@/modules/chat/transcript/BackgroundTasksStrip';
+import { useSmoothWheel } from '@/shared/hooks/useSmoothWheel';
 
 /**
  * How many of the newest rows mount with real content on the first commit,
@@ -384,6 +385,7 @@ function ChatMessagesPane({
   // 50px) any growth of the content keeps it there: late rendering, older history preloaded above, the
   // running-chat indicator's padding, new messages. Scrolling up by hand stops the following until the user
   // comes back down. The paddings sit on the content (not the scroller) so every change resizes it.
+  useSmoothWheel(scrollContainerRef);
   const contentRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const pane = scrollContainerRef.current;
