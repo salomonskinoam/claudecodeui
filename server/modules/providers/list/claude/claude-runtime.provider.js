@@ -86,9 +86,10 @@ const TOOL_APPROVAL_TIMEOUT_MS = parseInt(process.env.CLAUDE_TOOL_APPROVAL_TIMEO
 //
 // The hold normally ends long before this: a turn with nothing outstanding closes
 // stdin immediately, background work releases it as soon as it reports back, and a
-// new turn supersedes the previous hold. This ceiling only catches background work
-// that never reports at all, so an abandoned session cannot leak a CLI process
-// forever. The timer resets on every message, so it measures silence, not total time.
+// new turn supersedes the previous hold. This ceiling only catches work the tracker
+// cannot see (Monitor, ScheduleWakeup): a task the tracker still counts as running
+// keeps the hold, however long it is silent. The timer resets on every message, so
+// it measures silence, not total time.
 const BG_WAIT_CEILING_MS = 30 * 60 * 1000;
 
 const TOOLS_REQUIRING_INTERACTION = new Set(['AskUserQuestion', 'ExitPlanMode']);
@@ -1075,6 +1076,12 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     }
     idleReleaseTimer = setTimeout(() => {
       idleReleaseTimer = null;
+      // quests: a background task still running keeps the process: closing stdin kills it. On 6 Nov a silent
+      // `until grep ...; sleep` eval watcher died 30 min after its turn, and the chat waited on nothing.
+      if (backgroundWork.hasOutstanding(sessionKey())) {
+        scheduleRelease();
+        return;
+      }
       releasePromptStream();
     }, BG_WAIT_CEILING_MS);
     // Never let the hold keep the server process alive on its own.
