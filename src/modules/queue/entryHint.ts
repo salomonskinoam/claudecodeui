@@ -19,8 +19,10 @@ export function entryHint(e: QueueEntry, dot: ChatDot | undefined): string {
           : e.state === 'blocker' ? `Blocked${line ? `: ${line}` : ''}`
             : e.state === 'unclaimed' ? 'Ticket no chat has claimed'
               : e.live ? 'Idle: its last reply has no closing line' : 'No process';
+  // A chat waiting or blocked with no process: nothing runs in it, so nothing will wake it.
+  const asleep = !e.live && (e.state === 'waiting' || e.state === 'blocker') ? '. No process: nothing will wake it' : '';
   const where = e.placement === 'hold' ? 'On hold until its next activity. '
     : e.placement === 'archive' ? 'Archived until its next activity. ' : '';
   const seen = dot === 'done' ? 'Turn ended, not seen yet. ' : '';
-  return `${where}${seen}${why}`;
+  return `${where}${seen}${why}${asleep}`;
 }

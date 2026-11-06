@@ -24,6 +24,11 @@ describe('entryHint', () => {
     expect(entryHint(entry({ state: 'none', live: false, placement: 'archive' }), undefined)).toBe('Archived until its next activity. No process');
   });
 
+  it('says when a waiting chat has no process to wake it', () => {
+    expect(entryHint(entry({ state: 'waiting', live: false, closingLine: 'waiting for the debug run' }), undefined))
+      .toBe('Waits for something else, not you: the debug run. No process: nothing will wake it');
+  });
+
   it('says a chat Noam never wrote in is not started, whatever its last line', () => {
     expect(entryHint(entry({ state: 'done', started: false, closingLine: 'done read the notice' }), 'done'))
       .toBe('Turn ended, not seen yet. Not started: you have not written in it; it only ran on its own');

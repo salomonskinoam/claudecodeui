@@ -1127,7 +1127,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(300);
     console.log(JSON.stringify({
       linesAsExpected: JSON.stringify(shown) === JSON.stringify(expected), lines: shown.length, pending, active, unclaimed,
-      activeChats: activeKeys.length, expectedActive: view.filter((e) => e.live && !e.waitsForMe && e.placement === 'queue').length, runningLast,
+      activeChats: activeKeys.length, expectedActive: view.filter((e) => !e.waitsForMe && e.state !== 'unclaimed' && e.placement === 'queue').length, runningLast,
       openedUnclaimed: opened - shown.length, expectedUnclaimed: view.filter((e) => e.state === 'unclaimed' && e.placement === 'queue').length,
       doneEnabled, doneWhileTyped, viewLines: view.length,
     }));

@@ -9,9 +9,9 @@ import type { QueueEntry } from '@/modules/queue/types';
  *                      drawer open by default.
  * The chat on screen is placed like any other: being open never moves it (Noam, 6 Nov: "it's \"focused\" status
  * should not affect its queue or drawer association status at all").
- *   Active chats       every other chat with a process. The ones running come last: "they require no
+ *   Active chats       every other chat, with a process or without. The ones running come last: "they require no
  *                      attention by definition" (Noam, 3 Nov). Idle ones first, each half in queue order.
- *   On hold            the chats Noam put on hold, until they reply again.
+ *   On hold            the chats Noam put on hold, until their next activity.
  *   Tickets-Unclaimed  the tickets no chat claimed, in the order Noam drags.
  *   Archived           what Noam archived, until its chat does anything; the most recently archived first.
  * Noam, 28 Oct: "the philosophy is to filter for the user only chats that require attention. the rest is spam."
@@ -74,7 +74,9 @@ export function useQueueView(): QueueView {
   // Status alone decides the drawer; the chat on screen gets no place of its own (requirement 100). Put on hold,
   // it leaves the list and the forest while its tab stays open (2 Nov).
   const lines = rest.filter((e) => e.waitsForMe);
-  const open = rest.filter((e) => e.live && !lines.includes(e));
+  // Every chat that does not wait for Noam is an active chat, with a process or without: an entry must never sit
+  // in no drawer (6 Nov: a chat whose process had ended, "waiting for" an eval, was nowhere but in its tab).
+  const open = rest.filter((e) => e.state !== 'unclaimed' && !lines.includes(e));
   return {
     mode: current,
     lines,
