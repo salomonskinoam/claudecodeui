@@ -42,8 +42,6 @@ export type QueueEntry = QueueOrderEntry & {
   replyAt: string | null;
   /** The chat's last activity (epoch ms, 0 for none): its process's last status change, or its last reply. */
   activityAt: number;
-  /** Noam wrote in the chat at least once (transcripts.ts isUnstarted); a chat that only ran on its own never waits for him. */
-  started: boolean;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
   heldOutside: boolean;
   closingLine: string | null;
@@ -82,7 +80,6 @@ const chatFields = (c: Chat | null) => ({
   live: c?.process != null,
   replyAt: c?.closingLine?.at ?? null,
   activityAt: Math.max(c?.process?.statusUpdatedAt ?? 0, time(c?.closingLine?.at)),
-  started: c ? !isUnstarted(c.sid) : false,
 });
 
 /**
@@ -140,6 +137,10 @@ export function buildEntries(): QueueEntry[] {
   for (const c of chats.values()) {
     if (!(isOpen(c) || (c.closingLine && !c.finalized))) continue;
     if (ticketOf.has(c.sid)) continue;
+    // A chat Noam never wrote in (0 messages of his) is not in the queue at all (Noam, 6 Nov: "i said we dont want
+    // such chats in the queue. you should identifyu them by 0 user messages total"). Its first message of his
+    // brings it in.
+    if (isUnstarted(c.sid)) continue;
     const st = stateOf(c);
     entries.push({
       key: `chat:${c.sid}`, kind: 'chat', title: c.name, ticketTitle: null, url: null, number: null, parentKey: null, blocks: [],
@@ -152,6 +153,6 @@ export function buildEntries(): QueueEntry[] {
   const placements = readPlacements();
   return entries.map((e) => {
     const { where, at } = resolvePlacement(placements[e.key], e.replyAt ?? 'none', e.activityAt);
-    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), placement: where, placedAt: at, waitsForMe: where === 'queue' && (e.state === 'permission' || (waitsForMe(e) && (e.started || e.kind !== 'chat'))) };
+    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), placement: where, placedAt: at, waitsForMe: where === 'queue' && (e.state === 'permission' || waitsForMe(e)) };
   });
 }

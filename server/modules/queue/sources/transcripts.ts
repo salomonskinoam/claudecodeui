@@ -110,9 +110,8 @@ export function isNoamMessage(row: Record<string, any> | null): boolean {
 }
 
 /**
- * The chats Noam never wrote in: they only ran on their own (another chat's message, a hook). Not queue-worthy
- * yet: they never wait for him (Noam, 6 Nov: "chats that didn't start don't belong in pending, especially after
- * they just got a \"sdk changed\" message"). Only the transcripts read in full can be known so.
+ * The chats Noam never wrote in: they only ran on their own (another chat's message, a hook). Not in the queue
+ * at all (entries.ts). Only the transcripts read in full can be known so.
  */
 const unstarted = new Set<string>();
 export const isUnstarted = (sid: string): boolean => unstarted.has(sid);

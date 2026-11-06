@@ -43,7 +43,6 @@ export type QueueEntry = {
   /** The chat has a running process, whatever its state. */
   live: boolean;
   /** Noam wrote in the chat at least once; a chat that only ran on its own never waits for him. */
-  started: boolean;
   /** Where Noam put the entry, one flag: the queue, "On hold" (until the chat replies again) or "Archived". */
   placement: Where;
   /** When it was put on hold or archived (epoch ms); null in the queue. */
