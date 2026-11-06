@@ -1085,6 +1085,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         scheduleRelease();
         return;
       }
+      console.log(`[quests] release of ${sessionKey()}: the 30 min silence ceiling; outstanding ${backgroundWork.hasOutstanding(sessionKey())}`);
       releasePromptStream();
     }, BG_WAIT_CEILING_MS);
     // Never let the hold keep the server process alive on its own.
@@ -1466,6 +1467,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         && !backgroundWork.hasOutstanding(sessionKey())
       ) {
         heldForBackgroundWork = false;
+        console.log(`[quests] release of ${sessionKey()}: its last background task was stopped; outstanding ${backgroundWork.hasOutstanding(sessionKey())}`);
         releasePromptStream();
       }
 
@@ -1532,6 +1534,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
           // Either nothing was backgrounded, or the background work just
           // reported in — let the CLI exit now, as it always has.
           heldForBackgroundWork = false;
+          console.log(`[quests] release of ${sessionKey()}: the turn ended with nothing outstanding; outstanding ${backgroundWork.hasOutstanding(sessionKey())}`);
           releasePromptStream();
         }
       } else if (idleReleaseTimer) {
@@ -1631,6 +1634,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       clearTimeout(idleReleaseTimer);
       idleReleaseTimer = null;
     }
+    console.log(`[quests] release of ${sessionKey()}: the message loop ended (process exit, abort or error); outstanding ${backgroundWork.hasOutstanding(sessionKey())}`);
     releasePromptStream();
   }
 }
