@@ -59,6 +59,8 @@ type ChatInterfaceProps = {
   onShowAllTasks?: (() => void) | null;
   /** quests: a new chat's own draft scope (see useChatComposerState). */
   newChatScope?: string;
+  /** quests: send the new chat's draft at once (see useChatComposerState). */
+  autoSubmit?: boolean;
   /** quests: drawn in place of the empty chat's start screen until the first message (a ticket's page). */
   intro?: React.ReactNode;
 };
@@ -86,6 +88,7 @@ function ChatInterface({
   newSessionTrigger,
   onShowAllTasks,
   newChatScope,
+  autoSubmit,
   intro,
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
@@ -257,6 +260,7 @@ function ChatInterface({
     cancelEditMessage,
   } = useChatComposerState({
     newChatScope,
+    autoSubmit,
     selectedProject,
     selectedSession,
     currentSessionId,

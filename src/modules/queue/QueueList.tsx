@@ -8,7 +8,7 @@ import QueueToolbar from '@/modules/queue/QueueToolbar';
 import RenameDialog from '@/modules/queue/RenameDialog';
 import TabContextMenu from '@/modules/queue/TabContextMenu';
 import { setQueueOpener } from '@/modules/queue/queueNavigation';
-import { placeQueueEntry, useQueue } from '@/modules/queue/queueStore';
+import { placeQueueEntry, requestAutoClaim, useQueue } from '@/modules/queue/queueStore';
 import { useQueueView } from '@/modules/queue/queueView';
 import TicketGroups, { TicketGroupMenu } from '@/modules/queue/TicketGroups';
 import type { QueueEntry } from '@/modules/queue/types';
@@ -71,6 +71,7 @@ export default function QueueList({ filter, onNewSession }: QueueListProps) {
         : e.number !== null && e.state === 'unclaimed' ? (event) => { event.preventDefault(); setTicketMenu({ target: { ticket: e.number as number }, x: event.clientX, y: event.clientY }); } : undefined}
       onRename={e.sessionId ? () => setRenaming(e) : undefined}
       onGroup={e.number !== null && e.state === 'unclaimed' ? (event) => setTicketMenu({ target: { ticket: e.number as number }, x: event.clientX, y: event.clientY }) : undefined}
+      onClaim={e.number !== null && e.state === 'unclaimed' ? (event) => { requestAutoClaim(e.number as number); open(e, event); } : undefined}
     />
   );
   const groups: Array<[string, QueueEntry[]]> = (mode === 'focus'

@@ -6,7 +6,7 @@ import { useWebSocket } from '@/shared/context/WebSocketContext';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import type { Project, SessionEstablishedContext } from '@/shared/types';
 import { ChatInterface, Markdown } from '@/modules/chat';
-import { claimTicketForChat, useQueue } from '@/modules/queue/queueStore';
+import { claimTicketForChat, takeAutoClaim, useQueue } from '@/modules/queue/queueStore';
 
 type TicketPage = { number: number; title: string; url: string; labels: string[]; body: string; createdAt: string };
 
@@ -55,6 +55,10 @@ function TicketView({ number, project, onStarted }: {
     preset.current = number;
     if (!readDraftText(scope)) writeDraftText(scope, `claim ticket #${number} ${url} `);
   }
+  // The line's "Claim this ticket" button: the prompt goes out at once (Noam, 6 Nov: "a button ... to \"claim this
+  // ticket\" which will open a chat, tell it \"claim ticket #<number>\" and launch").
+  const autoRef = useRef(new Set<number>());
+  if (takeAutoClaim(number)) autoRef.current.add(number);
 
   const page = (
     <div className="pb-8 pl-12 pr-8 pt-4" data-quests-ticket={number}>
@@ -97,6 +101,7 @@ function TicketView({ number, project, onStarted }: {
         showThinking={showThinking}
         sendByCtrlEnter={sendByCtrlEnter}
         newChatScope={scope}
+        autoSubmit={autoRef.current.has(number)}
         intro={page}
       />
     </div>

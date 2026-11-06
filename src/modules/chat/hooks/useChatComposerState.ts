@@ -37,6 +37,8 @@ import { openNextInQueue } from '@/modules/queue';
 type UseChatComposerStateArgs = {
   /** quests: the draft scope of a chat not sent yet, instead of its project's (a ticket's chat: `ticket:<n>`). */
   newChatScope?: string;
+  /** quests: send the draft as soon as the composer is up (a ticket's "Claim this ticket" button). */
+  autoSubmit?: boolean;
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   currentSessionId: string | null;
@@ -175,6 +177,7 @@ const SAFARI_IME_RACE_WINDOW_MS = 30;
 
 export function useChatComposerState({
   newChatScope,
+  autoSubmit,
   selectedProject,
   selectedSession,
   currentSessionId,
@@ -1025,6 +1028,13 @@ export function useChatComposerState({
   useEffect(() => {
     handleSubmitRef.current = handleSubmit;
   }, [handleSubmit]);
+
+  // Sent once, after this render's effects set the refs handleSubmit reads.
+  useEffect(() => {
+    if (!autoSubmit) return undefined;
+    const timer = setTimeout(() => void handleSubmitRef.current?.(createFakeSubmitEvent()), 0);
+    return () => clearTimeout(timer);
+  }, [autoSubmit]);
 
   // The VPS dispatcher owns sending. While the card is visible, periodically
   // reconcile only its removal so the UI notices when the server claims it.

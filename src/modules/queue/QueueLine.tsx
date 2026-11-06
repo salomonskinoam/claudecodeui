@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { Archive, CircleCheck, FolderInput, ListEnd, Pause, Pencil, Pin, SquareArrowOutUpRight } from 'lucide-react';
+import { Archive, CircleCheck, FolderInput, ListEnd, Pause, Pencil, Pin, Play, SquareArrowOutUpRight } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import EntryDot from '@/modules/queue/EntryDot';
@@ -39,6 +39,8 @@ type QueueLineProps = {
   onRename?: () => void;
   /** An unclaimed ticket's folder button, in the pencil's column: the menu of groups to put it in. */
   onGroup?: (event: MouseEvent) => void;
+  /** An unclaimed ticket's play button, in the pin's column: a new chat claims it, sent at once. */
+  onClaim?: (event: MouseEvent) => void;
 };
 
 /**
@@ -47,7 +49,7 @@ type QueueLineProps = {
  */
 const ICONS: Record<Where, typeof Archive> = { queue: ListEnd, hold: Pause, archive: Archive };
 
-export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onPlace, onMenu, onRename, onGroup }: QueueLineProps) {
+export default function QueueLine({ entry: e, look, blinking, latched, separator, marker, drag, onOpen, onCloseTicket, onPlace, onMenu, onRename, onGroup, onClaim }: QueueLineProps) {
   const dots = useChatDots();
   const dot = e.sessionId ? dots[e.sessionId] : undefined;
   return (
@@ -101,6 +103,12 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
             data-quests-pin={latched ? 'pinned' : 'pin'}
             onClick={(event) => { event.stopPropagation(); void setQueueLatch(latched ? null : e.key); }}>
             <Pin className={cn('h-4 w-4', latched && 'fill-current')} />
+          </button>
+        )}
+        {!e.sessionId && onClaim && (
+          <button type="button" title="Claim this ticket" className={BUTTON}
+            data-quests-line="claim" onClick={(event) => { event.stopPropagation(); onClaim(event); }}>
+            <Play className="h-4 w-4" />
           </button>
         )}
       </span>

@@ -125,6 +125,12 @@ export const useTicketFolders = (): Record<number, string> => useSyncExternalSto
 /** A chat started from a ticket's tab: the queue counts it as the ticket's at once, before its claim reaches GitHub. */
 export const claimTicketForChat = (number: number, sessionId: string) => request('POST', '/claim', { number, sessionId });
 
+// The tickets whose "Claim this ticket" button was pressed: their tab sends its preset prompt once, at once.
+const autoClaims = new Set<number>();
+export const requestAutoClaim = (number: number) => { autoClaims.add(number); };
+/** True once per press: the ticket's tab takes it. */
+export const takeAutoClaim = (number: number): boolean => autoClaims.delete(number);
+
 /**
  * A chat's turn just ended (the page heard it): the server reads that chat's transcript and the live processes
  * now, and the queue comes back with it. The finish sound waits for this, so the sound and the queue's change
