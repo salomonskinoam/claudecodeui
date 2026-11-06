@@ -552,7 +552,7 @@ export function useChatComposerState({
     // moment, so the browser clamps its scrollTop to the shorter end, and once the box is back the view at the
     // end sits one box height up (measured: 155 px with a six-line draft). The pane's scroll is kept through
     // the measurement.
-    const pane = document.querySelector<HTMLElement>('.chat-messages-pane');
+    const pane = target.closest('[data-chat-view]')?.querySelector<HTMLElement>('.chat-messages-pane');
     const paneTop = pane?.scrollTop ?? 0;
     target.style.height = 'auto';
     const nextHeight = Math.max(22, target.scrollHeight);

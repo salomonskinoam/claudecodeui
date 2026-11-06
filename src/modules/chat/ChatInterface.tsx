@@ -37,6 +37,11 @@ import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 
 type ChatInterfaceProps = {
   isActive: boolean;
+  /**
+   * quests: the chat of a left tab that is not shown, kept built for a fast switch (keptChats.ts). It keeps its
+   * rows up to date but makes no sound, takes no keys, and opens no tab.
+   */
+  isHiddenTab?: boolean;
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   ws: WebSocket | null;
@@ -61,6 +66,7 @@ type ChatInterfaceProps = {
  */
 function ChatInterface({
   isActive,
+  isHiddenTab = false,
   selectedProject,
   selectedSession,
   ws,
@@ -169,6 +175,7 @@ function ChatInterface({
     requestLatestMessages,
   } = useChatSessionState({
     isActive,
+    isHiddenTab,
     selectedProject,
     selectedSession,
     ws,
@@ -275,16 +282,17 @@ function ChatInterface({
   // missed live events, and re-attaches a still-running stream to this socket.
   const handleWebSocketReconnect = useCallback(async () => {
     if (!selectedProject || !selectedSession) return;
-    await requestLatestMessages(selectedSession.id, isActive);
+    await requestLatestMessages(selectedSession.id, isActive || isHiddenTab);
     statusCheckSentAtRef.current.set(selectedSession.id, Date.now());
     sendMessage({
       type: 'chat.subscribe',
       sessions: [subscribeTarget(selectedSession.id, lastSeqRef.current.get(selectedSession.id))],
     });
-  }, [isActive, requestLatestMessages, selectedProject, selectedSession, sendMessage]);
+  }, [isActive, isHiddenTab, requestLatestMessages, selectedProject, selectedSession, sendMessage]);
 
   useChatRealtimeHandlers({
     isActive,
+    isHiddenTab,
     subscribe,
     provider,
     selectedSession,
@@ -324,10 +332,10 @@ function ChatInterface({
     });
   }, [setInput, textareaRef]);
 
-  usePaletteOpsRegister({ insertComposerText });
+  usePaletteOpsRegister({ insertComposerText: isHiddenTab ? undefined : insertComposerText });
 
   useEffect(() => {
-    if (!canAbortSession) {
+    if (!canAbortSession || isHiddenTab) {
       return;
     }
 
@@ -344,7 +352,7 @@ function ChatInterface({
     return () => {
       document.removeEventListener('keydown', handleGlobalEscape, { capture: true });
     };
-  }, [canAbortSession, handleAbortSession]);
+  }, [canAbortSession, handleAbortSession, isHiddenTab]);
 
   useEffect(() => {
     return () => {
@@ -431,7 +439,7 @@ function ChatInterface({
   // overlapping the last message.
   const hasActivityIndicator = Boolean(sessionActivity && pendingPermissionRequests.length === 0);
   // quests: a plan the chat writes opens as its own tab next to this chat's tab, as in Cursor.
-  usePlanTabs(selectedSession?.id || currentSessionId, chatMessages, isLoadingSessionMessages);
+  usePlanTabs(isHiddenTab ? null : selectedSession?.id || currentSessionId, chatMessages, isLoadingSessionMessages);
 
   const selectedProviderLabel =
     provider === 'cursor'

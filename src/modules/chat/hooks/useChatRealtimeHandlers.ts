@@ -21,6 +21,8 @@ const hasActionablePermissionRequests = (requests: Array<{ toolName?: unknown }>
 
 type UseChatRealtimeHandlersArgs = {
   isActive: boolean;
+  /** A kept, hidden left tab (keptChats.ts): its rows stay current, but it makes no sound. */
+  isHiddenTab?: boolean;
   subscribe: (listener: (event: ServerEvent) => void) => () => void;
   provider: LLMProvider;
   selectedSession: ProjectSession | null;
@@ -64,6 +66,7 @@ type UseChatRealtimeHandlersArgs = {
  */
 export function useChatRealtimeHandlers({
   isActive,
+  isHiddenTab = false,
   subscribe,
   provider,
   selectedSession,
@@ -91,6 +94,8 @@ export function useChatRealtimeHandlers({
   activeViewSessionIdRef.current = selectedSession?.id || currentSessionId || null;
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
+  const isHiddenTabRef = useRef(isHiddenTab);
+  isHiddenTabRef.current = isHiddenTab;
   // quests: the streamed reply so far, per session. One buffer for every session (the old single string) mixed
   // two chats streaming at once, and a hidden chat's deltas were appended as one row each.
   const streamBySession = useRef(new Map<string, string>());
@@ -166,7 +171,7 @@ export function useChatRealtimeHandlers({
             pendingPermissionRequestsRef.current = nextPendingPermissionRequests;
             setPendingPermissionRequests(nextPendingPermissionRequests);
 
-            if (hasPendingActionablePermissionRequests && !hadActionablePermissionRequests) {
+            if (hasPendingActionablePermissionRequests && !hadActionablePermissionRequests && !isHiddenTabRef.current) {
               void playNotificationSound();
             }
           }
@@ -293,7 +298,7 @@ export function useChatRealtimeHandlers({
           }
 
           // Celebrate only successful runs (failed runs end with success: false).
-          if (msg.success !== false) {
+          if (msg.success !== false && !isHiddenTabRef.current) {
             showCompletionTitleIndicator();
             void playChatCompletionSound();
           }
@@ -302,7 +307,7 @@ export function useChatRealtimeHandlers({
           // before the first send), so the only follow-up is syncing the
           // viewed conversation with the now-persisted transcript.
           if (sid && sid === activeViewSessionId) {
-            void requestLatestMessages(sid, isActiveRef.current);
+            void requestLatestMessages(sid, isActiveRef.current || isHiddenTabRef.current);
           }
 
           break;
@@ -314,7 +319,7 @@ export function useChatRealtimeHandlers({
 
         case 'permission_request': {
           if (!msg.requestId) break;
-          if (isActionablePermissionRequest({ toolName: msg.toolName })) {
+          if (isActionablePermissionRequest({ toolName: msg.toolName }) && !isHiddenTabRef.current) {
             void playNotificationSound();
           }
 
@@ -389,7 +394,7 @@ export function useChatRealtimeHandlers({
           // turn's `complete` triggers. Without it the result waited for a
           // manual reload.
           if (sid && sid === activeViewSessionId && msg.event === 'notification') {
-            void requestLatestMessages(sid, isActiveRef.current);
+            void requestLatestMessages(sid, isActiveRef.current || isHiddenTabRef.current);
           }
           break;
         }

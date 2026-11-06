@@ -94,6 +94,8 @@ export function visibleCountToReveal(total: number, index: number, current: numb
 
 type UseChatSessionStateArgs = {
   isActive: boolean;
+  /** A kept, hidden left tab (keptChats.ts): it loads and keeps its rows current, so showing it costs nothing. */
+  isHiddenTab?: boolean;
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   ws: WebSocket | null;
@@ -209,6 +211,7 @@ function findAnchorRow(pane: HTMLElement): { rowId: string; offset: number } | n
 
 export function useChatSessionState({
   isActive,
+  isHiddenTab = false,
   selectedProject,
   selectedSession,
   ws,
@@ -370,6 +373,10 @@ export function useChatSessionState({
   const activeSessionIdRef = useRef(activeSessionId);
   isActiveRef.current = isActive;
   activeSessionIdRef.current = activeSessionId;
+  // The shown chat and the kept hidden ones keep their rows current (reads, re-renders); only the shown one scrolls.
+  const keepsRows = isActive || isHiddenTab;
+  const keepsRowsRef = useRef(keepsRows);
+  keepsRowsRef.current = keepsRows;
 
   const latestRefreshExecutorRef = useRef<(sessionId: string) => Promise<boolean | void>>(
     async () => true,
@@ -378,7 +385,7 @@ export function useChatSessionState({
     const result = await sessionStore.refreshLatestFromServer(sessionId, {
       limit: SESSION_MESSAGES_PAGE_SIZE,
       canRequest: () => (
-        isActiveRef.current
+        keepsRowsRef.current
         && activeSessionIdRef.current === sessionId
       ),
     });
@@ -398,11 +405,11 @@ export function useChatSessionState({
   if (!refreshCoordinatorRef.current) {
     refreshCoordinatorRef.current = createMessageHistoryRefreshCoordinator(
       (sessionId) => latestRefreshExecutorRef.current(sessionId),
-      (sessionId) => isActiveRef.current && activeSessionIdRef.current === sessionId,
+      (sessionId) => keepsRowsRef.current && activeSessionIdRef.current === sessionId,
     );
   }
 
-  const requestLatestMessages = useCallback((sessionId: string, allowNetwork = isActiveRef.current) => (
+  const requestLatestMessages = useCallback((sessionId: string, allowNetwork = keepsRowsRef.current) => (
     refreshCoordinatorRef.current?.request(sessionId, allowNetwork) ?? Promise.resolve()
   ), []);
 
@@ -414,7 +421,7 @@ export function useChatSessionState({
 
   // Hidden Chat tabs keep collecting realtime rows without re-rendering the
   // CSS-hidden tree. Activation itself renders once and reads the latest cache.
-  const activeSessionForStore = isActive ? activeSessionId : null;
+  const activeSessionForStore = keepsRows ? activeSessionId : null;
   const prevActiveForStoreRef = useRef<string | null>(null);
   if (activeSessionForStore !== prevActiveForStoreRef.current) {
     prevActiveForStoreRef.current = activeSessionForStore;
@@ -765,7 +772,7 @@ export function useChatSessionState({
       return;
     }
 
-    if (!isActive) {
+    if (!keepsRows) {
       setIsLoadingSessionMessages(false);
       return;
     }
@@ -820,7 +827,7 @@ export function useChatSessionState({
       limit: SESSION_MESSAGES_PAGE_SIZE,
       offset: 0,
       canRequest: () => (
-        isActiveRef.current
+        keepsRowsRef.current
         && activeSessionIdRef.current === selectedSessionId
       ),
     }).then(slot => {
@@ -837,7 +844,7 @@ export function useChatSessionState({
       setIsLoadingSessionMessages(false);
     });
   }, [
-    isActive,
+    keepsRows,
     resetStreamingState,
     requestLatestMessages,
     selectedProject,

@@ -282,6 +282,10 @@ function ChatMessagesPane({
   selectedProject,
 }: ChatMessagesPaneProps) {
   const { t } = useTranslation('chat');
+  // quests: rows read only the project's id and path. A new project object with the same two (a sidebar refresh,
+  // a tab switch) must not redraw every row (measured: most of a switch's rendering).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rowProject = useMemo(() => selectedProject, [selectedProject.projectId, selectedProject.fullPath]);
   // quests: every loaded message stays mounted. Unmounting rows off screen swapped them for estimated-height
   // placeholders, so the content height changed while scrolling and the view jumped.
   const lazyRows = null;
@@ -559,7 +563,7 @@ function ChatMessagesPane({
                       onGrantToolPermission={onGrantToolPermission}
                       showRawParameters={showRawParameters}
                       showThinking={showThinking}
-                      selectedProject={selectedProject}
+                      selectedProject={rowProject}
                       provider={provider}
                     />
                   </LazyMessageRow>
@@ -586,7 +590,7 @@ function ChatMessagesPane({
                     onGrantToolPermission={onGrantToolPermission}
                     showRawParameters={showRawParameters}
                     showThinking={showThinking}
-                    selectedProject={selectedProject}
+                    selectedProject={rowProject}
                     provider={provider}
                     onEditMessage={onEditMessage}
                     onForkFromMessage={onForkFromMessage}

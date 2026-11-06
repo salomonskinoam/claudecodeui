@@ -15,6 +15,9 @@ import { EditorSidebar, useEditorSidebar } from '@/modules/code-editor';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
+import { keepChats, nextToPreload, preloadChat, type KeptChat } from '@/modules/project-workspace/keptChats';
+import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
+import { isEmbedded, usePanes } from '@/shared/hooks/useSplitPane';
 
 type WorkspaceMainProps = {
   selectedProject: Project | null;
@@ -133,6 +136,31 @@ function WorkspaceMain({
   // rewriting the whole palette registry on every render.
   usePaletteOpsRegister({ openFile, openFileInEditor, openDirectory });
 
+  // quests: the chats of the open left tabs stay built; a switch shows one and hides the rest (keptChats.ts).
+  const { left: openTabs } = usePanes();
+  // Derived during render (React's pattern for state that follows props), so the switch draws in one pass.
+  const [kept, setKept] = useState<KeptChat[]>([]);
+  const [keptFor, setKeptFor] = useState<unknown[]>([]);
+  if (keptFor[0] !== selectedProject || keptFor[1] !== selectedSession || keptFor[2] !== openTabs) {
+    setKeptFor([selectedProject, selectedSession, openTabs]);
+    setKept(keepChats(kept, selectedProject, selectedSession, openTabs, Date.now()));
+  }
+  // The other open tabs are built in the background, one every 1.5 s once the shown chat is drawn (each build
+  // holds the page for a moment). The right pane's page builds nothing: its tabs are the left pane's.
+  const { projects } = useProjectSidebarState().sidebarSharedProps;
+  const nextId = isEmbedded ? undefined : nextToPreload(kept, openTabs, projects)?.session.id;
+  useEffect(() => {
+    if (!nextId) return undefined;
+    const timer = window.setTimeout(() => setKept((prev) => {
+      const chat = nextToPreload(prev, openTabs, projects);
+      return chat ? preloadChat(prev, chat.project, chat.session) : prev;
+    }), 1500);
+    return () => window.clearTimeout(timer);
+    // The id alone restarts the wait: a sidebar refresh (a new projects array) must not postpone it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextId, selectedSession?.id]);
+  const shownKey = kept.reduce<KeptChat | null>((a, k) => (a && a.shownAt >= k.shownAt ? a : k), null)?.key;
+
   if (isLoading) {
     return <WorkspaceStateView mode="loading" isMobile={isMobile} onMenuClick={onMenuClick} />;
   }
@@ -160,28 +188,40 @@ function WorkspaceMain({
       )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className={`flex min-h-0 min-w-[200px] flex-col overflow-hidden ${editorExpanded ? 'hidden' : ''} flex-1`}>
-          <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
-            <WorkspaceErrorBoundary showDetails>
-              <ChatInterface
-                isActive={activeTab === 'chat'}
-                selectedProject={selectedProject}
-                selectedSession={selectedSession}
-                ws={ws}
-                sendMessage={sendMessage}
-                onFileOpen={handleFileOpen}
-                onNavigateToSession={onNavigateToSession}
-                onSessionEstablished={onSessionEstablished}
-                onShowSettings={onShowSettings}
-                showRawParameters={showRawParameters}
-                showThinking={showThinking}
-                sendByCtrlEnter={sendByCtrlEnter}
-                externalMessageUpdate={externalMessageUpdate}
-                newSessionTrigger={newSessionTrigger}
-                onShowAllTasks={tasksEnabled ? showAllTasks : null}
-              />
-            </WorkspaceErrorBoundary>
-          </div>
+        <div className={`relative flex min-h-0 min-w-[200px] flex-col overflow-hidden ${editorExpanded ? 'hidden' : ''} flex-1`}>
+          {kept.map((k) => (
+            <div
+              key={k.key}
+              data-chat-view={k.key === shownKey ? 'shown' : 'kept'}
+              // Every view keeps the same box and stays laid out; a hidden one is only moved out of the pane by a
+              // transform, so showing it again needs no new layout (measured on a 156-row chat, headless: under
+              // 1 ms; display none 130 ms, the inert attribute 60 ms, visibility hidden 30 ms).
+              // ponytail: a hidden view can still take focus by the Tab key; inert if that ever matters.
+              className="absolute inset-0"
+              style={activeTab === 'chat' && k.key === shownKey ? undefined : { transform: 'translateX(-200%)' }}
+            >
+              <WorkspaceErrorBoundary showDetails>
+                <ChatInterface
+                  isActive={activeTab === 'chat' && k.key === shownKey}
+                  isHiddenTab={k.key !== shownKey}
+                  selectedProject={k.project}
+                  selectedSession={k.session}
+                  ws={ws}
+                  sendMessage={sendMessage}
+                  onFileOpen={handleFileOpen}
+                  onNavigateToSession={onNavigateToSession}
+                  onSessionEstablished={onSessionEstablished}
+                  onShowSettings={onShowSettings}
+                  showRawParameters={showRawParameters}
+                  showThinking={showThinking}
+                  sendByCtrlEnter={sendByCtrlEnter}
+                  externalMessageUpdate={externalMessageUpdate}
+                  newSessionTrigger={newSessionTrigger}
+                  onShowAllTasks={tasksEnabled ? showAllTasks : null}
+                />
+              </WorkspaceErrorBoundary>
+            </div>
+          ))}
 
           {activeTab === 'files' && (
             <div className="h-full overflow-hidden">

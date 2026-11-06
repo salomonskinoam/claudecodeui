@@ -16,7 +16,7 @@ export const TOOL_LINE = ':is(.chat-message.tool, .chat-message.assistant:not(:h
 
 /** Opens the chat's last tool row and scrolls it into view: what a click on the running step shows. */
 export function revealLastToolRow(): void {
-  const rows = document.querySelectorAll<HTMLElement>(`.chat-messages-pane ${TOOL_LINE}`);
+  const rows = document.querySelectorAll<HTMLElement>(`[data-chat-view="shown"] .chat-messages-pane ${TOOL_LINE}`);
   const row = rows[rows.length - 1];
   if (!row) return;
   if (row.dataset.rowId) setRowOpen(row.dataset.rowId, true);

@@ -24,6 +24,7 @@
 //           color on the mode button (the text must be readable in every mode)
 //   back    Back is disabled at start; Next opens the next chat and enables Back; Back returns, is disabled again,
 //           and the opened chat's line has the dot and blink it had before Next
+//   preload after a reload, the other open tab is built in the background; ms per switch (click to 2nd frame)
 //   names   every open tab whose chat has a line in the list shows the same name as that line
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
 //           panes, prints the stored layout after each drag. Restores no layout: use a fresh browser profile.
@@ -34,7 +35,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit', 'modecolors', 'names'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit', 'modecolors', 'names', 'preload'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -52,7 +53,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   page.on('pageerror', (error) => console.log('page error:', (error.stack || error.message).slice(0, 700)));
   await page.goto(check === 'plan' ? 'http://127.0.0.1:3001/' : `http://127.0.0.1:3001/session/${sessionId}`);
   await page.waitForTimeout(6000);
-  const pane = page.locator('.chat-messages-pane');
+  const pane = page.locator('[data-chat-view="shown"] .chat-messages-pane');
 
   if (check === 'live') {
     let previous = '';
@@ -237,7 +238,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     }));
     const second = after.view.find((k) => k !== root && after.entries.find((e) => e.key === k).rootKey === k
       && after.entries.find((e) => e.key === k).state !== 'permission');
-    await mouseDrag(second, page.locator('.chat-messages-pane'), 200);
+    await mouseDrag(second, page.locator('[data-chat-view="shown"] .chat-messages-pane'), 200);
     console.log(JSON.stringify({ releasedOutside: second, unchanged: JSON.stringify((await apiQueue()).order) === JSON.stringify(after.order) }));
     await put('/order', { order: before.order });
     console.log(JSON.stringify({ restored: JSON.stringify((await apiQueue()).order) === JSON.stringify(before.order) }));
@@ -422,7 +423,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // the chat), and the marked row's place is measured again 4 s later.
     const jsonl = new Database(path.join(os.homedir(), '.cloudcli', 'auth.db'), { readonly: true })
       .prepare('select jsonl_path from sessions where session_id = ?').get(sessionId)?.jsonl_path;
-    await page.locator('.chat-messages-pane .chat-message').first().waitFor({ timeout: 40000 }).catch(() => undefined);
+    await page.locator('[data-chat-view="shown"] .chat-messages-pane .chat-message').first().waitFor({ timeout: 40000 }).catch(() => undefined);
     await page.waitForTimeout(2000);
     await pane.evaluate((p) => { p.scrollTop = Math.round(p.scrollHeight * 0.5); });
     await page.waitForTimeout(2500);
@@ -454,7 +455,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // At the bottom of a long chat, typing one character into the input box must not move the view. The pane is
     // scrolled to its end, the last row in view is marked, one character is typed, and the row's place and the
     // pane's scrollTop are measured again; the character is then deleted.
-    await page.locator('.chat-messages-pane .chat-message').first().waitFor({ timeout: 40000 }).catch(() => undefined);
+    await page.locator('[data-chat-view="shown"] .chat-messages-pane .chat-message').first().waitFor({ timeout: 40000 }).catch(() => undefined);
     await page.waitForTimeout(2000);
     await pane.evaluate((p) => { p.scrollTop = p.scrollHeight; });
     await page.waitForTimeout(1500);
@@ -542,7 +543,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   if (check === 'dupes') {
     // Rows shown twice: the top-level rows (a lazy row's wrapper and the row inside both carry the attributes,
     // so nested ones are left out), grouped by row id and by text head. Expected: no group by id.
-    const rows = await page.locator('.chat-messages-pane > div > div > [data-message-timestamp]').evaluateAll((ns) => ns.map((n) => ({ ts: n.getAttribute('data-message-timestamp'), id: n.getAttribute('data-row-id') || '', text: n.textContent.replace(/\s+/g, ' ').trim().slice(0, 70) })));
+    const rows = await page.locator('[data-chat-view="shown"] .chat-messages-pane > div > div > [data-message-timestamp]').evaluateAll((ns) => ns.map((n) => ({ ts: n.getAttribute('data-message-timestamp'), id: n.getAttribute('data-row-id') || '', text: n.textContent.replace(/\s+/g, ' ').trim().slice(0, 70) })));
     const group = (key) => { const by = new Map(); for (const r of rows) by.set(r[key], [...(by.get(r[key]) || []), r]); return [...by.values()].filter((g) => g.length > 1); };
     const byId = group('id');
     const byText = group('text');
@@ -553,7 +554,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // The chat view is a ledger (requirement 52): the rows drawn, by id, in order; then 90 s of the chat working
     // (run it while the chat answers in Cursor); then again. Every earlier id must still be there, in the same
     // relative order, each once, and the new ids only at the ends.
-    const readIds = () => page.locator('.chat-messages-pane > div > div > [data-row-id]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id')));
+    const readIds = () => page.locator('[data-chat-view="shown"] .chat-messages-pane > div > div > [data-row-id]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id')));
     const before = await readIds();
     await page.waitForTimeout(90000);
     const after = await readIds();
@@ -572,11 +573,11 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // The ledger is persisted per viewer: the rows, which tool lines are open and which folds are closed must be
     // the same across a reload. The check opens the last two collapsed tool lines first, so there is state to keep.
     const read = async () => ({
-      ids: await page.locator('.chat-messages-pane > div > div > [data-row-id]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id'))),
+      ids: await page.locator('[data-chat-view="shown"] .chat-messages-pane > div > div > [data-row-id]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id'))),
       open: await page.locator('.chat-message.qt-open').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id'))),
       folds: await page.locator('[data-quests-fold]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-quests-fold'))),
     });
-    const lines = page.locator('.chat-messages-pane > div > div > .chat-message:not(.qt-open):not(.user)');
+    const lines = page.locator('[data-chat-view="shown"] .chat-messages-pane > div > div > .chat-message:not(.qt-open):not(.user)');
     const n = await lines.count();
     let clicked = 0;
     for (let i = n - 1; i >= 0 && clicked < 2; i -= 1) {
@@ -590,7 +591,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     await page.waitForTimeout(1500);
     const before = await read();
     await page.reload();
-    await page.locator('.chat-messages-pane [data-row-id]').first().waitFor({ timeout: 20000 }).catch(() => undefined);
+    await page.locator('[data-chat-view="shown"] .chat-messages-pane [data-row-id]').first().waitFor({ timeout: 20000 }).catch(() => undefined);
     await page.waitForTimeout(3000);
     const after = await read();
     const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -602,7 +603,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const read = async () => ({
       folds: await page.locator('[data-quests-fold]').evaluateAll((ns) => ns.map((n) => n.textContent.trim().slice(0, 80))),
       replies: await page.locator('.chat-message.assistant, [data-message-timestamp] .prose').count(),
-      rows: await page.locator('.chat-messages-pane > div > div > [data-message-timestamp]').count(),
+      rows: await page.locator('[data-chat-view="shown"] .chat-messages-pane > div > div > [data-message-timestamp]').count(),
       tails: await page.locator('[data-message-timestamp] .prose').evaluateAll((ns) => ns.slice(-6).map((n) => n.textContent.replace(/\s+/g, ' ').trim().slice(-110))),
     });
     const before = await read();
@@ -614,7 +615,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
 
   if (check === 'peek') {
     // The pane's own message objects (the last 16), read off the React fiber: what the fold rule sees.
-    const rows = await page.locator('.chat-messages-pane').evaluate((pane) => {
+    const rows = await page.locator('[data-chat-view="shown"] .chat-messages-pane').evaluate((pane) => {
       const key = Object.keys(pane).find((k) => k.startsWith('__reactFiber'));
       let fiber = key ? pane[key] : null;
       while (fiber && !(fiber.memoizedProps && Array.isArray(fiber.memoizedProps.visibleMessages))) fiber = fiber.return;
@@ -638,9 +639,9 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // Rows that render nothing but a separator: which messages they are (read off the React fiber of each row).
     // WAIT_MS (default 4000) lets a live chat stream rows first: the empties come with the live stream.
     await page.waitForTimeout(Number(process.env.WAIT_MS || 4000));
-    const rows = await page.locator('.chat-messages-pane').evaluate((pane) => {
+    const rows = await page.locator('[data-chat-view="shown"] .chat-messages-pane').evaluate((pane) => {
       const out = [];
-      for (const row of pane.querySelectorAll('.chat-messages-pane > div > div > [data-message-timestamp]')) {
+      for (const row of pane.querySelectorAll('[data-chat-view="shown"] .chat-messages-pane > div > div > [data-message-timestamp]')) {
         if (row.textContent.trim() !== '') continue;
         const key = Object.keys(row).find((k) => k.startsWith('__reactFiber'));
         let fiber = key ? row[key] : null;
@@ -669,7 +670,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   if (check === 'tailrows') {
     // The last rows of the transcript as drawn: height, text head, and the message behind each (off the React fiber).
     await page.waitForTimeout(Number(process.env.WAIT_MS || 3000));
-    const rows = await page.locator('.chat-messages-pane').evaluate((pane) => {
+    const rows = await page.locator('[data-chat-view="shown"] .chat-messages-pane').evaluate((pane) => {
       const all = [...pane.querySelectorAll('[data-message-timestamp]')].filter((r) => !r.parentElement.closest('[data-message-timestamp]'));
       return all.slice(-10).map((row) => {
         const key = Object.keys(row).find((k) => k.startsWith('__reactFiber'));
@@ -860,7 +861,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     const results = [];
     // Long main-thread tasks (over 50 ms) per click: the page is frozen while they run.
     await page.evaluate(() => { window.__long = []; new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long.push(Math.round(e.duration)); }).observe({ type: 'longtask', buffered: false }); });
-    const ids = () => page.locator('.chat-messages-pane [data-row-id]').evaluateAll((ns) => ns.map((n) => n.dataset.rowId));
+    const ids = () => page.locator('[data-chat-view="shown"] .chat-messages-pane [data-row-id]').evaluateAll((ns) => ns.map((n) => n.dataset.rowId));
     // ROUNDS=<n>: n rounds of A, B (default 2); the summary gives the median per tab.
     for (const target of Array.from({ length: 2 * Number(process.env.ROUNDS || 2) }, (_, i) => i % 2)) {
       const before = reads.length;
@@ -878,15 +879,19 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
         const s = { t0: performance.now(), paintMs: null, lastGrowMs: null, rows: 0 };
         window.__sw = s;
         const tick = () => {
-          const ids = Array.from(document.querySelectorAll('.chat-messages-pane [data-row-id]'), (n) => n.dataset.rowId);
+          const ids = Array.from(document.querySelectorAll('[data-chat-view="shown"] .chat-messages-pane [data-row-id]'), (n) => n.dataset.rowId);
           const now = performance.now() - s.t0;
           if (s.paintMs === null && ids.length > 0 && !ids.some((id) => old.has(id))) s.paintMs = Math.round(now);
           if (s.paintMs !== null && ids.length !== s.rows) { s.rows = ids.length; s.lastGrowMs = Math.round(now); }
           // FRAMES=1: what the pane shows at each frame (scroll position, rows, a loading text), to see jumps.
-          const pane = document.querySelector('.chat-messages-pane');
+          const pane = document.querySelector('[data-chat-view="shown"] .chat-messages-pane');
           if (pane && (s.frames ||= []).length < 80) s.frames.push([Math.round(now), ids.length, Math.round(pane.scrollTop), pane.scrollHeight, pane.clientHeight, /Loading/i.test(pane.innerText.slice(0, 300)) ? 'loading' : '']);
           if (now < 5000) requestAnimationFrame(tick);
         };
+        // MUTATIONS=1: what changes in the chat views during the click, counted by kind, element and attribute.
+        const mut = {}; window.__mut = mut;
+        const views = document.querySelector('[data-chat-view]')?.parentElement;
+        if (views) new MutationObserver((records) => { for (const r of records) { const t = r.target.nodeType === 1 ? r.target : r.target.parentElement; const k = `${r.type} ${t?.tagName}.${String(t?.className || '').slice(0, 50)} ${r.attributeName || ''}`; mut[k] = (mut[k] || 0) + 1; } }).observe(views, { subtree: true, attributes: true, childList: true, characterData: true });
         tab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         requestAnimationFrame(tick);
       }, [...old]);
@@ -902,10 +907,11 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       const longTasks = await page.evaluate(() => window.__long.slice());
       if (cdp) require('node:fs').writeFileSync(`${process.env.PROFILE}${results.length}.cpuprofile`, JSON.stringify({ ...(await cdp.send('Profiler.stop')).profile, clickAt: t0 }));
       await page.waitForTimeout(1500);
-      const atBottom = await page.locator('.chat-messages-pane').evaluate((p) => p.scrollHeight - p.scrollTop - p.clientHeight < 50);
+      const atBottom = await page.locator('[data-chat-view="shown"] .chat-messages-pane').evaluate((p) => p.scrollHeight - p.scrollTop - p.clientHeight < 50);
       // Elements in the pane, and how many of them sit inside a closed (display none) part.
-      const nodes = await page.locator('.chat-messages-pane').evaluate((p) => { const all = p.querySelectorAll('*'); let hidden = 0; for (const n of all) if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') hidden += 1; return { all: all.length, hidden }; });
+      const nodes = await page.locator('[data-chat-view="shown"] .chat-messages-pane').evaluate((p) => { const all = p.querySelectorAll('*'); let hidden = 0; for (const n of all) if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') hidden += 1; return { all: all.length, hidden }; });
       const inPage = await page.evaluate(() => window.__sw);
+      if (process.env.MUTATIONS) console.log(names[target], JSON.stringify(Object.entries(await page.evaluate(() => window.__mut)).sort((a, b) => b[1] - a[1]).slice(0, 15)));
       if (process.env.FRAMES) console.log(names[target], JSON.stringify(inPage.frames.filter((f, i, a) => i === 0 || f.slice(1).join() !== a[i - 1].slice(1).join())));
       results.push({ paintMs: inPage.paintMs, allRowsMs: inPage.lastGrowMs, requests: timeline.filter((x) => x.start < 3000).slice(), nodes, tab: names[target], firstMs: first || null, ms: settled || null, rows, reads: reads.length - before, atBottom, longTasks });
     }
@@ -964,7 +970,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // Ctrl+= twice (+1 px), Ctrl+wheel down three notches (-1.5 px), Ctrl+0: the chat's text follows (the computed
     // size of a transcript row), the sidebar's text and the page's root size do not, the label shows the size in px.
     const size = () => page.evaluate(() => {
-      const row = document.querySelector('.chat-messages-pane .chat-message p, .chat-messages-pane .chat-message');
+      const row = document.querySelector('[data-chat-view="shown"] .chat-messages-pane .chat-message p, .chat-messages-pane .chat-message');
       const line = document.querySelector('[data-quests-queue="list"] [data-queue-key]');
       const toast = document.querySelector('[data-quests-text-size]');
       return {
@@ -992,6 +998,28 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     console.log(JSON.stringify({ start, up, down, reset, upBy: Math.round((up.chatPx - start.chatPx) * 100) / 100, downBy: Math.round((down.chatPx - up.chatPx) * 100) / 100, sidebarSame: up.sidebarPx === start.sidebarPx, rootUntouched: !up.root, toastGone: reset.toast === null }));
   }
 
+  if (check === 'preload') {
+    // Open tabs stay built (requirement 89): after a reload, the other open tab is built in the background, and
+    // the first switch to it, like every later one, takes about a frame or two (ms from the click to the second
+    // frame after it). views: each chat view, shown or kept, with its row count.
+    const q = await apiQueue();
+    const other = q.entries.find((e) => e.sessionId && e.sessionId !== sessionId && !e.heldOutside && e.placement !== 'archive');
+    await page.goto(`http://127.0.0.1:3001/session/${other.sessionId}`); await page.waitForTimeout(4000);
+    await page.goto(`http://127.0.0.1:3001/session/${sessionId}`); await page.waitForTimeout(2000);
+    await page.reload(); await page.waitForTimeout(8000);
+    const views = () => page.evaluate(() => [...document.querySelectorAll('[data-chat-view]')].map((v) => `${v.dataset.chatView}:${v.querySelectorAll('[data-row-id]').length}`));
+    const before = await views();
+    const switchMs = [];
+    for (const i of [0, 1, 0, 1]) {
+      switchMs.push(await page.locator('[data-tab-id]').nth(i).evaluate((el) => new Promise((done) => {
+        const s = performance.now();
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        requestAnimationFrame(() => requestAnimationFrame(() => done(Math.round(performance.now() - s))));
+      })));
+      await page.waitForTimeout(800);
+    }
+    console.log(JSON.stringify({ before, switchMs, after: await views() }));
+  }
   if (check === 'names') {
     // Every open tab whose chat has a line reads the line's name: one name per chat (requirement 90).
     await page.waitForTimeout(4000);
@@ -1144,7 +1172,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       const p = await panes();
       const all = [...p.left, ...p.right];
       const box = tabs[all.indexOf(id)];
-      const area = await page.locator('.chat-messages-pane').first().boundingBox();
+      const area = await page.locator('[data-chat-view="shown"] .chat-messages-pane').first().boundingBox();
       await page.mouse.move(box.x + 20, box.y + box.height / 2);
       await page.mouse.down();
       for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + 20 + (area.x + area.width * xShare - box.x - 20) * (i / 10), box.y + (area.y + area.height / 2 - box.y) * (i / 10));
