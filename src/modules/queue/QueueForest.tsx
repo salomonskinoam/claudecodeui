@@ -45,7 +45,7 @@ export default function QueueForest() {
       <div key={e.key} style={{ marginLeft: depth ? 10 : 0 }}>
         <div
           data-forest-key={e.key}
-          title={e.chatName ?? e.title}
+          title={e.title}
           onMouseEnter={look.onMouseEnter}
           onMouseLeave={look.onMouseLeave}
           onClick={() => openQueueEntry(e)}

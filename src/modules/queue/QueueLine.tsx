@@ -47,12 +47,13 @@ export default function QueueLine({ entry: e, look, blinking, latched, separator
   return (
     <div
       data-queue-key={e.key}
+      data-session-id={e.sessionId ?? undefined}
       {...drag}
       onMouseEnter={look.onMouseEnter}
       onMouseLeave={look.onMouseLeave}
       onClick={onOpen}
       onContextMenu={onMenu}
-      title={e.chatName ?? e.title}
+      title={e.title}
       className={cn(
         'group relative mx-1 flex h-[32px] cursor-pointer items-center gap-1 rounded-sm px-2 text-[15px] text-[#cccccc]',
         look.shownClass,

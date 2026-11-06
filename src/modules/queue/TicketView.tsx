@@ -50,7 +50,7 @@ function TicketView({ number }: { number: number }) {
               {entry.sessionId ? 'Claim this ticket with a new chat' : 'Claim this ticket'}
             </button>
           )}
-          {entry?.sessionId && <span className="text-xs text-muted-foreground">Held by "{entry.chatName ?? entry.title}"; a new claim takes it over.</span>}
+          {entry?.sessionId && <span className="text-xs text-muted-foreground">Held by "{entry.title}"; a new claim takes it over.</span>}
         </div>
         {ticket && <h1 className="mb-2 text-lg font-semibold">{ticket.title}</h1>}
         {ticket && ticket.labels.length > 0 && (

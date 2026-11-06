@@ -70,7 +70,7 @@ export function getChats(): Map<string, Chat> {
     chats.set(sid, {
       sid,
       pageSessionId: s?.session_id ?? null,
-      name: titles.get(sid) ?? s?.custom_name ?? p?.name ?? sid,
+      name: s?.custom_name || titles.get(sid) || p?.name || sid,
       projectPath: s?.project_path ?? null,
       transcriptPath: s?.jsonl_path ?? null,
       process: p,

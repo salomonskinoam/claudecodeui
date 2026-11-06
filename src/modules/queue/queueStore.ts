@@ -84,3 +84,19 @@ function subscribe(listener: () => void): () => void {
 }
 
 export const useQueue = (): Queue => useSyncExternalStore(subscribe, () => queue);
+
+// The queue's names by page session id (entries.ts `title`, the one name of a chat), for the tabs. A new object
+// only when a name changes, so a poll that changes nothing re-renders nothing.
+let namesKey = '';
+let names: Record<string, string> = {};
+function namesSnapshot(): Record<string, string> {
+  const next: Record<string, string> = {};
+  for (const e of queue.entries) if (e.sessionId) next[e.sessionId] = e.title;
+  const key = JSON.stringify(next);
+  if (key !== namesKey) {
+    namesKey = key;
+    names = next;
+  }
+  return names;
+}
+export const useQueueNames = (): Record<string, string> => useSyncExternalStore(subscribe, namesSnapshot);

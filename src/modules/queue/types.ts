@@ -25,14 +25,15 @@ export type QueueEntry = {
   blocks: string[];
   state: QueueState;
   since: number;
+  /** The entry's one name (server/modules/queue/entries.ts): the chat's name, else the ticket's title. */
   title: string;
+  /** For tickets: the ticket's own title on GitHub. */
+  ticketTitle: string | null;
   url: string | null;
   number: number | null;
   /** The attached chat: the page's session id (for opening) and Claude Code's. */
   sessionId: string | null;
   providerSessionId: string | null;
-  /** The attached chat's name (rename, else Claude's title). */
-  chatName: string | null;
   projectPath: string | null;
   world: string | null;
   rootKey: string;

@@ -10,7 +10,7 @@ import SplitDropZone, { type SplitSide } from '@/modules/project-workspace/Split
 import { useTabDragging } from '@/modules/project-workspace/tabDrag';
 import { PlanView, WorkView, registerWorkNavigate, useWorkTitles } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
-import { noteShownChat, reportPageTabs, TicketView } from '@/modules/queue';
+import { noteShownChat, reportPageTabs, TicketView, useQueueNames } from '@/modules/queue';
 import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -56,6 +56,7 @@ function ProjectWorkspaceShell({
     return () => registerWorkNavigate(null);
   }, [navigate]);
   const workTitles = useWorkTitles();
+  const queueNames = useQueueNames();
   const panes = usePanes();
   const { projects } = useProjectSidebarState().sidebarSharedProps;
   const showTabs = !isEmbedded && !isMobile;
@@ -108,8 +109,9 @@ function ProjectWorkspaceShell({
     if (work) {
       return workTitles[id] ?? (work.kind === 'agent' ? 'Agent' : 'Command');
     }
-    return loadedName(id) ?? fetchedNames[id] ?? `chat ${id.slice(0, 8)}`;
-  }, [loadedName, fetchedNames, workTitles]);
+    // The queue's name first: the one name the list and the forest show (server/modules/queue/entries.ts).
+    return queueNames[id] ?? loadedName(id) ?? fetchedNames[id] ?? `chat ${id.slice(0, 8)}`;
+  }, [queueNames, loadedName, fetchedNames, workTitles]);
 
   // Status dots (useLiveChats): the chats on screen are each pane's active tab; showing a chat marks it seen.
   useEffect(() => {

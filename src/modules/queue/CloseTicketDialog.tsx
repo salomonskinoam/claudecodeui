@@ -17,7 +17,7 @@ export default function CloseTicketDialog({ entry, entries, onDone }: CloseTicke
   const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState('');
   const blockers = entry.rootKey === entry.key ? entry.openBlockers : [];
-  const title = (n: number) => entries.find((e) => e.number === n)?.title ?? '';
+  const title = (n: number) => entries.find((e) => e.number === n)?.ticketTitle ?? '';
 
   const choose = (choice: string) => {
     setBusy(true);
@@ -28,7 +28,7 @@ export default function CloseTicketDialog({ entry, entries, onDone }: CloseTicke
     <Dialog open onOpenChange={(open) => { if (!open) onDone(); }}>
       <DialogContent className="w-[440px] max-w-[92vw] rounded-md border border-[#454647] bg-[#1E1F22] p-5 text-[#cccccc] shadow-2xl">
         <DialogTitle className="not-sr-only text-[15px] font-semibold leading-snug text-white">Close ticket #{entry.number}?</DialogTitle>
-        <p className="text-[13px]">{entry.title}</p>
+        <p className="text-[13px]">{entry.ticketTitle ?? entry.title}</p>
         {blockers.length > 0 && (
           <div className="text-[13px]">
             <p className="mt-2">Are you sure? It still has open blockers:</p>

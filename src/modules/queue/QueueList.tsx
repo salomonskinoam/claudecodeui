@@ -34,7 +34,7 @@ export default function QueueList({ filter, onNewSession, onStartTicket }: Queue
   const queue = useQueue();
   const view = useQueueView();
   const q = filter.trim().toLowerCase();
-  const hit = (e: QueueEntry) => [e.chatName, e.title, e.number !== null ? `#${e.number}` : '', e.world, e.closingLine].filter(Boolean).join(' ').toLowerCase().includes(q);
+  const hit = (e: QueueEntry) => [e.title, e.ticketTitle, e.number !== null ? `#${e.number}` : '', e.world, e.closingLine].filter(Boolean).join(' ').toLowerCase().includes(q);
   const show = (xs: QueueEntry[]) => (q ? xs.filter(hit) : xs);
   const { mode } = view;
   const [lines, active, hold, unclaimed, archived] = [view.lines, view.active, view.hold, view.unclaimed, view.archived].map(show);
@@ -97,7 +97,7 @@ export default function QueueList({ filter, onNewSession, onStartTicket }: Queue
       {closing && <CloseTicketDialog entry={closing} entries={queue.entries} onDone={() => setClosing(null)} />}
       {menu && <TabContextMenu sessionId={menu.sessionId} entryKey={menu.entryKey} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
       {ticketMenu && <TicketGroupMenu target={ticketMenu.target} x={ticketMenu.x} y={ticketMenu.y} onRename={setRenamingGroup} onClose={() => setTicketMenu(null)} />}
-      {renaming?.sessionId && <RenameDialog sessionId={renaming.sessionId} current={renaming.chatName ?? renaming.title} onDone={() => setRenaming(null)} />}
+      {renaming?.sessionId && <RenameDialog sessionId={renaming.sessionId} current={renaming.title} onDone={() => setRenaming(null)} />}
     </div>
   );
 }

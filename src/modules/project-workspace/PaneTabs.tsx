@@ -89,6 +89,7 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
         return (
           <div
             key={id}
+            data-tab-id={id}
             draggable
             onDragStart={(event) => {
               event.dataTransfer.setData(TAB_DRAG_TYPE, id);

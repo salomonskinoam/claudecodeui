@@ -24,6 +24,7 @@
 //           color on the mode button (the text must be readable in every mode)
 //   back    Back is disabled at start; Next opens the next chat and enables Back; Back returns, is disabled again,
 //           and the opened chat's line has the dot and blink it had before Next
+//   names   every open tab whose chat has a line in the list shows the same name as that line
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
 //           panes, prints the stored layout after each drag. Restores no layout: use a fresh browser profile.
 const os = require('node:os');
@@ -33,7 +34,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit', 'modecolors'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit', 'modecolors', 'names'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -734,11 +735,11 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     // restores the list.
     const q = await apiQueue();
     const keys = () => page.locator('[data-quests-queue="list"] [data-queue-key]').evaluateAll((ns) => ns.map((n) => n.dataset.queueKey));
-    const textOf = (e) => [e.chatName, e.title, e.number !== null ? `#${e.number}` : '', e.world, e.closingLine].filter(Boolean).join(' ').toLowerCase();
+    const textOf = (e) => [e.title, e.ticketTitle, e.number !== null ? `#${e.number}` : '', e.world, e.closingLine].filter(Boolean).join(' ').toLowerCase();
     const box = page.locator('input.nav-search-input:visible').first();
     const before = (await keys()).length;
-    const sample = q.entries.find((e) => e.placement !== 'archive' && e.chatName) ?? q.entries[0];
-    const word = (sample.chatName ?? sample.title).split(/\s+/).find((w) => w.length >= 3) ?? sample.title.slice(0, 3);
+    const sample = q.entries.find((e) => e.placement !== 'archive' && e.sessionId) ?? q.entries[0];
+    const word = sample.title.split(/\s+/).find((w) => w.length >= 3) ?? sample.title.slice(0, 3);
     await box.fill(word);
     await page.waitForTimeout(500);
     const shown = await keys();
@@ -991,6 +992,15 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
     console.log(JSON.stringify({ start, up, down, reset, upBy: Math.round((up.chatPx - start.chatPx) * 100) / 100, downBy: Math.round((down.chatPx - up.chatPx) * 100) / 100, sidebarSame: up.sidebarPx === start.sidebarPx, rootUntouched: !up.root, toastGone: reset.toast === null }));
   }
 
+  if (check === 'names') {
+    // Every open tab whose chat has a line reads the line's name: one name per chat (requirement 90).
+    await page.waitForTimeout(4000);
+    const pairs = await page.evaluate(() => [...document.querySelectorAll('[data-tab-id]')].map((tab) => {
+      const line = document.querySelector(`[data-session-id="${tab.getAttribute('data-tab-id')}"]`);
+      return { tab: tab.getAttribute('title'), line: line ? line.getAttribute('title') : null };
+    }));
+    console.log(JSON.stringify({ pairs, differ: pairs.filter((p) => p.line !== null && p.line !== p.tab).length }));
+  }
   if (check === 'renamebutton') {
     // The pencil on the active tab opens the rename popup with the chat name filled in; Cancel closes it.
     const pencil = page.locator('[data-quests-tab="rename"]');

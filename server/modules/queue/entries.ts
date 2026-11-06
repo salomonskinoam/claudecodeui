@@ -11,15 +11,19 @@ import { getTickets, openBlockersOf, type Ticket } from '@/modules/queue/sources
 
 /** One line of the queue, as the page shows it. */
 export type QueueEntry = QueueOrderEntry & {
+  /**
+   * The entry's one name, the same on the line, the forest, the tab and the header: the attached chat's name
+   * (rename, else Claude's title), else the ticket's title for a ticket no chat holds.
+   */
   title: string;
+  /** For tickets: the ticket's own title on GitHub. */
+  ticketTitle: string | null;
   /** The ticket's GitHub page, for tickets. */
   url: string | null;
   number: number | null;
   /** The chat attached to the entry: the page's session id (for opening) and Claude Code's. */
   sessionId: string | null;
   providerSessionId: string | null;
-  /** The attached chat's name, shown on hover. */
-  chatName: string | null;
   projectPath: string | null;
   world: string | null;
   rootKey: string;
@@ -65,7 +69,6 @@ export function stateOf(c: Chat): { state: QueueState; since: number } {
 const chatFields = (c: Chat | null) => ({
   sessionId: c ? c.pageSessionId ?? c.sid : null,
   providerSessionId: c?.sid ?? null,
-  chatName: c?.name ?? null,
   projectPath: c?.projectPath ?? null,
   closingLine: c?.closingLine ? `${c.closingLine.kind} ${c.closingLine.text}` : null,
   heldOutside: c ? isHeldOutside(c) : false,
@@ -109,7 +112,7 @@ export function buildEntries(): QueueEntry[] {
     const st = chat ? stateOf(chat) : { state: 'unclaimed' as QueueState, since: time(t.createdAt) };
     const opener = t.parentChatSid ? chats.get(t.parentChatSid) : undefined;
     entries.push({
-      key: `ticket:${t.number}`, kind, title: t.title, url: t.url, number: t.number,
+      key: `ticket:${t.number}`, kind, title: chat?.name ?? t.title, ticketTitle: t.title, url: t.url, number: t.number,
       parentKey: t.parent && t.parent.state === 'OPEN' && openTickets.has(t.parent.number) ? `ticket:${t.parent.number}` : null,
       blocks: kind === 'blocker' ? t.blocksSids.map((s) => (ticketOf.has(s) ? `ticket:${ticketOf.get(s)}` : `chat:${s}`)) : [],
       state: st.state, since: st.since || time(t.createdAt),
@@ -124,7 +127,7 @@ export function buildEntries(): QueueEntry[] {
     if (ticketOf.has(c.sid)) continue;
     const st = stateOf(c);
     entries.push({
-      key: `chat:${c.sid}`, kind: 'chat', title: c.name, url: null, number: null, parentKey: null, blocks: [],
+      key: `chat:${c.sid}`, kind: 'chat', title: c.name, ticketTitle: null, url: null, number: null, parentKey: null, blocks: [],
       state: st.state, since: st.since, world: null, parentChatSid: null, openBlockers: [], startFolder: null,
       ...chatFields(c),
     });

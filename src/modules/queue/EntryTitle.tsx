@@ -8,7 +8,7 @@ export default function EntryTitle({ entry: e, className }: { entry: QueueEntry;
   return (
     <>
       {e.url && (
-        <a href={e.url} target="_blank" rel="noreferrer" title={`Ticket #${e.number} on GitHub`}
+        <a href={e.url} target="_blank" rel="noreferrer" title={`Ticket #${e.number} on GitHub: ${e.ticketTitle ?? ''}`}
           className="flex-shrink-0 text-[13px] text-[#9d9d9d] hover:text-[#3794ff]" onClick={(event) => event.stopPropagation()}>
           #{e.number}
         </a>
