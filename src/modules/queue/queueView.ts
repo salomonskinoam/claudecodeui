@@ -7,7 +7,8 @@ import { isChat, type QueueEntry } from '@/modules/queue/types';
 /**
  * quests priority queue: what the list shows. Five drawers, each entry in exactly one, in this order:
  *   Pending chats      what needs Noam: a permission prompt, a question, a Done he has not approved; plus the
- *                      chat on screen. The only drawer open by default.
+ *                      chat on screen when it has no process (else it would be in no drawer). The only drawer
+ *                      open by default.
  *   Active chats       every other chat with a process. The ones running come last: "they require no
  *                      attention by definition" (Noam, 3 Nov). Idle ones first, each half in queue order.
  *   On hold            the chats Noam put on hold, until they reply again.
@@ -71,9 +72,11 @@ export function useQueueView(): QueueView {
   // queue is kept; its next reply takes it out of the group.
   const hold = all.filter((e) => e.placement === 'hold');
   const rest = all.filter((e) => e.placement === 'queue');
-  // The chat on screen stays listed, unless it was put on hold: then it leaves the list and the forest
-  // while its tab stays open (Noam, 2 Nov: "the chat tab is open, should remain open and leave the queue").
-  const lines = rest.filter((e) => e.waitsForMe || isChat(e, shown));
+  // The chat on screen sits where its status puts it: running or idle with a process, it is an active chat
+  // (Noam, 6 Nov: "after i click enter on a chat, i still see it in pending chats ... it should go to active
+  // chats, to reflect the actual status"). Only without a process does it stay in Pending, to stay listed. Put
+  // on hold, it leaves the list and the forest while its tab stays open (2 Nov).
+  const lines = rest.filter((e) => e.waitsForMe || (isChat(e, shown) && !e.live));
   const open = rest.filter((e) => e.live && !lines.includes(e));
   return {
     mode: current,
