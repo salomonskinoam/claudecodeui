@@ -57,6 +57,10 @@ type ChatInterfaceProps = {
   newSessionTrigger?: number;
   onTaskClick?: (...args: unknown[]) => void;
   onShowAllTasks?: (() => void) | null;
+  /** quests: a new chat's own draft scope (see useChatComposerState). */
+  newChatScope?: string;
+  /** quests: drawn in place of the empty chat's start screen until the first message (a ticket's page). */
+  intro?: React.ReactNode;
 };
 
 /**
@@ -81,6 +85,8 @@ function ChatInterface({
   externalMessageUpdate,
   newSessionTrigger,
   onShowAllTasks,
+  newChatScope,
+  intro,
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe } = useWebSocket();
@@ -250,6 +256,7 @@ function ChatInterface({
     beginEditMessage,
     cancelEditMessage,
   } = useChatComposerState({
+    newChatScope,
     selectedProject,
     selectedSession,
     currentSessionId,
@@ -528,6 +535,7 @@ function ChatInterface({
               onEditMessage={supportsMessageEditing && !isProcessing ? beginEditMessage : undefined}
               onForkFromMessage={supportsSessionForking ? handleForkFromMessage : undefined}
               onLoadFullTranscript={loadFullTranscript}
+              intro={intro}
             />
           </TranscriptSessionContext.Provider>
         </MarkdownWorkspaceContext.Provider>

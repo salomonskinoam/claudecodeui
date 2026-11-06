@@ -5,6 +5,7 @@ import { readLatch, readOrder, writeLatch, writeOrder } from '@/modules/queue/or
 import { drag, lift, repair, view } from '@/modules/queue/queue-order.js';
 import { setPageTabs } from '@/modules/queue/sources/page-tabs.js';
 import { noteTranscriptOnce } from '@/modules/queue/sources/transcripts.js';
+import { notePageClaim } from '@/modules/queue/page-claims.js';
 import { getTicketGroups, setTicketGroups, type TicketGroup } from '@/modules/queue/ticket-groups.js';
 
 /** quests priority queue: what the page asks of the queue. Each call answers with the whole queue. */
@@ -75,4 +76,10 @@ export function syncFromCursor(): Queue & { cursorSessionIds: string[] } {
   writeOrder(lift(repair(readOrder(), entries), entries, synced.map((e) => e.key)));
   writeLatch(null);
   return { ...getQueue(), cursorSessionIds: synced.map((e) => e.sessionId).filter((id): id is string => Boolean(id)) };
+}
+
+/** A chat started from a ticket's tab: the queue counts it as the ticket's claim at once (page-claims.ts). */
+export function claimFromPage(number: number, sessionId: string): Queue {
+  notePageClaim(number, sessionId);
+  return getQueue();
 }

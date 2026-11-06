@@ -7,7 +7,7 @@ import QueueLine from '@/modules/queue/QueueLine';
 import QueueToolbar from '@/modules/queue/QueueToolbar';
 import RenameDialog from '@/modules/queue/RenameDialog';
 import TabContextMenu from '@/modules/queue/TabContextMenu';
-import { setQueueOpener, setTicketStarter } from '@/modules/queue/queueNavigation';
+import { setQueueOpener } from '@/modules/queue/queueNavigation';
 import { placeQueueEntry, useQueue } from '@/modules/queue/queueStore';
 import { useQueueView } from '@/modules/queue/queueView';
 import TicketGroups, { TicketGroupMenu } from '@/modules/queue/TicketGroups';
@@ -20,8 +20,6 @@ type QueueListProps = {
   /** The sidebar's search box: only the lines whose name, title, ticket number or world contain it, every drawer open. */
   filter: string;
   onNewSession: () => void;
-  /** "Claim this ticket" on a ticket's page: a new chat for it; the chat asks for its own name at its start. */
-  onStartTicket: (entry: QueueEntry) => void;
 };
 
 /**
@@ -30,7 +28,7 @@ type QueueListProps = {
  * tickets no chat has claimed, and the Archived drawer. With text in the sidebar's search box only the matching
  * lines show, in every drawer, all open (Noam, 3 Nov: "the search does nothing").
  */
-export default function QueueList({ filter, onNewSession, onStartTicket }: QueueListProps) {
+export default function QueueList({ filter, onNewSession }: QueueListProps) {
   const queue = useQueue();
   const view = useQueueView();
   const q = filter.trim().toLowerCase();
@@ -40,7 +38,7 @@ export default function QueueList({ filter, onNewSession, onStartTicket }: Queue
   const [lines, active, hold, unclaimed, archived] = [view.lines, view.active, view.hold, view.unclaimed, view.archived].map(show);
   const lookOf = useEntryLook();
   const open = useOpenEntry();
-  useEffect(() => { setQueueOpener(open); setTicketStarter(onStartTicket); });
+  useEffect(() => { setQueueOpener(open); });
   const blinking = useBlink(queue);
   const [closing, setClosing] = useState<QueueEntry | null>(null);
   // quests: a right-click on a line opens the chat's menu (rename, pin, send to the end, on hold, Cursor, the ticket).

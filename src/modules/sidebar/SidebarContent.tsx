@@ -10,7 +10,6 @@ import SidebarHeader from '@/modules/sidebar/SidebarHeader';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import SidebarRecentConversations from '@/modules/sidebar/SidebarRecentConversations';
 import { QueueForest, QueueList } from '@/modules/queue';
-import { writeDraftText } from '@/shared/chatDrafts';
 
 function HighlightedSnippet({ snippet, highlights }: { snippet: string; highlights: { start: number; end: number }[] }) {
   const parts: ReactNode[] = [];
@@ -682,13 +681,6 @@ export default function SidebarContent({
             onNewSession={() => {
               const project = projectListProps.selectedProject ?? projects[0];
               if (project) projectListProps.onNewSession(project);
-            }}
-            onStartTicket={(entry) => {
-              // The folder of the chat that opened the ticket; else the shown chat's project.
-              const project = projects.find((p) => p.fullPath === entry.startFolder) ?? projectListProps.selectedProject ?? projects[0];
-              if (!project) return;
-              writeDraftText(`project:${project.projectId}`, `claim this ticket ${entry.url}`);
-              projectListProps.onNewSession(project);
             }}
           />
           </>

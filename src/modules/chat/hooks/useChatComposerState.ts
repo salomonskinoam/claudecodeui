@@ -34,6 +34,8 @@ import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
 import { openNextInQueue } from '@/modules/queue';
 
 type UseChatComposerStateArgs = {
+  /** quests: the draft scope of a chat not sent yet, instead of its project's (a ticket's chat: `ticket:<n>`). */
+  newChatScope?: string;
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   currentSessionId: string | null;
@@ -171,6 +173,7 @@ const getNotificationSessionSummary = (
 const SAFARI_IME_RACE_WINDOW_MS = 30;
 
 export function useChatComposerState({
+  newChatScope,
   selectedProject,
   selectedSession,
   currentSessionId,
@@ -220,7 +223,7 @@ export function useChatComposerState({
     if (typeof window === 'undefined') {
       return { scope: null, value: '' };
     }
-    const initialScope = selectedSession?.id || currentSessionId
+    const initialScope = selectedSession?.id || currentSessionId || newChatScope
       || (selectedProject ? `project:${selectedProject.projectId}` : null);
     return {
       scope: initialScope,
@@ -252,7 +255,7 @@ export function useChatComposerState({
   // The chat scope a draft belongs to: the open session, or the project for a
   // chat that has not been sent yet and so has no session id. Drafts used to be
   // keyed by project alone, so every session in a project shared one draft.
-  const draftScope = sessionKey ?? (selectedProjectId ? `project:${selectedProjectId}` : null);
+  const draftScope = sessionKey ?? newChatScope ?? (selectedProjectId ? `project:${selectedProjectId}` : null);
   const draftScopeRef = useRef(draftScope);
   draftScopeRef.current = draftScope;
   // Composition is tracked on `window` in the capture phase rather than on the textarea, so a

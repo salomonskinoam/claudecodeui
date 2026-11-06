@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 
-import { dragTo, getQueue, placeEntry, replaceTicketGroups, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
+import { claimFromPage, dragTo, getQueue, placeEntry, replaceTicketGroups, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
 import { closeTicket, getTickets, type CloseChoice } from '@/modules/queue/sources/tickets.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -64,6 +64,12 @@ router.get('/ticket/:number', asyncHandler(async (req: Request, res: Response) =
   res.json(createApiSuccessResponse({ number: t.number, title: t.title, url: t.url, labels: t.labels, body: t.body, createdAt: t.createdAt }));
 }));
 
+// A chat started from a ticket's tab (its page session id): the ticket's line and the chat become one at once.
+router.post('/claim', asyncHandler(async (req: Request, res: Response) => {
+  const { number, sessionId } = req.body ?? {};
+  if (!Number.isInteger(number) || typeof sessionId !== 'string' || !sessionId) throw bad('number and sessionId are required.');
+  res.json(createApiSuccessResponse(claimFromPage(number, sessionId)));
+}));
 router.post('/sync-cursor', asyncHandler(async (_req: Request, res: Response) => {
   res.json(createApiSuccessResponse(syncFromCursor()));
 }));

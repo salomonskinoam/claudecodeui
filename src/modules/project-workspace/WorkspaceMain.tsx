@@ -40,6 +40,8 @@ type WorkspaceMainProps = {
   onProjectsRefresh: () => void;
   /** Persists a new title for a session; resolves false when the backend refuses it. Used by the header's inline rename. */
   onRenameSession: (sessionId: string, summary: string) => Promise<boolean>;
+  /** quests: a plan, work or ticket tab is shown over the chats: every chat view stays built and hidden. */
+  covered?: boolean;
 };
 
 /** Rendered by ProjectMainRegion to show the selected project's active tab: chat, files, shell, git, tasks, browser or a plugin. */
@@ -61,6 +63,7 @@ function WorkspaceMain({
   onProjectSelect,
   onProjectsRefresh,
   onRenameSession,
+  covered = false,
 }: WorkspaceMainProps) {
   const preferences = useUiPreferences();
   const { showRawParameters, showThinking, sendByCtrlEnter } = preferences;
@@ -141,7 +144,8 @@ function WorkspaceMain({
   // Derived during render (React's pattern for state that follows props), so the switch draws in one pass.
   const [kept, setKept] = useState<KeptChat[]>([]);
   const [keptFor, setKeptFor] = useState<unknown[]>([]);
-  if (keptFor[0] !== selectedProject || keptFor[1] !== selectedSession || keptFor[2] !== openTabs) {
+  // Covered (the address is a plan, work or ticket tab, with no chat), the views stay as they are.
+  if (!covered && (keptFor[0] !== selectedProject || keptFor[1] !== selectedSession || keptFor[2] !== openTabs)) {
     setKeptFor([selectedProject, selectedSession, openTabs]);
     setKept(keepChats(kept, selectedProject, selectedSession, openTabs, Date.now()));
   }
@@ -160,6 +164,7 @@ function WorkspaceMain({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextId, selectedSession?.id]);
   const shownKey = kept.reduce<KeptChat | null>((a, k) => (a && a.shownAt >= k.shownAt ? a : k), null)?.key;
+  const chatShown = activeTab === 'chat' && !covered;
 
   if (isLoading) {
     return <WorkspaceStateView mode="loading" isMobile={isMobile} onMenuClick={onMenuClick} />;
@@ -198,12 +203,12 @@ function WorkspaceMain({
               // 1 ms; display none 130 ms, the inert attribute 60 ms, visibility hidden 30 ms).
               // ponytail: a hidden view can still take focus by the Tab key; inert if that ever matters.
               className="absolute inset-0"
-              style={activeTab === 'chat' && k.key === shownKey ? undefined : { transform: 'translateX(-200%)' }}
+              style={chatShown && k.key === shownKey ? undefined : { transform: 'translateX(-200%)' }}
             >
               <WorkspaceErrorBoundary showDetails>
                 <ChatInterface
-                  isActive={activeTab === 'chat' && k.key === shownKey}
-                  isHiddenTab={k.key !== shownKey}
+                  isActive={chatShown && k.key === shownKey}
+                  isHiddenTab={covered || k.key !== shownKey}
                   selectedProject={k.project}
                   selectedSession={k.session}
                   ws={ws}

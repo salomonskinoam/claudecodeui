@@ -100,3 +100,21 @@ function namesSnapshot(): Record<string, string> {
   return names;
 }
 export const useQueueNames = (): Record<string, string> => useSyncExternalStore(subscribe, namesSnapshot);
+
+// The folder each ticket's chat starts in (entries.ts `startFolder`), by ticket number, for the ticket tabs.
+let foldersKey = '';
+let folders: Record<number, string> = {};
+function foldersSnapshot(): Record<number, string> {
+  const next: Record<number, string> = {};
+  for (const e of queue.entries) if (e.number !== null && e.startFolder) next[e.number] = e.startFolder;
+  const key = JSON.stringify(next);
+  if (key !== foldersKey) {
+    foldersKey = key;
+    folders = next;
+  }
+  return folders;
+}
+export const useTicketFolders = (): Record<number, string> => useSyncExternalStore(subscribe, foldersSnapshot);
+
+/** A chat started from a ticket's tab: the queue counts it as the ticket's at once, before its claim reaches GitHub. */
+export const claimTicketForChat = (number: number, sessionId: string) => request('POST', '/claim', { number, sessionId });

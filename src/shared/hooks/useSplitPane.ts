@@ -75,6 +75,14 @@ export const openLeftTab = (id: string) =>
 export const replaceNewChatTab = (id: string) =>
   write((p) => ({ ...p, left: p.left.includes(id) ? without(p.left, NEW_CHAT_TAB) : p.left.map((x) => (x === NEW_CHAT_TAB ? id : x)) }));
 
+/** A tab becomes another in place, in either pane (a ticket's tab becomes the chat started from it). */
+export const replaceTab = (oldId: string, newId: string) =>
+  write((p) => ({
+    left: p.left.includes(newId) ? without(p.left, oldId) : p.left.map((x) => (x === oldId ? newId : x)),
+    right: p.right.includes(newId) ? without(p.right, oldId) : p.right.map((x) => (x === oldId ? newId : x)),
+    rightActive: p.rightActive === oldId ? newId : p.rightActive,
+  }));
+
 /** The left pane's tabs become `ids` (a chat already in the right pane stays there). */
 export const setLeftTabs = (ids: string[]) => write((p) => ({ ...p, left: ids.filter((id) => !p.right.includes(id)) }));
 

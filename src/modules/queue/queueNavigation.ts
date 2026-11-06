@@ -10,8 +10,6 @@ import { entryOfChat, type QueueEntry } from '@/modules/queue/types';
 /**
  * quests priority queue: moving between chats.
  *   openQueueEntry      open an entry as its line does (the list registers how, since it holds the router)
- *   startTicket         "Claim this ticket" on a ticket's page: a new chat for it (the list registers how, since
- *                       it holds the new-chat action)
  *   openNextInQueue     "bring me the next one in line": the highest entry that waits for the user, other than
  *                       the shown one; tickets no chat has claimed are skipped
  *   goBack              the undo of "Next": back to the chat "Next" left, and the chat "Next" opened gets its seen
@@ -21,13 +19,10 @@ import { entryOfChat, type QueueEntry } from '@/modules/queue/types';
  *   syncTabsFromCursor  the chats open in Cursor go on top of the queue and become the left pane's tabs
  */
 let opener: ((entry: QueueEntry) => void) | null = null;
-let starter: ((entry: QueueEntry) => void) | null = null;
 
 export const setQueueOpener = (open: (entry: QueueEntry) => void) => { opener = open; };
-export const setTicketStarter = (start: (entry: QueueEntry) => void) => { starter = start; };
 
 export const openQueueEntry = (entry: QueueEntry) => opener?.(entry);
-export const startTicket = (entry: QueueEntry) => starter?.(entry);
 
 export async function syncTabsFromCursor(): Promise<void> {
   const ids = await syncQueueFromCursor();

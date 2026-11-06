@@ -11,7 +11,8 @@ function ProjectMainRegion({
   ws,
   sendMessage,
   navigate,
-}: ProjectWorkspaceShellProps) {
+  covered,
+}: ProjectWorkspaceShellProps & { covered: boolean }) {
   const {
     selectedProject,
     selectedSession,
@@ -71,6 +72,7 @@ function ProjectMainRegion({
       onProjectSelect={handleProjectSelect}
       onProjectsRefresh={handleProjectsRefresh}
       onRenameSession={renameSession}
+      covered={covered}
     />
   );
 }

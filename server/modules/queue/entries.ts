@@ -1,4 +1,5 @@
 import { getChats, isHeldOutside, isOpen, type Chat } from '@/modules/queue/chats.js';
+import { pageClaims } from '@/modules/queue/page-claims.js';
 import { readPlacements, resolvePlacement, type Where } from '@/modules/queue/placement.js';
 import { groupOf, rootOf, waitsForMe, type QueueGroup, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import { getTickets, openBlockersOf, type Ticket } from '@/modules/queue/sources/tickets.js';
@@ -106,7 +107,14 @@ export function buildEntries(): QueueEntry[] {
   const tickets = getTickets();
   const chats = getChats();
   const openTickets = new Set(tickets.map((t) => t.number));
-  const { claimant, ticketOf } = resolveClaims(tickets, (sid) => chats.get(sid)?.finalized ?? false);
+  // A chat started from a ticket's tab claims it at once (page-claims.ts), by Claude's id once the chat has one.
+  const claudeIdOf = new Map([...chats.values()].filter((c) => c.pageSessionId).map((c) => [c.pageSessionId as string, c.sid]));
+  const fromPage = pageClaims();
+  const claimed = tickets.map((t) => {
+    const p = fromPage.get(t.number);
+    return p ? { ...t, claims: [...t.claims, { name: 'page', sid: claudeIdOf.get(p.sessionId) ?? p.sessionId, at: p.at }] } : t;
+  });
+  const { claimant, ticketOf } = resolveClaims(claimed, (sid) => chats.get(sid)?.finalized ?? false);
 
   const entries: Omit<QueueEntry, 'rootKey' | 'group' | 'waitsForMe' | 'placement' | 'placedAt'>[] = [];
   for (const t of tickets) {

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, MouseEvent, RefObject, SetStateAction } from 'react';
+import type { Dispatch, MouseEvent, ReactNode, RefObject, SetStateAction } from 'react';
 
 import type { BackgroundTaskSummary,
   ChatMessage,
@@ -84,6 +84,8 @@ type ChatMessagesPaneProps = {
   onForkFromMessage?: (message: ChatMessage) => void;
   /** Fetches the whole transcript for an export, which otherwise only sees the loaded page. */
   onLoadFullTranscript?: () => Promise<ChatMessage[]>;
+  /** quests: shown instead of the start screen while the chat is empty (a ticket's page). */
+  intro?: ReactNode;
 };
 
 /**
@@ -280,6 +282,7 @@ function ChatMessagesPane({
   showRawParameters,
   showThinking,
   selectedProject,
+  intro,
 }: ChatMessagesPaneProps) {
   const { t } = useTranslation('chat');
   // quests: rows read only the project's id and path. A new project object with the same two (a sidebar refresh,
@@ -459,6 +462,8 @@ function ChatMessagesPane({
             <p>{t('session.loading.sessionMessages')}</p>
           </div>
         </div>
+      ) : chatMessages.length === 0 && intro ? (
+        intro
       ) : chatMessages.length === 0 ? (
         <ProviderSelectionEmptyState
           selectedSession={selectedSession}

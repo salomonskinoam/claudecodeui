@@ -3,14 +3,14 @@ import type { PointerEvent } from 'react';
 import { useParams } from 'react-router-dom';
 
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
-import type { ProjectWorkspaceShellProps } from '@/shared/types';
-import { useProjectCommandState, useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
+import type { Project, ProjectWorkspaceShellProps, SessionEstablishedContext } from '@/shared/types';
+import { useProjectCommandState, useProjectMainState, useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import PaneTabs from '@/modules/project-workspace/PaneTabs';
 import SplitDropZone, { type SplitSide } from '@/modules/project-workspace/SplitDropZone';
 import { useTabDragging } from '@/modules/project-workspace/tabDrag';
 import { PlanView, WorkView, registerWorkNavigate, useWorkTitles } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
-import { noteShownChat, reportPageTabs, TicketView, useQueueNames } from '@/modules/queue';
+import { noteShownChat, reportPageTabs, TicketView, useQueueNames, useTicketFolders } from '@/modules/queue';
 import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -34,6 +34,7 @@ import {
   usePanes,
   ticketOf,
   ticketTabId,
+  replaceTab,
 } from '@/shared/hooks/useSplitPane';
 
 /** Rendered by ProjectWorkspaceRoute to lay out the workspace sidebar, main region and global overlays. */
@@ -160,6 +161,18 @@ function ProjectWorkspaceShell({
   // The address "/" carries no project, so after a reload the new chat would lose its input box. Start it in
   // the project of the last chat tab, else the first project.
   const { selectedProject, handleNewSession } = useProjectCommandState();
+
+  // quests: a ticket's chat starts in the folder of the chat that opened the ticket, else the shown project.
+  const ticketFolders = useTicketFolders();
+  const ticketProject = (number: number): Project | null =>
+    projects.find((p) => p.fullPath === ticketFolders[number]) ?? selectedProject ?? projects[0] ?? null;
+  // The ticket's chat got its id: its tab becomes the chat's tab in place, and the left pane shows it.
+  const { registerOptimisticSession } = useProjectMainState();
+  const startedFrom = (tabId: string, pane: 'left' | 'right') => (id: string, context: SessionEstablishedContext) => {
+    registerOptimisticSession({ sessionId: id, ...context });
+    replaceTab(tabId, id);
+    if (pane === 'left') navigate(`/session/${id}`);
+  };
   useEffect(() => {
     if (!showTabs || sessionId || planName || selectedProject || projects.length === 0) {
       return;
@@ -257,21 +270,29 @@ function ProjectWorkspaceShell({
             />
           )}
           {/* The chat view fills the height left under the tab row, so its bottom stays on screen. */}
+          {/* quests: the chats stay built under a plan, work or ticket tab (moved out of view, not unmounted), so
+              coming back to a chat tab is as fast as any switch (requirement 91). */}
           <div className="relative flex min-h-0 flex-1 flex-col">
-            {workTab ? (
-              <WorkView tabId={workTab} />
-            ) : ticketTab ? (
-              <TicketView number={ticketOf(ticketTab) as number} />
-            ) : planName ? (
-              <PlanView planName={planName} />
-            ) : (
+            {(workTab || ticketTab || planName) && (
+              <div className="absolute inset-0 z-10 flex flex-col bg-background">
+                {workTab ? (
+                  <WorkView tabId={workTab} />
+                ) : ticketTab ? (
+                  <TicketView number={ticketOf(ticketTab) as number} project={ticketProject(ticketOf(ticketTab) as number)} onStarted={startedFrom(ticketTab, 'left')} />
+                ) : (
+                  <PlanView planName={planName as string} />
+                )}
+              </div>
+            )}
+            <div className="absolute inset-0 flex flex-col" style={workTab || ticketTab || planName ? { transform: 'translateX(-200%)' } : undefined}>
               <ProjectMainRegion
                 isMobile={isMobile}
                 ws={ws}
                 sendMessage={sendMessage}
                 navigate={navigate}
+                covered={Boolean(workTab || ticketTab || planName)}
               />
-            )}
+            </div>
             {showTabs && <SplitDropZone onDrop={dropSplit} />}
           </div>
         </div>
@@ -309,7 +330,7 @@ function ProjectWorkspaceShell({
             {workOf(panes.rightActive) ? (
               <WorkView tabId={panes.rightActive} />
             ) : ticketOf(panes.rightActive) !== null ? (
-              <TicketView number={ticketOf(panes.rightActive) as number} />
+              <TicketView number={ticketOf(panes.rightActive) as number} project={ticketProject(ticketOf(panes.rightActive) as number)} onStarted={startedFrom(panes.rightActive, 'right')} />
             ) : planNameOf(panes.rightActive) ? (
               <PlanView planName={planNameOf(panes.rightActive) as string} />
             ) : panes.rightActive === sessionId ? (

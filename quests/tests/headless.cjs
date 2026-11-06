@@ -338,24 +338,24 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'ticketchat') {
-    // Click an unclaimed ticket: its page opens in the chat window (title, text, "Claim this ticket"). The button
-    // opens a new chat with "claim this ticket <link>" typed in, unsent (it names itself at its start). The text
-    // is then cleared, so no draft is left behind. Nothing is sent.
+    // Click an unclaimed ticket: its tab is a new chat for it (requirement 97): the ticket's page (title, text)
+    // fills the chat, and the input box holds "claim ticket #<n> <link> ", unsent. The text is then cleared, so
+    // no draft is left behind. Nothing is sent.
     const q = await apiQueue();
     const t = q.entries.find((e) => e.state === 'unclaimed' && e.placement === 'queue');
     await page.locator('[data-quests-group="Tickets-Unclaimed"]').click();
     await page.waitForTimeout(300);
-    await page.locator(`[data-quests-queue="list"] [data-queue-key="${t.key}"]`).click();
+    // An in-page click: the drawer can reach below the window, where a mouse click lands on nothing.
+    await page.evaluate((key) => document.querySelector(`[data-quests-queue="list"] [data-queue-key="${key}"]`).click(), t.key);
     await page.waitForTimeout(3000);
     const pageUrl = await page.evaluate(() => location.pathname);
     const view = page.locator(`[data-quests-ticket="${t.number}"]`);
     const title = (await view.locator('h1').textContent().catch(() => '')).trim();
     const bodyChars = (await view.locator('.prose').textContent().catch(() => '')).length;
-    await page.locator(`[data-quests-ticket-claim="${t.number}"]`).click();
-    await page.waitForTimeout(3000);
-    const box = page.locator('[data-chat-view="shown"] [data-slot="prompt-input-textarea"]').first();
+    const box = page.locator(`[data-quests-ticket-chat="${t.number}"] [data-slot="prompt-input-textarea"]`);
     const text = await box.inputValue();
-    console.log(JSON.stringify({ ticket: t.key, pageUrl, title, titleOk: title === t.title, bodyChars, text, ok: text === `claim this ticket ${t.url}` }));
+    const pageInChat = await page.locator(`[data-quests-ticket-chat="${t.number}"] [data-quests-ticket="${t.number}"]`).count();
+    console.log(JSON.stringify({ ticket: t.key, pageUrl, title, titleOk: title === t.title, bodyChars, pageInChat, text, ok: text === `claim ticket #${t.number} ${t.url} ` }));
     await box.fill('');
     await page.waitForTimeout(1500);
   }
