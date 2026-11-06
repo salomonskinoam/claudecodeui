@@ -4,7 +4,9 @@ import { buildEntries, type QueueEntry } from '@/modules/queue/entries.js';
 import { readLatch, readOrder, writeLatch, writeOrder } from '@/modules/queue/order-store.js';
 import { drag, lift, repair, view } from '@/modules/queue/queue-order.js';
 import { setPageTabs } from '@/modules/queue/sources/page-tabs.js';
-import { noteTranscriptOnce } from '@/modules/queue/sources/transcripts.js';
+import { noteTranscript, noteTranscriptOnce } from '@/modules/queue/sources/transcripts.js';
+import { refreshLive } from '@/modules/queue/sources/live.js';
+import { queueDb } from '@/modules/database/index.js';
 import { notePageClaim } from '@/modules/queue/page-claims.js';
 import { getTicketGroups, setTicketGroups, type TicketGroup } from '@/modules/queue/ticket-groups.js';
 
@@ -81,5 +83,16 @@ export function syncFromCursor(): Queue & { cursorSessionIds: string[] } {
 /** A chat started from a ticket's tab: the queue counts it as the ticket's claim at once (page-claims.ts). */
 export function claimFromPage(number: number, sessionId: string): Queue {
   notePageClaim(number, sessionId);
+  return getQueue();
+}
+
+/**
+ * A chat's turn just ended (the page heard it): its transcript and the live processes are read now, not at the
+ * next file event or poll, and the queue answers with the chat in its new place. `sessionId` is the page's id.
+ */
+export async function settleChat(sessionId: string): Promise<Queue> {
+  const row = queueDb.listClaudeSessions().find((s) => s.session_id === sessionId || s.provider_session_id === sessionId);
+  await refreshLive();
+  if (row?.jsonl_path) await noteTranscript(row.jsonl_path);
   return getQueue();
 }

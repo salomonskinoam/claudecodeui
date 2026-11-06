@@ -83,7 +83,7 @@ export function openTasksOf(lines: string[]): OpenTask[] {
   return [...launches.values()].filter((t) => !closedToolUse.has(t.toolUseId) && !(t.taskId && closed.has(t.taskId)));
 }
 
-async function readTail(file: string, bytes: number): Promise<string[]> {
+async function readTail(file: string, bytes: number): Promise<{ lines: string[]; whole: boolean }> {
   const handle = await fs.open(file, 'r');
   try {
     const { size } = await handle.stat();
@@ -91,11 +91,31 @@ async function readTail(file: string, bytes: number): Promise<string[]> {
     const buffer = Buffer.alloc(size - start);
     await handle.read(buffer, 0, buffer.length, start);
     const lines = buffer.toString('utf8').split('\n');
-    return start > 0 ? lines.slice(1) : lines;
+    return { lines: start > 0 ? lines.slice(1) : lines, whole: start === 0 };
   } finally {
     await handle.close();
   }
 }
+
+/**
+ * A message Noam wrote: a user row that is not a tool result, a note the harness adds (isMeta: another chat's
+ * message, an image path), a compaction summary or a task notification. Typed in an editor it carries origin
+ * "human"; sent from the page it carries no origin.
+ */
+export function isNoamMessage(row: Record<string, any> | null): boolean {
+  if (!row || row.type !== 'user' || row.isMeta || row.isSidechain || row.isCompactSummary || row.toolUseResult) return false;
+  if (row.origin && row.origin.kind !== 'human') return false;
+  const content = row.message?.content;
+  return typeof content === 'string' || (Array.isArray(content) && content.some((b: { type?: string }) => b.type !== 'tool_result'));
+}
+
+/**
+ * The chats Noam never wrote in: they only ran on their own (another chat's message, a hook). Not queue-worthy
+ * yet: they never wait for him (Noam, 6 Nov: "chats that didn't start don't belong in pending, especially after
+ * they just got a \"sdk changed\" message"). Only the transcripts read in full can be known so.
+ */
+const unstarted = new Set<string>();
+export const isUnstarted = (sid: string): boolean => unstarted.has(sid);
 
 /** The JSON of a transcript line, or null for a line being written right now. */
 function parse(line: string): Record<string, any> | null {
@@ -155,7 +175,9 @@ function titleOf(lines: string[], type: string, field: string): string | null {
 export async function noteTranscript(file: string): Promise<void> {
   if (!file.endsWith('.jsonl') || file.includes(`${path.sep}subagents${path.sep}`)) return;
   const sid = path.basename(file, '.jsonl');
-  const lines = await readTail(file, TAIL_BYTES);
+  const { lines, whole } = await readTail(file, TAIL_BYTES);
+  if (whole && !lines.some((l) => l.includes('"type":"user"') && isNoamMessage(parse(l)))) unstarted.add(sid);
+  else unstarted.delete(sid);
   const line = closingLine(lines);
   const name = titleOf(lines, 'custom-title', 'customTitle') ?? titleOf(lines, 'ai-title', 'aiTitle');
   if (name) titles.set(sid, name);

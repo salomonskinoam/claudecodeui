@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 
-import { claimFromPage, dragTo, getQueue, placeEntry, replaceTicketGroups, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
+import { claimFromPage, dragTo, settleChat, getQueue, placeEntry, replaceTicketGroups, reportPageTabs, setLatch, setOrder, syncFromCursor } from '@/modules/queue/queue.service.js';
 import { closeTicket, getTickets, type CloseChoice } from '@/modules/queue/sources/tickets.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -69,6 +69,12 @@ router.post('/claim', asyncHandler(async (req: Request, res: Response) => {
   const { number, sessionId } = req.body ?? {};
   if (!Number.isInteger(number) || typeof sessionId !== 'string' || !sessionId) throw bad('number and sessionId are required.');
   res.json(createApiSuccessResponse(claimFromPage(number, sessionId)));
+}));
+// A chat's turn just ended: the queue is read again for it at once (the page's finish sound waits for this).
+router.post('/settle', asyncHandler(async (req: Request, res: Response) => {
+  const { sessionId } = req.body ?? {};
+  if (typeof sessionId !== 'string' || !sessionId) throw bad('sessionId is required.');
+  res.json(createApiSuccessResponse(await settleChat(sessionId)));
 }));
 router.post('/sync-cursor', asyncHandler(async (_req: Request, res: Response) => {
   res.json(createApiSuccessResponse(syncFromCursor()));

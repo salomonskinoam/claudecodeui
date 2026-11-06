@@ -118,3 +118,10 @@ export const useTicketFolders = (): Record<number, string> => useSyncExternalSto
 
 /** A chat started from a ticket's tab: the queue counts it as the ticket's at once, before its claim reaches GitHub. */
 export const claimTicketForChat = (number: number, sessionId: string) => request('POST', '/claim', { number, sessionId });
+
+/**
+ * A chat's turn just ended (the page heard it): the server reads that chat's transcript and the live processes
+ * now, and the queue comes back with it. The finish sound waits for this, so the sound and the queue's change
+ * come together (Noam, 6 Nov: "the beep has to be together with an update of the queue after the state change").
+ */
+export const settleQueue = (sessionId: string) => request('POST', '/settle', { sessionId });

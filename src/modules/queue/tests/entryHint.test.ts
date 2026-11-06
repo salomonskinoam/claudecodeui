@@ -4,7 +4,7 @@ import { entryHint } from '@/modules/queue/entryHint';
 import type { QueueEntry } from '@/modules/queue/types';
 
 const entry = (over: Partial<QueueEntry>): QueueEntry => ({
-  state: 'none', waitsForMe: false, live: true, placement: 'queue', closingLine: null, ...over,
+  kind: 'chat', sessionId: 's', started: true, state: 'none', waitsForMe: false, live: true, placement: 'queue', closingLine: null, ...over,
 }) as QueueEntry;
 
 describe('entryHint', () => {
@@ -22,5 +22,10 @@ describe('entryHint', () => {
     expect(entryHint(entry({ state: 'running' }), 'running')).toBe('Running');
     expect(entryHint(entry({ state: 'running', placement: 'hold' }), 'running')).toBe('On hold until its next activity. Running');
     expect(entryHint(entry({ state: 'none', live: false, placement: 'archive' }), undefined)).toBe('Archived until its next activity. No process');
+  });
+
+  it('says a chat Noam never wrote in is not started, whatever its last line', () => {
+    expect(entryHint(entry({ state: 'done', started: false, closingLine: 'done read the notice' }), 'done'))
+      .toBe('Turn ended, not seen yet. Not started: you have not written in it; it only ran on its own');
   });
 });

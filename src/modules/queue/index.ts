@@ -13,7 +13,7 @@ export { default as BackButton } from '@/modules/queue/BackButton';
 export { default as TabContextMenu } from '@/modules/queue/TabContextMenu';
 export { default as RenameDialog } from '@/modules/queue/RenameDialog';
 export { useChatLook } from '@/modules/queue/entryLook';
-export { reportPageTabs, useQueue, useQueueNames, useTicketFolders } from '@/modules/queue/queueStore';
+export { reportPageTabs, settleQueue, useQueue, useQueueNames, useTicketFolders } from '@/modules/queue/queueStore';
 export type { Queue, QueueEntry, QueueKind } from '@/modules/queue/types';
 export { noteShownChat } from '@/modules/queue/shownChat';
 export { openNextInQueue } from '@/modules/queue/queueNavigation';

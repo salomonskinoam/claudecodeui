@@ -3,6 +3,7 @@ import { pageClaims } from '@/modules/queue/page-claims.js';
 import { readPlacements, resolvePlacement, type Where } from '@/modules/queue/placement.js';
 import { groupOf, rootOf, waitsForMe, type QueueGroup, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import { getTickets, openBlockersOf, type Ticket } from '@/modules/queue/sources/tickets.js';
+import { isUnstarted } from '@/modules/queue/sources/transcripts.js';
 
 /**
  * quests priority queue: the entries, built from the tickets and the chats on every read. One entry per open
@@ -41,6 +42,8 @@ export type QueueEntry = QueueOrderEntry & {
   replyAt: string | null;
   /** The chat's last activity (epoch ms, 0 for none): its process's last status change, or its last reply. */
   activityAt: number;
+  /** Noam wrote in the chat at least once (transcripts.ts isUnstarted); a chat that only ran on its own never waits for him. */
+  started: boolean;
   /** Open in another editor (Cursor, the Claude desktop app, a terminal): read-only in the page. */
   heldOutside: boolean;
   closingLine: string | null;
@@ -79,6 +82,7 @@ const chatFields = (c: Chat | null) => ({
   live: c?.process != null,
   replyAt: c?.closingLine?.at ?? null,
   activityAt: Math.max(c?.process?.statusUpdatedAt ?? 0, time(c?.closingLine?.at)),
+  started: c ? !isUnstarted(c.sid) : false,
 });
 
 /**
@@ -148,6 +152,6 @@ export function buildEntries(): QueueEntry[] {
   const placements = readPlacements();
   return entries.map((e) => {
     const { where, at } = resolvePlacement(placements[e.key], e.replyAt ?? 'none', e.activityAt);
-    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), placement: where, placedAt: at, waitsForMe: where === 'queue' && (e.state === 'permission' || waitsForMe(e)) };
+    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), placement: where, placedAt: at, waitsForMe: where === 'queue' && (e.state === 'permission' || (waitsForMe(e) && (e.started || e.kind !== 'chat'))) };
   });
 }

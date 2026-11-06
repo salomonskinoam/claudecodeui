@@ -4,6 +4,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { ServerEvent,MarkSessionIdle,MarkSessionProcessing,PendingPermissionRequest,ProjectSession,LLMProvider,NormalizedMessage,GetSessionActivity,MarkSessionBackground } from '@/shared/types';
 import { showCompletionTitleIndicator } from '@/modules/chat/utils/pageTitleNotification';
 import { playChatCompletionSound, playNotificationSound } from '@/shared/utils';
+import { settleQueue } from '@/modules/queue';
 import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
 import { collectRunningBackgroundTasks } from '@/modules/chat/utils/backgroundTasks';
@@ -298,9 +299,12 @@ export function useChatRealtimeHandlers({
           }
 
           // Celebrate only successful runs (failed runs end with success: false).
+          // The sound comes with the queue's change: the queue is read again first (settleQueue), at most 3 s.
           if (msg.success !== false && !isHiddenTabRef.current) {
-            showCompletionTitleIndicator();
-            void playChatCompletionSound();
+            const finished = () => { showCompletionTitleIndicator(); void playChatCompletionSound(); };
+            if (sid) {
+              void Promise.race([settleQueue(sid).catch(() => undefined), new Promise((resolve) => { setTimeout(resolve, 3000); })]).then(finished);
+            } else finished();
           }
 
           // The session id is stable for the whole conversation (allocated

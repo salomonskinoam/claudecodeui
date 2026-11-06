@@ -13,6 +13,7 @@ export function entryHint(e: QueueEntry, dot: ChatDot | undefined): string {
   const line = e.closingLine ? e.closingLine.replace(/^(\S+( for)?)\s*/, '').trim() : '';
   const why = e.state === 'permission' ? 'Waits for you: a permission prompt'
     : e.state === 'running' ? 'Running'
+      : e.kind === 'chat' && e.sessionId && !e.started ? 'Not started: you have not written in it; it only ran on its own'
       : e.waitsForMe ? `Waits for you: ${e.state === 'done' ? 'a Done to approve' : 'a question'}${line ? ` (${line})` : ''}`
         : e.state === 'waiting' ? `Waits for something else, not you${line ? `: ${line}` : ''}`
           : e.state === 'blocker' ? `Blocked${line ? `: ${line}` : ''}`
