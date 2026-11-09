@@ -7,3 +7,5 @@ export { authenticateToken } from './auth.middleware.js';
 export { authenticateWebSocket } from './auth.middleware.js';
 // validateApiKey: used by the server entrypoint for optional API-wide key validation.
 export { validateApiKey } from './auth.middleware.js';
+// generateToken: used by the quests chat manager (server/modules/chat-hosts) to sign its own connections to chat services.
+export { generateToken } from './auth.middleware.js';

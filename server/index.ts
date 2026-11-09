@@ -17,6 +17,7 @@ import {
     sessionHistoryCache,
 } from '@/modules/providers/index.js';
 import { createWebSocketServer } from '@/modules/websocket/index.js';
+import { handleBrowserChat } from '@/modules/chat-hosts/index.js';
 import { proxyToRunner } from '@/modules/runner/index.js';
 import { approvalsOf, runningRuns, setOnProcessChange, startRuntimeStatePoll } from '@/shared/runtime-state.js';
 
@@ -104,15 +105,15 @@ const agentRoutes = createAgentModule({
     queryOpenCode,
 });
 
-// Single WebSocket server that handles chat, shell, and plugin proxy paths. quests: the chats run in the runner
-// (server/runner.ts, its own service), so a restart of this server stops no chat: the chat and notification
-// sockets pass through to it.
+// Single WebSocket server that handles chat, shell, and plugin proxy paths. quests: each chat runs in its own
+// service (server/modules/chat-hosts), so a restart of this server stops no chat: the chat socket's frames go to
+// each chat's service. The notification socket (used only by the Electron app) still passes to the old runner.
 createWebSocketServer(server, {
     verifyClient: {
         isPlatform: IS_PLATFORM,
         authenticateWebSocket,
     },
-    chat: (ws, request) => proxyToRunner(ws, request, true),
+    chat: (ws, request) => handleBrowserChat(ws, request),
     notifications: (ws, request) => proxyToRunner(ws, request, false),
     shell: {
         resolveProviderSessionId: (sessionId, provider) => {

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -43,7 +44,6 @@ export type RuntimeState = {
 
 export const EMPTY_RUNTIME_STATE: RuntimeState = { runs: [], approvals: {}, inFlight: [], lastSteps: {}, background: [], startTimes: {} };
 let copy: RuntimeState = EMPTY_RUNTIME_STATE;
-let warned = false;
 // Called with each session whose Claude process started or ended (server/index.ts drops its cached history).
 let onProcessChange: (sessionId: string) => void = () => undefined;
 export const setOnProcessChange = (f: (sessionId: string) => void): void => { onProcessChange = f; };
@@ -58,9 +58,44 @@ export const isTurnInFlight = (sessionId: string): boolean => copy.inFlight.incl
 export const lastStepOf = (sessionId: string) => copy.lastSteps[sessionId] ?? null;
 export const startTimeOf = (sessionId: string): number | null => copy.startTimes[sessionId] ?? null;
 
-function fetchState(): Promise<RuntimeState> {
+/** The chat services whose last /state read timed out: alive but not answering (the check calls them hung). */
+const timedOut = new Set<string>();
+export const isUnanswering = (sessionId: string): boolean => timedOut.has(sessionId);
+
+/** The chats the old single runner (quests-runner.service) still holds: they stay there until they end. */
+let oldRunner = new Set<string>();
+export const heldByOldRunner = (sessionId: string): boolean => oldRunner.has(sessionId);
+
+/** The page session ids of the chat services with a socket file (a crashed one leaves its file behind). */
+export const chatSocketIds = (): string[] => {
+  try {
+    return fs.readdirSync(CHATS_DIR).filter((f) => f.startsWith('chat-') && f.endsWith('.sock')).map((f) => f.slice(5, -5));
+  } catch {
+    return [];
+  }
+};
+
+/** The old single runner's state plus every chat service's, merged; a socket that does not answer counts empty. */
+async function fetchState(): Promise<RuntimeState> {
+  const ids = chatSocketIds();
+  const parts = await Promise.all([RUNNER_SOCKET, ...ids.map(chatSocket)].map((socket, i) => fetchOne(socket).then(
+    (state) => { if (i > 0) timedOut.delete(ids[i - 1]); return state; },
+    (error: Error) => { if (i > 0 && error.message === 'timed out') timedOut.add(ids[i - 1]); return EMPTY_RUNTIME_STATE; },
+  )));
+  oldRunner = new Set([...parts[0].runs.map((r) => r.sessionId), ...Object.keys(parts[0].startTimes)]);
+  return {
+    runs: parts.flatMap((p) => p.runs),
+    approvals: Object.assign({}, ...parts.map((p) => p.approvals)),
+    inFlight: parts.flatMap((p) => p.inFlight),
+    lastSteps: Object.assign({}, ...parts.map((p) => p.lastSteps)),
+    background: parts.flatMap((p) => p.background),
+    startTimes: Object.assign({}, ...parts.map((p) => p.startTimes)),
+  };
+}
+
+function fetchOne(socketPath: string): Promise<RuntimeState> {
   return new Promise((resolve, reject) => {
-    const req = http.get({ socketPath: RUNNER_SOCKET, path: '/state', timeout: 2000 }, (res) => {
+    const req = http.get({ socketPath, path: '/state', timeout: 2000 }, (res) => {
       let body = '';
       res.setEncoding('utf8');
       res.on('data', (chunk) => { body += chunk; });
@@ -72,22 +107,14 @@ function fetchState(): Promise<RuntimeState> {
         }
       });
     });
-    req.on('timeout', () => req.destroy(new Error('runner state timed out')));
+    req.on('timeout', () => req.destroy(new Error('timed out')));
     req.on('error', reject);
   });
 }
 
 /** Reads the runner's state now. With the runner down nothing runs: the copy is empty. */
 export async function refreshRuntimeState(): Promise<void> {
-  let next: RuntimeState;
-  try {
-    next = await fetchState();
-    warned = false;
-  } catch (error) {
-    if (!warned) console.warn('[runner] state unavailable; no chat counts as running until it answers', { error: String(error) });
-    warned = true;
-    next = EMPTY_RUNTIME_STATE;
-  }
+  const next = await fetchState();
   // A session's history says whether its background agents run from whether its process is live: a process that
   // started or ended makes its cached history stale (session-history-cache.service.ts).
   for (const id of new Set([...Object.keys(copy.startTimes), ...Object.keys(next.startTimes)])) {
