@@ -4,7 +4,7 @@ import { entryHint } from '@/modules/queue/entryHint';
 import type { QueueEntry } from '@/modules/queue/types';
 
 const entry = (over: Partial<QueueEntry>): QueueEntry => ({
-  kind: 'chat', sessionId: 's', state: 'none', waitsForMe: false, live: true, placement: 'queue', closingLine: null, ...over,
+  kind: 'chat', sessionId: 's', state: 'none', waitsForMe: false, live: true, placement: 'queue', closingLine: null, marks: [], ...over,
 }) as QueueEntry;
 
 describe('entryHint', () => {
@@ -29,8 +29,19 @@ describe('entryHint', () => {
       .toBe('Its workers run. Waits for something else, not you: the agents');
   });
 
-  it('says when a waiting chat has no process to wake it', () => {
-    expect(entryHint(entry({ state: 'waiting', live: false, closingLine: 'waiting for the debug run' }), undefined))
-      .toBe('Waits for something else, not you: the debug run. No process: nothing will wake it');
+  it('says when a waiting chat has no process and no listener to wake it', () => {
+    expect(entryHint(entry({ state: 'waiting', live: false, waitsForMe: true, closingLine: 'waiting for the debug run' }), undefined))
+      .toBe('Waits for something else, not you: the debug run. No process and no listener: nothing will wake it');
+    expect(entryHint(entry({ state: 'waiting', live: false, closingLine: 'waiting for the debug run', marks: ['listener'] }), 'listener'))
+      .toBe('Waits for something else, not you: the debug run. A listener runs and will wake it');
+  });
+
+  it("names what the manager's check found", () => {
+    expect(entryHint(entry({ state: 'waiting', live: false, closingLine: 'waiting for the eval', marks: ['listenerSilent'] }), 'listenerSilent'))
+      .toBe('Waits for something else, not you: the eval. A listener runs, but its log has been silent for 2 hours');
+    expect(entryHint(entry({ state: 'running', waitsForMe: true, marks: ['hung'] }), 'hung'))
+      .toBe('Running. May be hung: no output for 30 minutes and no worker running');
+    expect(entryHint(entry({ state: 'waiting', live: false, waitsForMe: true, closingLine: 'waiting for the eval', marks: ['listenerEnded'] }), undefined))
+      .toBe('Waits for something else, not you: the eval. No process and no listener: nothing will wake it. A listener ended, and the chat (open in Cursor) has not seen it');
   });
 });

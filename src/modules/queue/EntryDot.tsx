@@ -1,4 +1,5 @@
-import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
+import ChatDotMark from '@/shared/hooks/ChatDotMark';
+import { useChatDots } from '@/shared/hooks/useLiveChats';
 import { cn } from '@/shared/utils';
 
 /**
@@ -8,11 +9,5 @@ import { cn } from '@/shared/utils';
 export default function EntryDot({ sessionId, className }: { sessionId: string | null; className: string }) {
   const dots = useChatDots();
   const dot = sessionId ? dots[sessionId] : undefined;
-  return (
-    <span
-      title={dot && CHAT_DOT_STYLE[dot].label}
-      className={cn('flex-shrink-0 rounded-full', (dot === 'running' || dot === 'workers') && 'animate-pulse', className)}
-      style={{ backgroundColor: dot ? CHAT_DOT_STYLE[dot].color : 'transparent' }}
-    />
-  );
+  return dot ? <ChatDotMark dot={dot} className={className} /> : <span className={cn('flex-shrink-0', className)} />;
 }

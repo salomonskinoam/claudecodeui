@@ -42,6 +42,8 @@ export type QueueEntry = {
   waitsForMe: boolean;
   /** The chat has a running process, whatever its state. */
   live: boolean;
+  /** What the chat manager's check found: a listener runs or is silent, one ended unseen, may be hung, keeps dying. */
+  marks: Array<'listener' | 'listenerSilent' | 'listenerEnded' | 'hung' | 'keepsDying'>;
   /** Noam wrote in the chat at least once; a chat that only ran on its own never waits for him. */
   /** Where Noam put the entry, one flag: the queue, "On hold" (until the chat replies again) or "Archived". */
   placement: Where;

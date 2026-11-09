@@ -16,9 +16,9 @@ import {
     providerRuntimeService,
     sessionHistoryCache,
 } from '@/modules/providers/index.js';
-import { createWebSocketServer } from '@/modules/websocket/index.js';
-import { handleBrowserChat, startManager } from '@/modules/chat-hosts/index.js';
-import { approvalsOf, runningRuns, setOnProcessChange, startRuntimeStatePoll } from '@/shared/runtime-state.js';
+import { connectedClients, createWebSocketServer } from '@/modules/websocket/index.js';
+import { handleBrowserChat, onChatsChanged, startManager } from '@/modules/chat-hosts/index.js';
+import { allMarks, approvalsOf, runningRuns, setOnProcessChange, startRuntimeStatePoll } from '@/shared/runtime-state.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
@@ -49,7 +49,7 @@ import {
     closeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
-import { closeQueue, initializeQueue, processStates, queueRoutes } from './modules/queue/index.js';
+import { closeQueue, initializeQueue, onClosingLineChange, processStates, queueRoutes } from './modules/queue/index.js';
 import { findTaskOutputFile, isTaskOutputFile, readOutputTail } from './modules/queue/work.js';
 import { readWorkState } from './modules/queue/work-state.js';
 import { readClaudeSubagentTab } from './modules/providers/list/claude/claude-sessions.provider.js';
@@ -343,6 +343,14 @@ app.get('/api/quests/live', authenticateToken, async (_req: Request, res: Respon
     for (const run of runningRuns()) {
         states[run.sessionId] = approvalsOf(run.sessionId).length > 0 ? 'waiting' : 'running';
     }
+    // quests: what the manager's check found. Hung (or dying) shows over a running dot, never over an approval;
+    // a listener shows only on a chat that does nothing itself.
+    for (const [id, marks] of Object.entries(allMarks())) {
+        if (marks.includes('hung') || marks.includes('keepsDying')) {
+            if (states[id] !== 'waiting') states[id] = 'hung';
+        } else if (!states[id] && marks.includes('listenerSilent')) states[id] = 'listenerSilent';
+        else if (!states[id] && marks.includes('listener')) states[id] = 'listener';
+    }
     res.json(states);
 });
 
@@ -519,6 +527,12 @@ async function startServer() {
             startRuntimeStatePoll();
             initializeQueue();
             if (process.env.QUESTS_MANAGER !== 'off') startManager();
+            // quests: a chat started, stopped, asked, got a listener, or moved in the queue: every page reads its
+            // dots and its queue again at once (src/shared/hooks/useLiveChats.ts); the 10 s polls are the backup.
+            const liveChanged = JSON.stringify({ kind: 'quests_live_changed' });
+            const tellPages = () => { for (const c of connectedClients) if (c.readyState === 1) c.send(liveChanged); };
+            onChatsChanged(tellPages);
+            onClosingLineChange(tellPages);
 
             // Start server-side plugin processes for enabled plugins
             startEnabledPluginServers().catch(err => {

@@ -11,6 +11,7 @@ import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { useProviderSessionIdCopy } from '@/modules/sidebar/hooks/useProviderSessionIdCopy';
 import SessionOptions from '@/modules/sidebar/SessionOptions';
 import { openRightTab, usePanes } from '@/shared/hooks/useSplitPane';
+import ChatDotMark from '@/shared/hooks/ChatDotMark';
 import { CHAT_DOT_STYLE, useChatDots } from '@/shared/hooks/useLiveChats';
 
 type SidebarSessionItemProps = {
@@ -148,12 +149,7 @@ function SidebarSessionItem({
       {dot && (
         <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 transform">
           <Tooltip content={CHAT_DOT_STYLE[dot].label} position="right">
-            <div
-              role="status"
-              aria-label={CHAT_DOT_STYLE[dot].label}
-              className={cn('h-2 w-2 rounded-full', (dot === 'running' || dot === 'workers') && 'animate-pulse')}
-              style={{ backgroundColor: CHAT_DOT_STYLE[dot].color }}
-            />
+            <ChatDotMark dot={dot} className="h-2 w-2" />
           </Tooltip>
         </div>
       )}

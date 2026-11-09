@@ -13,15 +13,22 @@ export function entryHint(e: QueueEntry, dot: ChatDot | undefined): string {
   const line = e.closingLine ? e.closingLine.replace(/^(\S+( for)?)\s*/, '').trim() : '';
   const why = e.state === 'permission' ? 'Waits for you: a permission prompt'
     : e.state === 'running' ? 'Running'
-      : e.waitsForMe ? `Waits for you: ${e.state === 'done' ? 'a Done to approve' : 'a question'}${line ? ` (${line})` : ''}`
+      : e.waitsForMe && (e.state === 'question' || e.state === 'done') ? `Waits for you: ${e.state === 'done' ? 'a Done to approve' : 'a question'}${line ? ` (${line})` : ''}`
         : e.state === 'waiting' ? `Waits for something else, not you${line ? `: ${line}` : ''}`
           : e.state === 'blocker' ? `Blocked${line ? `: ${line}` : ''}`
             : e.state === 'unclaimed' ? 'Ticket no chat has claimed'
               : e.live ? 'Idle: its last reply has no closing line' : 'No process';
-  // A chat waiting or blocked with no process: nothing runs in it, so nothing will wake it.
-  const asleep = !e.live && (e.state === 'waiting' || e.state === 'blocker') ? '. No process: nothing will wake it' : '';
+  const m = e.marks;
+  const listening = m.includes('listener') || m.includes('listenerSilent');
+  // A chat waiting or blocked with no process and no listener: nothing will wake it.
+  const asleep = !e.live && !listening && (e.state === 'waiting' || e.state === 'blocker') ? '. No process and no listener: nothing will wake it' : '';
+  const found = m.includes('hung') ? '. May be hung: no output for 30 minutes and no worker running'
+    : m.includes('keepsDying') ? '. Its process keeps dying: woken 3 times in an hour, not again'
+      : m.includes('listenerEnded') ? '. A listener ended, and the chat (open in Cursor) has not seen it'
+        : m.includes('listenerSilent') ? '. A listener runs, but its log has been silent for 2 hours'
+          : m.includes('listener') ? '. A listener runs and will wake it' : '';
   const where = e.placement === 'hold' ? 'On hold until its next activity. '
     : e.placement === 'archive' ? 'Archived until its next activity. ' : '';
   const seen = dot === 'done' ? 'Turn ended, not seen yet. ' : dot === 'workers' ? 'Its workers run. ' : '';
-  return `${where}${seen}${why}${asleep}`;
+  return `${where}${seen}${why}${asleep}${found}`;
 }

@@ -2,7 +2,8 @@ import { memo, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import type { DragEvent } from 'react';
 
-import { type ChatDot, CHAT_DOT_STYLE } from '@/shared/hooks/useLiveChats';
+import ChatDotMark from '@/shared/hooks/ChatDotMark';
+import { type ChatDot } from '@/shared/hooks/useLiveChats';
 import { cn } from '@/shared/utils';
 import { KindSign, RenameDialog, TabContextMenu, useChatLook } from '@/modules/queue';
 import { planNameOf, ticketOf, workOf, NEW_CHAT_TAB } from '@/shared/hooks/useSplitPane';
@@ -118,11 +119,7 @@ function PaneTabs({ ids, activeId, nameOf, onSelect, onClose, onClosePane, dotOf
             onContextMenu={(event) => { event.preventDefault(); setMenu({ id, x: event.clientX, y: event.clientY }); }}
           >
             {dot && (
-              <span
-                title={CHAT_DOT_STYLE[dot].label}
-                className={cn('h-2 w-2 flex-shrink-0 rounded-full', (dot === 'running' || dot === 'workers') && 'animate-pulse')}
-                style={{ backgroundColor: CHAT_DOT_STYLE[dot].color }}
-              />
+              <ChatDotMark dot={dot} className="h-2 w-2" />
             )}
             {look && look.kind !== 'chat' && <KindSign kind={look.kind} />}
             <span className="truncate">{nameOf(id)}</span>

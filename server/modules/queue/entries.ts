@@ -4,6 +4,7 @@ import { readPlacements, resolvePlacement, type Where } from '@/modules/queue/pl
 import { groupOf, rootOf, waitsForMe, type QueueGroup, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import { getTickets, openBlockersOf, type Ticket } from '@/modules/queue/sources/tickets.js';
 import { isUnstarted } from '@/modules/queue/sources/transcripts.js';
+import { marksOf, type ChatMark } from '@/shared/runtime-state.js';
 
 /**
  * quests priority queue: the entries, built from the tickets and the chats on every read. One entry per open
@@ -32,6 +33,8 @@ export type QueueEntry = QueueOrderEntry & {
   group: QueueGroup;
   /** Waits for Noam's input: a permission prompt, or a question or Done he has not dismissed. The list shows these. */
   waitsForMe: boolean;
+  /** What the manager's check found (server/shared/runtime-state.ts ChatMark). */
+  marks: ChatMark[];
   /** The chat has a running process, whatever its state. */
   live: boolean;
   /** Where Noam put the entry: the queue, "On hold" or "Archived" (placement.ts). One flag. */
@@ -80,7 +83,17 @@ const chatFields = (c: Chat | null) => ({
   live: c?.process != null,
   replyAt: c?.closingLine?.at ?? null,
   activityAt: Math.max(c?.process?.statusUpdatedAt ?? 0, time(c?.closingLine?.at)),
+  marks: c ? marksOf(c.pageSessionId ?? c.sid) : [],
 });
+
+/**
+ * quests: a chat that needs Noam although its closing line does not ask him: the manager found it may be hung or
+ * keeps dying, a listener of a Cursor chat ended unseen, or it waits or is blocked with no process and no listener,
+ * so nothing will wake it.
+ */
+const needsMe = (e: { state: QueueState; live: boolean; marks: ChatMark[] }): boolean =>
+  e.marks.some((m) => m === 'hung' || m === 'keepsDying' || m === 'listenerEnded')
+  || ((e.state === 'waiting' || e.state === 'blocker') && !e.live && !e.marks.includes('listener') && !e.marks.includes('listenerSilent'));
 
 /**
  * Who holds which ticket, one to one (Noam, 4 Nov: "a chat can't hold 2 tickets and 1 ticket cant be in 2 chats.
@@ -153,6 +166,6 @@ export function buildEntries(): QueueEntry[] {
   const placements = readPlacements();
   return entries.map((e) => {
     const { where, at } = resolvePlacement(placements[e.key], e.replyAt ?? 'none', e.activityAt);
-    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), placement: where, placedAt: at, waitsForMe: where === 'queue' && (e.state === 'permission' || waitsForMe(e)) };
+    return { ...e, rootKey: rootOf(e.key, byKey), group: groupOf(e), placement: where, placedAt: at, waitsForMe: where === 'queue' && (e.state === 'permission' || waitsForMe(e) || needsMe(e)) };
   });
 }

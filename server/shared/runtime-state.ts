@@ -133,3 +133,4 @@ export type ChatMark = 'listener' | 'listenerSilent' | 'listenerEnded' | 'hung' 
 let marks: Record<string, ChatMark[]> = {};
 export const setChatMarks = (next: Record<string, ChatMark[]>): void => { marks = next; };
 export const marksOf = (sessionId: string): ChatMark[] => marks[sessionId] ?? [];
+export const allMarks = (): Record<string, ChatMark[]> => marks;

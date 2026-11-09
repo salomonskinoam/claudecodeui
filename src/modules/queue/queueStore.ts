@@ -11,7 +11,8 @@ import type { Queue, TicketGroup, Where } from '@/modules/queue/types';
  * the server (server/modules/queue/queue-order.ts).
  */
 
-const POLL_MS = 2000;
+// A backup only: the queue reads itself again on every `quests_live_changed` event (useLiveChats.ts).
+const POLL_MS = 10_000;
 const EMPTY: Queue = { entries: [], order: [], latch: null, view: [], ticketGroups: [] };
 
 let queue: Queue = EMPTY;

@@ -171,6 +171,11 @@ function titleOf(lines: string[], type: string, field: string): string | null {
   return null;
 }
 
+const lastLines = new Map<string, string>();
+const lineListeners = new Set<() => void>();
+/** quests: called when a chat's closing line changed (the queue moves it): the page reads again at once. */
+export const onClosingLineChange = (f: () => void): void => { lineListeners.add(f); };
+
 /** Reads a chat's transcript and stores what the queue needs from it. */
 export async function noteTranscript(file: string): Promise<void> {
   if (!file.endsWith('.jsonl') || file.includes(`${path.sep}subagents${path.sep}`)) return;
@@ -189,6 +194,9 @@ export async function noteTranscript(file: string): Promise<void> {
     line_at: line.at,
     finalized: lines.some(isFinalizeCommand) ? 1 : 0,
   });
+  const key = `${line.kind}|${line.text}|${line.at}`;
+  if (lastLines.has(sid) && lastLines.get(sid) !== key) for (const f of lineListeners) f();
+  lastLines.set(sid, key);
 }
 
 /** Reads a chat's transcript once, in the background, if it was never read (a chat that just appeared as a tab). */
