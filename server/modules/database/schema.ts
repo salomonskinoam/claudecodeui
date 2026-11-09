@@ -112,6 +112,37 @@ CREATE TABLE IF NOT EXISTS queue_chats (
     line_at TEXT,
     finalized INTEGER NOT NULL DEFAULT 0
 );
+-- One row per chat service (the user unit quests-chat-<session_id>), written by the service itself so the record
+-- outlives the manager (server/modules/chat-hosts). Times are ISO strings.
+CREATE TABLE IF NOT EXISTS chat_hosts (
+    session_id TEXT PRIMARY KEY,
+    unit TEXT NOT NULL,
+    build TEXT NOT NULL,
+    pid INTEGER,
+    started_at TEXT NOT NULL,
+    turn_open INTEGER NOT NULL DEFAULT 0,
+    turn_started_at TEXT,
+    -- a Claude process is alive between turns (held for background work)
+    held INTEGER NOT NULL DEFAULT 0,
+    last_event_at TEXT,
+    ended_at TEXT,
+    -- JSON list of the times the manager woke this chat after its process died
+    wakes TEXT NOT NULL DEFAULT '[]'
+);
+-- One row per listener a chat started with quests/bin/quests-listen; its wrapper writes ended_at and exit_code.
+CREATE TABLE IF NOT EXISTS listeners (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    command TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    log_path TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    exit_code INTEGER,
+    delivered_at TEXT,
+    restarts INTEGER NOT NULL DEFAULT 0
+);
 `;
 
 export const SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL = `

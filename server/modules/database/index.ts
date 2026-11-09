@@ -27,3 +27,5 @@ export { scheduledMessagesDb } from './repositories/scheduled-messages.db.js';
 export { queueDb } from './repositories/queue.db.js';
 export type { QueueChatRow, QueueSessionRow } from './repositories/queue.db.js';
 export type { ScheduledMessageRow, ScheduledMessageStatus } from './repositories/scheduled-messages.db.js';
+export { chatHostsDb, listenersDb } from './repositories/chat-hosts.db.js';
+export type { ChatHostRow, ListenerRow } from './repositories/chat-hosts.db.js';
