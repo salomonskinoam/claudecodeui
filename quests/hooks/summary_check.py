@@ -58,8 +58,8 @@ def failures(final, earlier):
         n = ITEM.match(b[0]).group(1)
         if not any(q in b[0] for q in QUOTES):
             out.append(f'Summary item {n} has no quotation mark in its first line: open it with the words it answers.')
-        text = '\n'.join(b)
-        if '[blocks]' in text and '?' not in text:
+        # The tag counts on the item's first line only: "[blocks]" written further down is text about the tag.
+        if '[blocks]' in b[0] and '?' not in '\n'.join(b):
             out.append(f'Summary item {n} is tagged [blocks] but asks no question.')
     return out
 
@@ -83,6 +83,7 @@ def test():
     assert 'no "**Summary**"' in failures('- **5.** "x" done', [])[0]
     assert 'quotation' in failures('**Summary**\n- **5.** done', [])[0]
     assert 'asks no question' in failures('**Summary**\n- **5.** "x" [blocks] go.', [])[0]
+    assert failures('**Summary**\n- **5.** "x" done.\n  - a [blocks] item asks no question: checked.', []) == []
     assert failures('1. restart the server\n2. reload', []) == []  # plain numbered lists are not items
     print('ok')
 
