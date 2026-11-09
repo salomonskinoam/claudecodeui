@@ -10,6 +10,5 @@ export type SessionMessagesRequestOptions = {
 // it is re-exported here because the pagination tests cover its shape.
 export { sessionMessagesUrl as buildSessionMessagesUrl } from '@/shared/api';
 
-// quests: the page merges (latest and older pages onto a cached list, the bridge planning, the time-boundary
-// checks) are gone: the chat's ledger (src/modules/chat/ledger/chatLedger.ts) confirms known rows by id and
-// appends the rest, so there is nothing to merge (requirement 52).
+// quests: reads are placed by transcript position (src/modules/chat/transcript/transcriptWindow.ts), so there is
+// nothing to merge (requirement 52).

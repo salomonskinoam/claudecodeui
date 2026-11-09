@@ -431,14 +431,12 @@ export type ChatMessage = {
   taskNotificationStatus?: string;
   /** quests: a task notification's `<result>`, drawn inside the report's frame under its summary line, closed by default. */
   reportBody?: string;
-  /** quests: a one-line note from Claude Code itself ("Tools loaded", an interrupted turn) or from the ledger (a gap in what the page saw). */
-  noteKind?: 'interrupt' | 'tools' | 'gap';
-  /** quests: the fold this row was appended into (requirement 39), set once at append, never later. */
+  /** quests: a one-line note from Claude Code itself ("Tools loaded", an interrupted turn). */
+  noteKind?: 'interrupt' | 'tools';
+  /** quests: the fold this row is hidden under (requirement 39), decided looking back only. */
   foldId?: string;
   /** quests: a typed message not yet in the transcript (`pending`), or one that never got there (`failed`, drawn "not delivered"). */
   delivery?: 'pending' | 'failed';
-  /** quests: the row was replaced by an edit of an earlier message; it stays drawn, dimmed. */
-  superseded?: boolean;
   /** Stored memory this reply drew on, shown as a footnote beneath it. */
   memoryCitations?: MemoryCitation[];
   /** Lifecycle the provider reported for this tool call, when it reports one; otherwise the status is inferred from whether a result has arrived. */
@@ -548,11 +546,9 @@ export type NormalizedMessage = {
   seq?: number;
   /** quests: the run `seq` counts in (see ServerEvent.runId). */
   runId?: string;
-  /** quests: the ledger's marks (src/modules/chat/ledger/chatLedger.ts); never sent by the backend. */
+  /** quests: the page's marks (src/modules/chat/transcript/transcriptWindow.ts); never sent by the backend. */
   foldId?: string;
   delivery?: 'pending' | 'failed';
-  superseded?: boolean;
-  noteKind?: 'gap';
 
   // kind-specific fields (flat for simplicity)
   role?: 'user' | 'assistant';

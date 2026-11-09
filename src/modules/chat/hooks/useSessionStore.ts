@@ -3,12 +3,11 @@
  *
  * Holds per-session state in a Map keyed by sessionId.
  * Session switch = change activeSessionId pointer. No clearing. Old data stays.
- * WebSocket handler = store.appendRealtime(msg.sessionId, msg). One line.
  *
- * quests: what the page draws is the session's LEDGER (src/modules/chat/ledger/chatLedger.ts, requirement 52):
- * one append-only list of rows, fed by the transcript reads, the live events, the typed echoes and the
- * streamed reply. This hook only drives it: it requests pages, serializes them, and tells React when the
- * ledger changed. No merge of lists, no removal by text, no sort lives here any more.
+ * quests: the page draws the transcript (requirement 52; Noam, 9 Nov: "there is a ssot. just display it"). A slot
+ * holds a window of the server's rows placed by position (src/modules/chat/transcript/transcriptWindow.ts), the
+ * typed messages and notices until the transcript has them, and the reply the page streams. A browser cache of the
+ * last window shows a chat at once and is overwritten by the next server read (transcriptCache.ts).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -18,10 +17,9 @@ import type { LLMProvider, NormalizedMessage } from '@/shared/types';
 import { SESSION_MESSAGES_PAGE_SIZE } from '@/modules/chat/utils/sessionMessagePagination';
 import type { SessionMessagesRequestOptions } from '@/modules/chat/utils/sessionMessagePagination';
 import {
-  appendLive, appendLocal, appendRead, appendStreamDelta, createLedger, cut, endStream, markUndelivered, mergeLedgers,
-  UNDELIVERED_AFTER_MS, type Ledger,
-} from '@/modules/chat/ledger/chatLedger';
-import { loadLedger, openKeysOf, saveLedger } from '@/modules/chat/ledger/ledgerStorage';
+  EMPTY_WINDOW, placeLatest, placeOlder, settleNotes, view, windowEnd, type Note, type TranscriptWindow,
+} from '@/modules/chat/transcript/transcriptWindow';
+import { loadCachedChat, openKeysOf, saveCachedChat } from '@/modules/chat/transcript/transcriptCache';
 import { onRowOpenChange, openKeys, seedRowOpen } from '@/modules/chat/ledger/rowOpen';
 
 // ─── Per-session slot ────────────────────────────────────────────────────────
@@ -29,43 +27,52 @@ import { onRowOpenChange, openKeys, seedRowOpen } from '@/modules/chat/ledger/ro
 export type SessionStatus = 'idle' | 'loading' | 'streaming' | 'error';
 
 export type SessionSlot = {
-  ledger: Ledger;
-  /** Settles once the ledger this viewer stored for the chat has been loaded in (or there was none). */
+  window: TranscriptWindow;
+  /** Typed messages and notices, until the transcript has them. */
+  notes: Note[];
+  /** The reply the page streams; it goes at the first read after the turn ends. */
+  stream: NormalizedMessage | null;
+  streamEnded: boolean;
+  /** What the page draws, rebuilt on every change. */
+  view: NormalizedMessage[];
+  /** Settles once the cached window has been drawn (or there was none). */
   ready: Promise<void>;
-  /**
-   * @internal Serializes history reads for this session so an older-page
-   * request calculates its offset after any latest-page refresh completes.
-   */
+  /** @internal Serializes history reads for this session. */
   _historyMutationQueue: Promise<void>;
+  /** False until the first server read of this page's life: that read also refreshes the cached rows. */
+  read: boolean;
   status: SessionStatus;
   fetchedAt: number;
+  /** The transcript's row count at the last read. */
   total: number;
   hasMore: boolean;
-  /** How many transcript rows, counted from the tail, the ledger holds: the next older page starts here. */
+  /** How many rows, counted from the transcript's end, the window holds: the next older page starts here. */
   offset: number;
   tokenUsage: unknown;
 };
 
 const EMPTY: NormalizedMessage[] = [];
 const SESSION_HISTORY_REQUEST_TIMEOUT_MS = 30_000;
-/** A change is saved this long after the last one. */
+/** A change is cached this long after the last one. */
 const SAVE_DEBOUNCE_MS = 1000;
-/** The biggest bridge read after a long absence. */
-const MAX_BRIDGE_ROWS = 5000;
+/** The biggest read that fills a hole after a long absence; past it the window starts over. */
+const MAX_FILL_ROWS = 5000;
+/** The first read of a cached chat re-reads at most this many of its rows. */
+const MAX_REFRESH_ROWS = 1000;
+/** A live event makes the page read the transcript, at most this often. */
+const LIVE_READ_MS = 300;
+/** A typed message the transcript does not have after this long is "not delivered". */
+const UNDELIVERED_AFTER_MS = 60_000;
 
-/** How many of a ledger's rows the transcript has served: where the next older page starts. */
-function transcriptRowCount(ledger: Ledger): number {
-  const confirmed = new Set<string>();
-  for (const [id, rowId] of Object.entries(ledger.alias)) {
-    if (!id.startsWith('local_') && !id.startsWith('__stream_')) confirmed.add(rowId);
-  }
-  return ledger.rows.filter((row) => row.source === 'transcript' || confirmed.has(row.id)).length;
-}
-
-function createEmptySlot(sessionId: string): SessionSlot {
+function createEmptySlot(): SessionSlot {
   return {
-    ledger: createLedger(sessionId),
+    window: EMPTY_WINDOW,
+    notes: [],
+    stream: null,
+    streamEnded: false,
+    view: EMPTY,
     ready: Promise.resolve(),
+    read: false,
     status: 'idle',
     fetchedAt: 0,
     total: 0,
@@ -82,6 +89,27 @@ function createEmptySlot(sessionId: string): SessionSlot {
   };
 }
 
+/** The window's new shape: its counts, the notes the transcript took over, and what the page draws. */
+function rebuild(slot: SessionSlot): void {
+  slot.offset = slot.total - slot.window.start;
+  slot.hasMore = slot.window.start > 0;
+  slot.notes = settleNotes(slot.window, slot.notes);
+  slot.view = view(slot.window, slot.notes, slot.stream);
+}
+
+/** Rows equal to the ones they replace keep their objects, so React redraws only what changed. */
+function keepSame(before: TranscriptWindow, after: TranscriptWindow): TranscriptWindow {
+  const offset = after.start - before.start;
+  let same = after.rows.length === before.rows.length && offset === 0;
+  const rows = after.rows.map((m, i) => {
+    const old = before.rows[i + offset];
+    if (old && old.id === m.id && JSON.stringify(old) === JSON.stringify(m)) return old;
+    same = false;
+    return m;
+  });
+  return same ? before : { start: after.start, rows };
+}
+
 type SessionHistoryPage = {
   messages: NormalizedMessage[];
   total: number;
@@ -93,7 +121,7 @@ function enqueueHistoryMutation<T>(
   slot: SessionSlot,
   operation: () => Promise<T>,
 ): Promise<T> {
-  // Every read waits for the stored ledger: a page is confirmed against what the viewer saw before.
+  // Every read waits for the cached window, so the read is placed over it.
   const result = slot._historyMutationQueue.then(() => slot.ready).then(operation);
   slot._historyMutationQueue = result.then(
     () => undefined,
@@ -148,46 +176,42 @@ function adoptTokenUsage(slot: SessionSlot, page: SessionHistoryPage): boolean {
 }
 
 /**
- * The latest page into the ledger. Known rows are confirmed, new rows land at the end. A page with no row in
- * common with a non-empty ledger (the page was away for more than a page of rows) is bridged: one bigger read
- * sized by how much the transcript grew, then, if still nothing in common, a gap note and the page as a block.
+ * Reads the newest rows and places them over the window by position. A read that does not reach the window (the
+ * page was away longer than one read) is followed by one read that fills the hole, up to MAX_FILL_ROWS rows; past
+ * that, or if the transcript shrank, the window starts over from the newest rows.
  */
 async function refreshLatestSlotFromServer(
   sessionId: string,
   slot: SessionSlot,
-  limit: number,
+  limit: number | null,
   canRequest: CanRequestHistory = () => true,
 ): Promise<LatestHistoryRefreshResult> {
   if (!canRequest()) {
     return { applied: false, changed: false, deferred: true };
   }
-  const ledger = slot.ledger;
-  const epoch = ledger.epoch;
-  const knownTotal = ledger.transcriptTotal;
-  let page = await requestSessionHistoryPage(sessionId, { limit, offset: 0 });
-  let changed = adoptTokenUsage(slot, page);
-  let result = appendRead(ledger, page.messages, { direction: 'latest', epoch, batch: ledger.rows.length === 0, total: page.total, now: Date.now() });
-  if (!result.stale && !result.overlapped && page.hasMore) {
-    const bridgeLimit = Math.min(MAX_BRIDGE_ROWS, Math.max(limit, page.total - knownTotal + limit));
-    if (!canRequest()) return { applied: false, changed, deferred: true };
-    page = await requestSessionHistoryPage(sessionId, { limit: bridgeLimit, offset: 0 });
-    result = appendRead(ledger, page.messages, { direction: 'latest', epoch, batch: true, total: page.total, now: Date.now() });
-    if (!result.stale && !result.overlapped) {
-      console.warn(`[SessionStore] no row in common after a ${bridgeLimit}-row read of ${sessionId}; drawing a gap`);
-      result = appendRead(ledger, page.messages, { direction: 'latest', epoch, batch: true, bridge: true, total: page.total, now: Date.now() });
+  const first = !slot.read && limit !== null ? Math.max(limit, Math.min(slot.window.rows.length, MAX_REFRESH_ROWS)) : limit;
+  let page = await requestSessionHistoryPage(sessionId, { limit: first, offset: 0 });
+  let placed = placeLatest(slot.window, page.messages, page.total);
+  if (!placed) {
+    const fill = page.total - slot.window.start;
+    if (fill <= MAX_FILL_ROWS) {
+      if (!canRequest()) return { applied: false, changed: false, deferred: true };
+      page = await requestSessionHistoryPage(sessionId, { limit: fill, offset: 0 });
+      placed = placeLatest(slot.window, page.messages, page.total);
     }
-  } else if (!result.stale && !result.overlapped) {
-    // The whole transcript came back and nothing in it is known: the chat was rewritten under the page.
-    result = appendRead(ledger, page.messages, { direction: 'latest', epoch, batch: true, bridge: true, total: page.total, now: Date.now() });
+    placed ??= { start: page.total - page.messages.length, rows: page.messages };
   }
-  if (result.stale) {
-    return { applied: false, changed, deferred: false };
-  }
+  const before = slot.window;
+  slot.window = keepSame(before, placed);
+  slot.read = true;
   slot.total = page.total;
-  slot.offset = Math.max(slot.offset + result.appended, page.messages.length);
-  if (page.messages.length >= slot.offset || !page.hasMore) slot.hasMore = page.hasMore;
   slot.fetchedAt = Date.now();
-  return { applied: true, changed: changed || result.changed, deferred: false };
+  const streamGone = slot.streamEnded && slot.stream !== null;
+  if (streamGone) { slot.stream = null; slot.streamEnded = false; }
+  const notesBefore = slot.notes.length;
+  rebuild(slot);
+  const changed = adoptTokenUsage(slot, page) || slot.window !== before || streamGone || slot.notes.length !== notesBefore;
+  return { applied: true, changed, deferred: false };
 }
 
 // ─── Stale threshold ─────────────────────────────────────────────────────────
@@ -200,18 +224,17 @@ export function useSessionStore() {
   const storeRef = useRef(new Map<string, SessionSlot>());
   const activeSessionIdRef = useRef<string | null>(null);
   // Bump to force re-render — only when the active session's data changes.
-  // Session ids are stable for the whole conversation lifetime (the backend
-  // allocates them before the first send), so slots are keyed directly with
-  // no alias/redirect indirection.
   const [, setTick] = useState(0);
-  // The ledger is saved per viewer (requirement 52), a second after its last change and when the page hides.
+  // The cache is overwritten a second after the last change and when the page hides.
   const saveTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const saveNow = useCallback((sessionId: string) => {
     const timer = saveTimersRef.current.get(sessionId);
     if (timer) clearTimeout(timer);
     saveTimersRef.current.delete(sessionId);
     const slot = storeRef.current.get(sessionId);
-    if (slot && slot.ledger.rows.length > 0) void saveLedger(slot.ledger, openKeysOf(slot.ledger, openKeys()));
+    if (slot && slot.window.rows.length > 0) {
+      void saveCachedChat({ sessionId, start: slot.window.start, rows: slot.window.rows, open: openKeysOf(slot.view, openKeys()) });
+    }
   }, []);
   const scheduleSave = useCallback((sessionId: string) => {
     const timers = saveTimersRef.current;
@@ -228,7 +251,7 @@ export function useSessionStore() {
   useEffect(() => {
     const flush = () => { for (const sessionId of [...saveTimersRef.current.keys()]) saveNow(sessionId); };
     window.addEventListener('pagehide', flush);
-    // A click on a row (its open state lives beside the ledger) is saved with the chat it belongs to.
+    // A click on a row is cached with the chat it belongs to.
     const unsubscribe = onRowOpenChange(() => { if (activeSessionIdRef.current) scheduleSave(activeSessionIdRef.current); });
     return () => { window.removeEventListener('pagehide', flush); unsubscribe(); };
   }, [saveNow, scheduleSave]);
@@ -240,14 +263,14 @@ export function useSessionStore() {
   const getSlot = useCallback((sessionId: string): SessionSlot => {
     const store = storeRef.current;
     if (!store.has(sessionId)) {
-      const slot = createEmptySlot(sessionId);
-      // What this viewer saw of the chat before: loaded first, so a reload draws the chat as it was. Rows that
-      // arrive meanwhile are merged after it in their order.
-      slot.ready = loadLedger(sessionId).then((stored) => {
-        if (!stored) return;
-        slot.ledger = slot.ledger.rows.length === 0 ? stored : mergeLedgers(stored, slot.ledger);
-        slot.offset = Math.max(slot.offset, transcriptRowCount(slot.ledger));
-        seedRowOpen(Object.keys(stored.open));
+      const slot = createEmptySlot();
+      // The cached window is drawn at once; the first server read is placed over it and overwrites it.
+      slot.ready = loadCachedChat(sessionId).then((cached) => {
+        if (!cached || slot.window.rows.length > 0) return;
+        slot.window = { start: cached.start, rows: cached.rows };
+        slot.total = windowEnd(slot.window);
+        rebuild(slot);
+        seedRowOpen(cached.open);
         if (sessionId === activeSessionIdRef.current) setTick(n => n + 1);
       }).catch(() => undefined);
       store.set(sessionId, slot);
@@ -256,12 +279,8 @@ export function useSessionStore() {
   }, []);
 
   /**
-   * Fetch messages from the provider sessions endpoint into the ledger.
-   *
-   * Provider and project metadata are resolved server-side from `sessionId`.
-   * The endpoint returns the standard `{ success, data }` envelope. A page from
-   * offset 0 is the latest page (whatever its size, up to the whole transcript);
-   * any other offset is an older page.
+   * Reads from the provider sessions endpoint. A read from offset 0 is the newest rows (whatever its size, up to
+   * the whole transcript); any other offset is an older page.
    */
   const fetchFromServer = useCallback(async (
     sessionId: string,
@@ -284,30 +303,18 @@ export function useSessionStore() {
       }
 
       try {
-        const ledger = slot.ledger;
-        const epoch = ledger.epoch;
-        const data = await requestSessionHistoryPage(sessionId, requestOptions);
-        const older = (requestOptions.offset ?? 0) > 0;
-        const result = appendRead(ledger, data.messages, {
-          direction: older ? 'older' : 'latest',
-          epoch,
-          batch: true,
-          // The whole transcript, or the first page: nothing to bridge against.
-          bridge: !older,
-          total: data.total,
-          now: Date.now(),
-        });
-        if (!result.stale) {
+        const offset = requestOptions.offset ?? 0;
+        if (offset > 0) {
+          const data = await requestSessionHistoryPage(sessionId, requestOptions);
+          slot.window = placeOlder(slot.window, data.messages, data.total, offset);
           slot.total = data.total;
-          slot.offset = older
-            ? slot.offset + result.prepended
-            : Math.max(slot.offset + result.appended, data.messages.length);
-          slot.hasMore = data.hasMore;
           slot.fetchedAt = Date.now();
+          adoptTokenUsage(slot, data);
+          rebuild(slot);
+        } else {
+          await refreshLatestSlotFromServer(sessionId, slot, requestOptions.limit === undefined ? SESSION_MESSAGES_PAGE_SIZE : requestOptions.limit, canRequest);
         }
         slot.status = 'idle';
-        adoptTokenUsage(slot, data);
-
         notify(sessionId);
         return slot;
       } catch (error) {
@@ -320,7 +327,7 @@ export function useSessionStore() {
   }, [getSlot, notify]);
 
   /**
-   * Load older (paginated) messages: a block before the ledger's first row.
+   * Load older (paginated) messages: the rows before the window.
    */
   const fetchMore = useCallback(async (
     sessionId: string,
@@ -332,78 +339,32 @@ export function useSessionStore() {
     const slot = getSlot(sessionId);
     return enqueueHistoryMutation(slot, async () => {
       let prependedCount = 0;
-      let changed = false;
       const canRequest = opts.canRequest ?? (() => true);
       if (!slot.hasMore || !canRequest()) return { slot, prependedCount };
 
       try {
-        // The offset counts from the tail, which grows while the chat works, so
-        // an older page can come back made of rows the ledger holds already.
-        // Those only confirm; the offset moves past them and the read is retried once.
-        for (let attempt = 0; attempt < 2 && slot.hasMore; attempt++) {
-          if (!canRequest()) break;
-          const ledger = slot.ledger;
-          const epoch = ledger.epoch;
-          const data = await requestSessionHistoryPage(sessionId, {
-            limit: opts.limit ?? SESSION_MESSAGES_PAGE_SIZE,
-            offset: slot.offset,
-          });
-          const result = appendRead(ledger, data.messages, { direction: 'older', epoch, batch: true, now: Date.now() });
-          if (result.stale) break;
-          slot.total = data.total;
-          changed = changed || result.changed || adoptTokenUsage(slot, data);
-          if (result.prepended === 0 && data.hasMore && data.messages.length > 0) {
-            slot.offset += data.messages.length;
-            continue;
-          }
-          slot.hasMore = data.hasMore;
-          slot.offset += result.prepended;
-          prependedCount = result.prepended;
-          break;
-        }
-
-        if (changed) notify(sessionId);
+        const offset = slot.offset;
+        const data = await requestSessionHistoryPage(sessionId, {
+          limit: opts.limit ?? SESSION_MESSAGES_PAGE_SIZE,
+          offset,
+        });
+        const before = slot.window.rows.length;
+        slot.window = placeOlder(slot.window, data.messages, data.total, offset);
+        slot.total = data.total;
+        prependedCount = slot.window.rows.length - before;
+        const usage = adoptTokenUsage(slot, data);
+        rebuild(slot);
+        if (prependedCount > 0 || usage) notify(sessionId);
         return { slot, prependedCount };
       } catch (error) {
         console.error(`[SessionStore] fetchMore failed for ${sessionId}:`, error);
-        if (changed) notify(sessionId);
         return { slot, prependedCount };
       }
     });
   }, [getSlot, notify]);
 
   /**
-   * An already-sent message was edited: the rows it replaces are marked, never
-   * removed. Runs on every subscribed client, not just the one that made the edit.
-   */
-  const truncateAt = useCallback((sessionId: string, anchorId: string) => {
-    const slot = storeRef.current.get(sessionId);
-    if (!slot) return;
-    if (cut(slot.ledger, anchorId)) notify(sessionId);
-  }, [notify]);
-
-  /**
-   * Append a realtime (WebSocket) message, or a typed echo (`local_` id), to the
-   * session's ledger. Works regardless of which session is actively viewed.
-   */
-  const appendRealtime = useCallback((sessionId: string, msg: NormalizedMessage) => {
-    const slot = getSlot(sessionId);
-    const now = Date.now();
-    if (msg.id.startsWith('local_')) {
-      if (appendLocal(slot.ledger, msg, now)) {
-        notify(sessionId);
-        // A typed message the transcript has not confirmed after a minute is "not delivered".
-        setTimeout(() => {
-          if (markUndelivered(slot.ledger, Date.now())) notify(sessionId);
-        }, UNDELIVERED_AFTER_MS + 1000);
-      }
-      return;
-    }
-    if (appendLive(slot.ledger, msg, now)) notify(sessionId);
-  }, [getSlot, notify]);
-
-  /**
-   * Refreshes the latest page into the ledger (see refreshLatestSlotFromServer).
+   * Refreshes the newest rows (see refreshLatestSlotFromServer).
    */
   const refreshLatestFromServer = useCallback(async (
     sessionId: string,
@@ -432,6 +393,54 @@ export function useSessionStore() {
   }, [getSlot, notify]);
 
   /**
+   * An already-sent message was edited: the transcript was rewritten, so the window starts over from its newest rows.
+   */
+  const truncateAt = useCallback((sessionId: string, _anchorId: string) => {
+    const slot = storeRef.current.get(sessionId);
+    if (!slot) return;
+    slot.window = EMPTY_WINDOW;
+    rebuild(slot);
+    notify(sessionId);
+    void refreshLatestFromServer(sessionId);
+  }, [notify, refreshLatestFromServer]);
+
+  // A live event means the transcript moved: read it, at most every LIVE_READ_MS per chat.
+  const liveReadsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const scheduleLiveRead = useCallback((sessionId: string) => {
+    if (liveReadsRef.current.has(sessionId)) return;
+    liveReadsRef.current.set(sessionId, setTimeout(() => {
+      liveReadsRef.current.delete(sessionId);
+      void refreshLatestFromServer(sessionId);
+    }, LIVE_READ_MS));
+  }, [refreshLatestFromServer]);
+
+  /**
+   * A typed message or a notice (`local_` id), an error, or a live event. Typed messages and notices are drawn
+   * until the transcript has them; a live event makes the page read the transcript.
+   */
+  const appendRealtime = useCallback((sessionId: string, msg: NormalizedMessage) => {
+    const slot = getSlot(sessionId);
+    const note = msg.id.startsWith('local_') || msg.id.startsWith('protocol_error_') || msg.kind === 'error' || msg.kind === 'status';
+    if (!note) {
+      scheduleLiveRead(sessionId);
+      return;
+    }
+    const typed = msg.role === 'user' && msg.kind === 'text';
+    const message: NormalizedMessage = typed ? { ...msg, delivery: 'pending' } : msg;
+    slot.notes = [...slot.notes, { message, at: windowEnd(slot.window) }];
+    rebuild(slot);
+    notify(sessionId);
+    if (!typed) return;
+    setTimeout(() => {
+      const i = slot.notes.findIndex((n) => n.message.id === msg.id);
+      if (i < 0) return;
+      slot.notes = slot.notes.map((n, j) => (j === i ? { ...n, message: { ...n.message, delivery: 'failed' } } : n));
+      rebuild(slot);
+      notify(sessionId);
+    }, UNDELIVERED_AFTER_MS + 1000);
+  }, [getSlot, notify, scheduleLiveRead]);
+
+  /**
    * Check if a session's data is stale (>30s old).
    */
   const isStale = useCallback((sessionId: string) => {
@@ -441,27 +450,35 @@ export function useSessionStore() {
   }, []);
 
   /**
-   * The streamed reply so far: one row that grows in place.
+   * The streamed reply so far: one row at the end that grows.
    */
   const updateStreaming = useCallback((sessionId: string, accumulatedText: string, msgProvider: LLMProvider) => {
     const slot = getSlot(sessionId);
-    if (appendStreamDelta(slot.ledger, accumulatedText, msgProvider, Date.now())) notify(sessionId);
+    if (slot.stream?.content === accumulatedText) return;
+    slot.stream = {
+      id: `__stream_${sessionId}`, sessionId, timestamp: slot.stream?.timestamp ?? new Date().toISOString(),
+      provider: msgProvider, kind: 'stream_delta', content: accumulatedText,
+    };
+    slot.streamEnded = false;
+    rebuild(slot);
+    notify(sessionId);
   }, [getSlot, notify]);
 
   /**
-   * Finalize streaming: the streamed row becomes the reply's text row, and what waited for it lands.
+   * The streamed reply is complete: it stays until the next read brings the transcript's copy.
    */
   const finalizeStreaming = useCallback((sessionId: string) => {
     const slot = storeRef.current.get(sessionId);
-    if (!slot) return;
-    if (endStream(slot.ledger, Date.now())) notify(sessionId);
-  }, [notify]);
+    if (!slot?.stream) return;
+    slot.streamEnded = true;
+    scheduleLiveRead(sessionId);
+  }, [scheduleLiveRead]);
 
   /**
-   * The ledger's rows for a session, in render order.
+   * What the page draws for a session, in order.
    */
   const getMessages = useCallback((sessionId: string): NormalizedMessage[] => {
-    return storeRef.current.get(sessionId)?.ledger.rows ?? EMPTY;
+    return storeRef.current.get(sessionId)?.view ?? EMPTY;
   }, []);
 
   /**

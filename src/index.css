@@ -617,7 +617,6 @@
   }
 
   /* quests: a row an edit replaced stays drawn, dimmed (requirement 52, point 1: nothing disappears). */
-  .quests-superseded { opacity: 0.5; }
 
   /* quests: every loaded message is rendered for real. Skipping off-screen rows (content-visibility: auto)
      stood in estimated heights of 96-240px, while a collapsed tool call is 9px, so rows changed height as

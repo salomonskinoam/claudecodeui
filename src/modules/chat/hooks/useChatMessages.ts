@@ -413,18 +413,10 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
       // Set by the provider only on an assistant reply, and only when it knows
       // which model produced it, so every other row simply carries undefined.
       model: msg.model,
-      // quests: the ledger's marks on the row (requirement 52): its fold, its delivery, an edit's replacement.
+      // quests: the page's marks on the row (requirement 52): its fold, and a typed message's delivery.
       ...(msg.foldId ? { foldId: msg.foldId } : {}),
       ...(msg.delivery ? { delivery: msg.delivery } : {}),
-      ...(msg.superseded ? { superseded: true } : {}),
     };
-
-    // quests: the ledger's own note (a gap in what the page saw): a grey line, never the chat's prose.
-    if (msg.noteKind === 'gap') {
-      converted.push({ type: 'assistant', content: msg.content ?? '', timestamp: msg.timestamp, noteKind: 'gap', ...sharedMetadata });
-      projectionCache.set(msg, { toolResultSource, subagentActivitySource, taskStatusSource, messages: converted.slice(convertedStart) });
-      continue;
-    }
 
     if (appendCompactionRow(msg, converted, sharedMetadata, {
       hasCompactionRow,

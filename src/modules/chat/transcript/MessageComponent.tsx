@@ -103,8 +103,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
       ref={messageRef}
       data-message-timestamp={message.timestamp || undefined}
       data-row-id={message.id || undefined}
-      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} ${toolOpen ? 'qt-open' : ''} ${message.superseded ? 'quests-superseded' : ''}`}
-      title={message.superseded ? 'Replaced by an edit' : undefined}
+      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} ${toolOpen ? 'qt-open' : ''}`}
     >
       {message.type === 'user' ? (
         /* User turn on the right: claude.ai-style attachment cards above the bubble */
