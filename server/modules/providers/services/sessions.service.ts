@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { renameSession as renameClaudeSession } from '@anthropic-ai/claude-agent-sdk';
 
-import { projectsDb, sessionsDb } from '@/modules/database/index.js';
+import { projectsDb, queueDb, sessionsDb } from '@/modules/database/index.js';
 import { broadcastSessionUpserted } from '@/modules/websocket/index.js';
 import { runOf, runningRuns, runtimeState } from '@/shared/runtime-state.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
@@ -716,6 +716,8 @@ export const sessionsService = {
     }
 
     sessionsDb.clearSupersededProviderSessions(sessionId);
+    // quests: a deleted chat leaves the priority queue too; its stored closing line would keep it listed.
+    if (session.provider_session_id) queueDb.deleteChat(session.provider_session_id);
     const deleted = sessionsDb.deleteSessionById(sessionId);
     if (!deleted) {
       throw new AppError(`Session "${sessionId}" was not found.`, {

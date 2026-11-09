@@ -42,6 +42,10 @@ export const queueDb = {
       .run(row);
   },
 
+  deleteChat(providerSessionId: string): void {
+    getConnection().prepare('DELETE FROM queue_chats WHERE provider_session_id = ?').run(providerSessionId);
+  },
+
   listChats(): QueueChatRow[] {
     return getConnection().prepare('SELECT * FROM queue_chats').all() as QueueChatRow[];
   },
