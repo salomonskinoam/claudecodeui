@@ -38,8 +38,8 @@ and the entries, never a source. On the page (`src/modules/queue/`), each piece 
 | Path | What | Installed as |
 |---|---|---|
 | `system/quests-ui.service` | The page's server as a user service, on 127.0.0.1:3001, started at login | Link: `~/.config/systemd/user/quests-ui.service`, enabled (`default.target.wants`) |
-| `system/quests-runner.service` | The chat runner (`server/runner.ts`): owns the page's chats' Claude processes, on the socket `$XDG_RUNTIME_DIR/quests-runner.sock`. Restarting quests-ui.service never stops a chat. `systemctl --user restart --no-block quests-runner.service` drains: no new turns, then it waits until no turn runs and no Claude process is held for background work (the journal names what it waits for every minute), then takes the new code | Link: `~/.config/systemd/user/quests-runner.service`, enabled (`default.target.wants`) |
-| `../scripts/start-runner.sh` | Starts the runner (used by its service) | |
+| `../scripts/start-chat.sh` | One chat's service, `quests-chat-<page session id>`, started by the page server's manager (`server/modules/chat-hosts`) with systemd-run from the newest build in `~/.local/share/quests/builds/current`. Restarting quests-ui.service never stops a chat. Record table `chat_hosts` | Started on demand |
+| `bin/quests-listen` | Starts a listener for a chat as its own unit `quests-listen-<id>`; the manager sends the chat its result and starts it again after a reboot | `quests-listen <chat id> <name> -- <command>` |
 | `system/quests-ide.desktop` | "Quests IDE": the page in its own Firefox window (profile `quests-ide`, window class `QuestsIDE`), rainbow icon | Link: `~/.local/share/applications/quests-ide.desktop` |
 | `../scripts/start-local.sh` | Starts the server (used by the service) | |
 | `../scripts/quests-update.sh` | The in-app Update: merges the original project's newest release into ours, rebuilds, pushes, restarts; rolls back on failure | Run by the page's Update button |
@@ -53,4 +53,4 @@ and the entries, never a source. On the page (`src/modules/queue/`), each piece 
 | `priority-queue/` | The priority queue's requirements (Noam's words verbatim) and plan | |
 | `examples/` | Use-case examples for the chat management design (side quest) | |
 
-Setting up a new machine: clone, `npm install && npm run build`, `git remote add upstream https://github.com/siteboon/claudecodeui.git && git fetch upstream --tags`, then create the two links above, `systemctl --user daemon-reload`, `systemctl --user enable --now quests-runner.service quests-ui.service`.
+Setting up a new machine: clone, `npm install && npm run build`, `git remote add upstream https://github.com/siteboon/claudecodeui.git && git fetch upstream --tags`, then create the two links above, `systemctl --user daemon-reload`, `systemctl --user enable --now quests-ui.service`.
