@@ -17,8 +17,8 @@
 //   drag    drags the first root line onto the last line (its family follows as the rules say), then drags another
 //           and releases it outside the list (the order must not change); puts the first root back at the end
 //   ledger  the rows by id now and after 90 s of the chat working: nothing missing, nothing moved, nothing twice,
-//           new rows only at the ends (requirement 52)
-//   reload  rows, open tool lines and folds before and after a page reload: all the same (the ledger is persisted)
+//           new rows only at the ends (requirement 52: the view draws the transcript)
+//   reload  rows, open tool lines and folds before and after a page reload: all the same (open state is cached)
 //   planedit <plan name>: the plan tab's Edit holds the file's text, Cancel goes back (nothing saved)
 //   modecolors Shift+Tab through every mode and back to the start: each mode's name, text color and background
 //           color on the mode button (the text must be readable in every mode)
@@ -554,7 +554,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'ledger') {
-    // The chat view is a ledger (requirement 52): the rows drawn, by id, in order; then 90 s of the chat working
+    // The chat view draws the transcript (requirement 52): the rows drawn, by id, in order; then 90 s of the chat working
     // (run it while the chat answers in Cursor); then again. Every earlier id must still be there, in the same
     // relative order, each once, and the new ids only at the ends.
     const readIds = () => page.locator('[data-chat-view="shown"] .chat-messages-pane > div > div > [data-row-id]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id')));
@@ -573,7 +573,7 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
   }
 
   if (check === 'reload') {
-    // The ledger is persisted per viewer: the rows, which tool lines are open and which folds are closed must be
+    // The rows come from the transcript and the open state from the cache: the rows, open tool lines and folds must be
     // the same across a reload. The check opens the last two collapsed tool lines first, so there is state to keep.
     const read = async () => ({
       ids: await page.locator('[data-chat-view="shown"] .chat-messages-pane > div > div > [data-row-id]').evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-id'))),
