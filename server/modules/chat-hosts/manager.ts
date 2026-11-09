@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
-import { chatHostsDb, listenersDb, scheduledMessagesDb, sessionDraftsDb } from '@/modules/database/index.js';
+import { chatHostsDb, listenersDb, scheduledMessagesDb, sessionDraftsDb, sessionsDb } from '@/modules/database/index.js';
 import type { ListenerRow } from '@/modules/database/index.js';
 import { getQueue } from '@/modules/queue/index.js';
 import { isUnanswering, refreshRuntimeState, runtimeState, setChatMarks } from '@/shared/runtime-state.js';
@@ -46,6 +46,13 @@ async function gather(): Promise<Facts> {
     const facts = { sessionId: e.sessionId, placement: e.placement, outside: e.heldOutside, activityAt: e.activityAt };
     chats.set(e.sessionId, facts);
     if (e.providerSessionId) chats.set(e.providerSessionId, facts);
+  }
+  // A listener's chat may not be in the queue (no message of Noam's yet, or not open): find it by its session row.
+  for (const l of listeners) {
+    if (l.ended_at && l.delivered_at) continue;
+    if (chats.has(l.session_id)) continue;
+    const row = sessionsDb.getSessionByProviderSessionId(l.session_id) ?? sessionsDb.getSessionById(l.session_id);
+    if (row) chats.set(l.session_id, { sessionId: row.session_id, placement: 'queue', outside: false, activityAt: 0 });
   }
   const logChangedAt = new Map<string, number>();
   for (const l of listeners) {
