@@ -400,6 +400,10 @@ const addProviderSessionIdMapping = (db: Database): void => {
   const sessionsTableInfo = getTableInfo(db, 'sessions');
   const columnNames = sessionsTableInfo.map((column) => column.name);
 
+  // quests: only when the column is new. Run at every start, the backfill also gave every brand-new chat (no
+  // provider id yet) its page id as Claude id, and its first turn then failed with "No conversation found"; with
+  // one service per chat, processes start all the time.
+  if (columnNames.includes('provider_session_id')) return;
   addColumnToTableIfNotExists(db, 'sessions', columnNames, 'provider_session_id', 'TEXT');
   db.exec(`
     UPDATE sessions
