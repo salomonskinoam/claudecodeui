@@ -20,11 +20,12 @@ const listeners = new Set<() => void>();
 let timer: number | null = null;
 
 // Requests can answer out of order (a slow poll after a drop): only an answer to a request sent after the one
-// shown may replace the queue, so an older state never flashes back.
+// shown may replace the queue, so an older state never flashes back. A settle is the exception: the server read
+// the chat's state fresh for it, so its answer is shown, and every request still in flight is older than it.
 let sent = 0;
 let shownSeq = 0;
 
-async function request(method: string, route: string, body?: unknown): Promise<unknown> {
+async function request(method: string, route: string, body?: unknown, fresh = false): Promise<unknown> {
   const seq = ++sent;
   const response = await authenticatedFetch(`/api/quests/queue${route}`, {
     method,
@@ -33,8 +34,8 @@ async function request(method: string, route: string, body?: unknown): Promise<u
   });
   if (!response.ok) throw new Error(`queue ${method} ${route}: ${response.status} ${await response.text()}`);
   const json = await response.json();
-  if (json.data?.entries && seq > shownSeq) {
-    shownSeq = seq;
+  if (json.data?.entries && (seq > shownSeq || fresh)) {
+    shownSeq = fresh ? sent : seq;
     queue = json.data;
     listeners.forEach((l) => l());
   }
@@ -137,4 +138,4 @@ export const takeAutoClaim = (number: number): boolean => autoClaims.delete(numb
  * now, and the queue comes back with it. The finish sound waits for this, so the sound and the queue's change
  * come together (Noam, 6 Nov: "the beep has to be together with an update of the queue after the state change").
  */
-export const settleQueue = (sessionId: string) => request('POST', '/settle', { sessionId });
+export const settleQueue = (sessionId: string) => request('POST', '/settle', { sessionId }, true);
