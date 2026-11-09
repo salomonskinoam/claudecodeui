@@ -27,6 +27,8 @@
 //   mention "@" plus QUERY in the input box: the files the dropdown lists (the box is emptied after)
 //   preload after a reload, the other open tab is built in the background; ms per switch (click to 2nd frame)
 //   names   every open tab whose chat has a line in the list shows the same name as that line
+//   summary the Summary drawer beside the shown chat: closed at start; a click on its strip opens it with the last
+//           Summary (or the last reply's closing lines); a second click closes it (requirement 107)
 //   tabs    sets a layout (left: <sessionId> + the 2 next chats, right: 1 more), drags tabs between and within
 //           panes, prints the stored layout after each drag. Restores no layout: use a fresh browser profile.
 const os = require('node:os');
@@ -36,7 +38,7 @@ const jwt = require('jsonwebtoken');
 const Database = require('better-sqlite3');
 
 const [check, sessionId] = process.argv.slice(2);
-if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit', 'modecolors', 'names', 'preload', 'mention'].includes(check) || !sessionId) {
+if (!['live', 'pin', 'bottom', 'scroll', 'tabs', 'mode', 'plan', 'queue', 'drag', 'next', 'latch', 'readonly', 'forest', 'ticketchat', 'tabhover', 'newtab', 'synccursor', 'dropline', 'split', 'colors', 'groups', 'dragtop', 'focus', 'subagents', 'livescroll', 'planwait', 'typejump', 'join', 'worktab', 'dupes', 'folds', 'peek', 'runners', 'empties', 'workers', 'tailrows', 'tabmenu', 'lasttab', 'textscale', 'renamebutton', 'ledger', 'reload', 'hold', 'archived', 'dragunclaimed', 'ticketgroups', 'switch', 'search', 'place', 'back', 'planedit', 'modecolors', 'names', 'preload', 'mention', 'summary'].includes(check) || !sessionId) {
   console.error('usage: node quests/tests/headless.cjs live|pin|bottom|scroll|tabs|mode|plan|queue|drag|next|latch|readonly|forest|ticketchat|tabhover|newtab|synccursor|dropline|split|colors|groups <sessionId>');
   process.exit(2);
 }
@@ -1057,6 +1059,19 @@ const token = jwt.sign({ userId: 1, username: os.userInfo().username }, secret, 
       await page.waitForTimeout(800);
     }
     console.log(JSON.stringify({ before, switchMs, after: await views() }));
+  }
+  if (check === 'summary') {
+    const drawer = page.locator('[data-chat-view="shown"] [data-summary-drawer]');
+    const state = () => drawer.getAttribute('data-summary-drawer');
+    const start = await state();
+    await drawer.locator('button').click();
+    await page.waitForTimeout(300);
+    const opened = await state();
+    const text = (await drawer.locator('[data-summary-body]').textContent()).trim();
+    const width = (await drawer.boundingBox()).width;
+    await drawer.locator('button').click();
+    await page.waitForTimeout(300);
+    console.log(JSON.stringify({ start, opened, width: Math.round(width), text: text.slice(0, 300), closedAgain: await state() }));
   }
   if (check === 'names') {
     // Every open tab whose chat has a line reads the line's name: one name per chat (requirement 90).

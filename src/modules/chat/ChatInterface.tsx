@@ -31,6 +31,7 @@ import {
 import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import OutsideApprovalBanner from '@/modules/chat/composer/OutsideApprovalBanner';
+import SummaryDrawer from '@/modules/chat/SummaryDrawer';
 import { OutsideChatBanner } from '@/modules/queue';
 import { usePlanTabs } from '@/modules/chat/plan/usePlanTabs';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
@@ -479,7 +480,9 @@ function ChatInterface({
 
   return (
     <PermissionContext.Provider value={permissionContextValue}>
-      <div className="flex h-full min-h-0 flex-col">
+      {/* quests: the chat column, then the Summary drawer (requirement 107). */}
+      <div className="flex h-full min-h-0">
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
         <MarkdownWorkspaceContext.Provider value={markdownWorkspaceValue}>
           <TranscriptSessionContext.Provider value={transcriptSessionValue}>
             <ChatMessagesPane
@@ -642,6 +645,8 @@ function ChatInterface({
         />
           </OutsideChatBanner>
         </div>
+      </div>
+      <SummaryDrawer sessionId={selectedSession?.id || currentSessionId || null} chatMessages={chatMessages} />
       </div>
 
       <CommandResultModal
