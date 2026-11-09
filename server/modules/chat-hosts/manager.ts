@@ -9,7 +9,7 @@ import { getQueue } from '@/modules/queue/index.js';
 import { isUnanswering, refreshRuntimeState, runtimeState, setChatMarks } from '@/shared/runtime-state.js';
 import { findApplicationRoot, getModuleDirectory } from '@/shared/utils.js';
 
-import { controlConnection, ensureHost, sendToChat } from './hosts.js';
+import { controlConnection, ensureHost, onHostStarted, sendToChat } from './hosts.js';
 import { decide, type Action, type ChatFacts, type Facts } from './reconcile.js';
 
 /**
@@ -60,8 +60,18 @@ async function gather(): Promise<Facts> {
       try { logChangedAt.set(l.id, fs.statSync(l.log_path).mtimeMs); } catch { /* not written yet: counts from its start */ }
     }
   }
+  // Hung is judged by the transcript's last write: a tool call, a tool result or a reply.
+  const transcriptAt = new Map<string, number>();
+  for (const h of hosts) {
+    if (h.ended_at || !h.turn_open) continue;
+    const file = sessionsDb.getSessionById(h.session_id)?.jsonl_path;
+    if (file) {
+      try { transcriptAt.set(h.session_id, fs.statSync(file).mtimeMs); } catch { /* moved: the record's times count */ }
+    }
+  }
   const now = new Date();
   return {
+    transcriptAt,
     now: now.getTime(),
     hosts,
     activeUnits: units,
@@ -126,29 +136,47 @@ function watchControls(active: Set<string>): void {
 }
 
 let running = false;
+let again = false;
 let lastMarks = '';
 export async function check(): Promise<void> {
-  if (running) return;
+  // One check at a time; a check asked for meanwhile runs right after, so no change waits for the next 30 s.
+  if (running) { again = true; return; }
   running = true;
+  again = false;
   try {
     const facts = await gather();
     watchControls(facts.activeUnits);
     const { actions, marks } = decide(facts, (l) => tail(l.log_path));
     setChatMarks(marks);
     const nextMarks = JSON.stringify(marks);
-    if (nextMarks !== lastMarks) { lastMarks = nextMarks; for (const f of changeListeners) f(); }
+    if (nextMarks !== lastMarks) {
+      console.log(`[manager] marks ${nextMarks}`);
+      lastMarks = nextMarks;
+      for (const f of changeListeners) f();
+    }
     for (const a of actions) {
       await apply(a, facts.listeners).catch((error: unknown) => console.warn(`[manager] ${a.kind} failed`, { error: String(error) }));
     }
   } finally {
     running = false;
+    if (again) void check();
   }
 }
 
 let timer: NodeJS.Timeout | null = null;
+let listenerSignature = '';
 export function startManager(): void {
   if (timer) return;
   void check();
   timer = setInterval(() => void check(), CHECK_MS);
   timer.unref?.();
+  // A chat service that just started: hear its changes from its first turn on, and tell the pages now.
+  onHostStarted((sid) => { watchControls(new Set([sid])); changed(); });
+  // A listener started or ended (quests-listen and its wrapper write the table): check now, so its pink dot or
+  // its result comes at once. One small read every second.
+  const listenerWatch = setInterval(() => {
+    const next = listenersDb.signature();
+    if (next !== listenerSignature) { listenerSignature = next; void check(); }
+  }, 1000);
+  listenerWatch.unref?.();
 }

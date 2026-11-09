@@ -44,6 +44,8 @@ export type Facts = {
   unanswering: Set<string>;
   /** Page session ids with live background work (agents, commands). */
   workers: Set<string>;
+  /** Page session id -> its transcript's last write, epoch ms, for the chats with a turn open. */
+  transcriptAt: Map<string, number>;
   listeners: ListenerRow[];
   /** Listener ids whose quests-listen-<id> unit is active. */
   activeListenerUnits: Set<string>;
@@ -83,7 +85,7 @@ export function decide(f: Facts, lastLines: (l: ListenerRow) => string): { actio
     if (h.ended_at) continue;
     const sid = h.session_id;
     if (f.activeUnits.has(sid)) {
-      const silentFor = f.now - Math.max(at(h.last_event_at), at(h.turn_started_at));
+      const silentFor = f.now - Math.max(at(h.last_event_at), at(h.turn_started_at), f.transcriptAt.get(sid) ?? 0);
       if (f.unanswering.has(sid) || (h.turn_open && silentFor > HUNG_MS && !f.workers.has(sid))) mark(sid, 'hung');
       continue;
     }

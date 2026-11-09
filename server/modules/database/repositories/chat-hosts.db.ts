@@ -78,6 +78,11 @@ export const chatHostsDb = {
 };
 
 export const listenersDb = {
+  /** Changes whenever a listener starts or ends. */
+  signature(): string {
+    return JSON.stringify(getConnection().prepare('SELECT count(*) AS n, max(started_at) AS s, count(ended_at) AS e FROM listeners').get());
+  },
+
   list(): ListenerRow[] {
     return getConnection().prepare('SELECT * FROM listeners').all() as ListenerRow[];
   },

@@ -19,7 +19,7 @@ function listener(over: Partial<ListenerRow> = {}): ListenerRow {
 function facts(over: Partial<Facts> = {}): Facts {
   const chat = { sessionId: 'c1', placement: 'queue' as const, outside: false, activityAt: NOW - 3600_000 };
   return {
-    now: NOW, hosts: [], activeUnits: new Set(), unanswering: new Set(), workers: new Set(), listeners: [],
+    now: NOW, hosts: [], activeUnits: new Set(), unanswering: new Set(), workers: new Set(), transcriptAt: new Map(), listeners: [],
     activeListenerUnits: new Set(), logChangedAt: new Map(), chats: new Map([['c1', chat], ['claude-1', chat]]), due: [], ...over,
   };
 }
@@ -63,6 +63,7 @@ test('hung: a turn open with no event past the limit and no worker; never an act
   assert.deepEqual(r.marks.c1, ['hung']);
   assert.deepEqual(kinds(r), []);
   assert.equal(decide(facts({ hosts: [stale], activeUnits: new Set(['c1']), workers: new Set(['c1']) }), lines).marks.c1, undefined);
+  assert.equal(decide(facts({ hosts: [stale], activeUnits: new Set(['c1']), transcriptAt: new Map([['c1', NOW - 1000]]) }), lines).marks.c1, undefined);
   assert.deepEqual(decide(facts({ hosts: [host()], activeUnits: new Set(['c1']), unanswering: new Set(['c1']) }), lines).marks.c1, ['hung']);
 });
 
