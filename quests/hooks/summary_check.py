@@ -16,8 +16,10 @@ QUOTES = '"“”«'
 
 
 def turn_texts(transcript_path):
-    """Claude's text blocks of the current turn, oldest first: everything after the last entry that a person or a
-    notification sent (a user entry that is not only tool results)."""
+    """Claude's text blocks of the current turn, oldest first: everything after the end of the last turn (its Stop
+    hook record) or the last entry that a person, an agent or a notification sent (a user entry that is not only tool
+    results). Messages from agents and other chats are meta entries; skipping them read the last turn's final message
+    as this turn's text, and every reply to an agent was sent back and written twice (9 Nov)."""
     texts = []
     with open(transcript_path, encoding='utf-8') as f:
         for line in f:
@@ -25,7 +27,9 @@ def turn_texts(transcript_path):
             if d.get('isSidechain'):
                 continue
             content = (d.get('message') or {}).get('content')
-            if d.get('type') == 'user' and not d.get('isMeta'):
+            if d.get('type') == 'system' and d.get('subtype') == 'stop_hook_summary':
+                texts = []
+            elif d.get('type') == 'user':
                 if isinstance(content, str) or any(c.get('type') != 'tool_result' for c in content or []):
                     texts = []
             elif d.get('type') == 'assistant' and isinstance(content, list):
@@ -85,6 +89,17 @@ def test():
     assert 'asks no question' in failures('**Summary**\n- **5.** "x" [blocks] go.', [])[0]
     assert failures('**Summary**\n- **5.** "x" done.\n  - a [blocks] item asks no question: checked.', []) == []
     assert failures('1. restart the server\n2. reload', []) == []  # plain numbered lists are not items
+    import os, tempfile
+    rows = [
+        {'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': '**Summary**\n- **7.** "x" done'}]}},
+        {'type': 'system', 'subtype': 'stop_hook_summary'},
+        {'type': 'user', 'isMeta': True, 'message': {'content': 'Another Claude session sent a message: ...'}},
+        {'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': 'reading it'}]}},
+    ]
+    with tempfile.NamedTemporaryFile('w', suffix='.jsonl', delete=False) as f:
+        f.write('\n'.join(json.dumps(r) for r in rows))
+    assert turn_texts(f.name) == ['reading it'], turn_texts(f.name)  # the last turn's item 7 is not this turn's
+    os.unlink(f.name)
     print('ok')
 
 

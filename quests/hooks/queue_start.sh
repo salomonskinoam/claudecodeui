@@ -18,6 +18,8 @@ cat <<EOF
 Listener rule: to wait for something outside this chat (an eval, a job, a file), start a listener, never a bare background loop or systemd-run:
   ~/src/quests/claudecodeui/quests/bin/quests-listen $sid "<what it waits for>" -- <command that polls until it is done>
 It outlives this chat's process and reboots, and when it ends this chat gets a message with its exit code and the last lines of its log. It may be started again after a reboot, so the command must be safe to run twice. Stop one for good with: quests-listen --stop <listener id>
+Never wait with Monitor or a background command either: every event and every expiry of one starts a turn, and each such turn repeats your last reply.
+Agent rule: an agent you start in the background reports by ending its turn; its end reaches you as a notification. Tell it in its prompt never to SendMessage you its results: a message and the end notification wake you twice, and you write the same reply twice.
 EOF
 python3 - "$sid" <<'PY' 2>/dev/null
 import json, re, subprocess, sys
