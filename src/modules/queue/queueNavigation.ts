@@ -42,7 +42,12 @@ export function openNextInQueue(): boolean {
   const byKey = new Map(entries.map((e) => [e.key, e]));
   const from = entryOfChat(entries, currentShownChat());
   const key = view.find((k) => k !== from?.key && byKey.get(k)?.waitsForMe);
-  if (!key || !opener) return false;
+  if (!opener) return false;
+  if (!key) {
+    // Noam, 9 Nov: "maybe because there is nothing up next. in that case there should be a popup saying so, with one OK option."
+    window.alert('Nothing is up next: no other chat waits for you.');
+    return false;
+  }
   const to = byKey.get(key)!;
   if (from?.sessionId && to.sessionId) {
     steps.push({ from, to, unseen: isChatUnseen(to.sessionId), blinking: isBlinking(to.key) });
