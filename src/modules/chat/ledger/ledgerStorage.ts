@@ -47,7 +47,8 @@ export async function loadLedger(sessionId: string): Promise<Ledger | null> {
     const db = await openDb();
     try {
       const record = await done(db.transaction(STORE, 'readonly').objectStore(STORE).get(sessionId)) as StoredLedger | undefined;
-      if (!record || record.v !== 1) return null;
+      // Version 2 (9 Nov): version 1 ledgers may hold rows a long absence put in old rows' places; they are rebuilt.
+      if (!record || record.v !== 2) return null;
       const { savedAt: _savedAt, ...ledger } = record;
       const loaded: Ledger = { ...ledger, queued: [] };
       dropStreamTwins(loaded);
@@ -75,7 +76,7 @@ export async function saveLedger(ledger: Ledger, open: Record<string, true>): Pr
       const store = tx.objectStore(STORE);
       const stored = await done(store.get(ledger.sessionId)) as StoredLedger | undefined;
       const mine: Ledger = { ...ledger, open };
-      const merged = stored && stored.v === 1 ? mergeLedgers({ ...stored, queued: [] }, mine) : mine;
+      const merged = stored && stored.v === 2 ? mergeLedgers({ ...stored, queued: [] }, mine) : mine;
       const rows = merged.rows.length > ROW_CAP ? merged.rows.slice(-ROW_CAP) : merged.rows;
       const { queued: _queued, ...record } = { ...merged, rows };
       await done(store.put({ ...record, savedAt: Date.now() } satisfies StoredLedger));

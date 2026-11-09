@@ -45,7 +45,7 @@ export type LedgerRow = NormalizedMessage & {
 };
 
 export type Ledger = {
-  v: 1;
+  v: 2;
   sessionId: string;
   /** Render order. Replaced by a new array on every change, never sorted. */
   rows: LedgerRow[];
@@ -88,7 +88,7 @@ const CONFIRM_CLOCK_SKEW_MS = 60_000;
 
 export function createLedger(sessionId: string): Ledger {
   return {
-    v: 1,
+    v: 2,
     sessionId,
     rows: [],
     alias: {},
@@ -228,15 +228,23 @@ function matchByText(l: Ledger, m: NormalizedMessage): number {
   return -1;
 }
 
-/** A re-stamped transcript row: the first unclaimed row with the same kind, role and words. */
+const inputOf = (m: { toolInput?: unknown }): string => (m.toolInput === undefined ? '' : JSON.stringify(m.toolInput));
+
+/**
+ * A re-stamped transcript row: the first unclaimed row with the same kind, role, words and tool input. A row with
+ * neither words nor input says nothing about where it belongs and never matches (a tool call has no words: by kind
+ * and tool name alone, every Bash call of a new page took an old Bash row's place).
+ */
 function matchRestamped(l: Ledger, m: NormalizedMessage, claimed: Set<string>): number {
   if (m.kind !== 'text' && m.kind !== 'tool_use' && m.kind !== 'tool_result' && m.kind !== 'thinking') return -1;
   const text = normalizeText(m.content);
+  const input = inputOf(m);
+  if (!text && !input) return -1;
   for (let i = 0; i < l.rows.length; i += 1) {
     const row = l.rows[i];
     if (claimed.has(row.id) || row.kind !== m.kind || (row.role ?? null) !== (m.role ?? null)) continue;
     if (row.source === 'stream' || row.delivery) continue;
-    if (normalizeText(row.content) !== text) continue;
+    if (normalizeText(row.content) !== text || inputOf(row) !== input) continue;
     if ((row.toolName ?? null) !== (m.toolName ?? null)) continue;
     return i;
   }
@@ -399,18 +407,26 @@ export function appendRead(l: Ledger, page: NormalizedMessage[], options: ReadOp
   // A latest page with not one id in common: the transcript was rewritten under the page (a provider that
   // rewinds by branching gives the kept turns new ids and times). Its rows are matched to the rows drawn by
   // their words, in order, each row claimed once; a row an edit had marked comes back as live history.
+  // A rewrite keeps most of the page; a page with only a few rows like old ones is new rows after a long absence
+  // (a repeated command, a short "ok"), so less than half the page matching is no rewrite: the caller bridges.
   if (firstKnown < 0 && l.rows.length > 0 && options.direction === 'latest') {
     const claimed = new Set<string>();
+    const matches: Array<{ u: (typeof unseen)[number]; i: number }> = [];
     const still: typeof unseen = [];
     for (const u of unseen) {
       const i = matchRestamped(l, u.m, claimed);
       if (i < 0) { still.push(u); continue; }
       claimed.add(l.rows[i].id);
-      if (confirmRow(l, i, u.m, true)) changed = true;
-      firstKnown = firstKnown < 0 ? u.at : Math.min(firstKnown, u.at);
+      matches.push({ u, i });
     }
-    unseen.length = 0;
-    unseen.push(...still);
+    if (matches.length * 2 >= page.length) {
+      for (const { u, i } of matches) {
+        if (confirmRow(l, i, u.m, true)) changed = true;
+        firstKnown = firstKnown < 0 ? u.at : Math.min(firstKnown, u.at);
+      }
+      unseen.length = 0;
+      unseen.push(...still);
+    }
   }
   let appended = 0;
   let prepended = 0;

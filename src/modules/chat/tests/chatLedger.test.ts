@@ -264,3 +264,21 @@ test('17: at load, the user rows the server once made from api-request-blob reco
   assert.equal(l.alias['claude_05a6e225-a7a5-4dec-bb46-615695062d8a_text_2'], undefined);
   assert.equal(dropBlobRows(l), false);
 });
+
+test('a latest page after a long absence is not taken for a rewrite: its tool calls never take old rows\' places', () => {
+  // 9 Nov: the page last saw this chat on 6 Nov. The latest page had no id in common, and every Bash call of it
+  // matched an old Bash row by kind and tool name (a tool call has no words), so the read counted as overlapped:
+  // three days were never drawn and old rows got today's calls.
+  const tool = (id: string, command: string, seconds: number) =>
+    ({ id, kind: 'tool_use', provider: 'claude', sessionId: 's1', toolName: 'Bash', toolId: `t_${id}`, toolInput: { command }, timestamp: at(seconds) }) as NormalizedMessage;
+  const l = createLedger('s1');
+  latest(l, [row('h1', 'user', 'old prompt', 1), tool('b1', 'ls', 2), tool('b2', 'git push -q', 3), row('h2', 'assistant', 'old answer', 4)], 5, { batch: true });
+  const before = JSON.stringify(l.rows);
+  const page = [row('n1', 'user', 'new prompt', 100), tool('n2', 'npm run build', 101), tool('n3', 'git push -q', 102), row('n4', 'assistant', 'new answer', 103)];
+  const result = latest(l, page, 104);
+  assert.equal(result.overlapped, false, 'the caller must bridge');
+  assert.equal(JSON.stringify(l.rows), before, 'no old row changed');
+  // The bridge then draws the page after a gap note.
+  latest(l, page, 105, { batch: true, bridge: true });
+  assert.deepEqual(l.rows.slice(-4).map((r) => r.timestamp), page.map((m) => m.timestamp));
+});
