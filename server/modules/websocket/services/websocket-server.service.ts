@@ -10,8 +10,8 @@ import type { AuthenticatedWebSocketRequest } from '@/shared/types.js';
 type WebSocketServerDependencies = {
   verifyClient: Parameters<typeof verifyWebSocketClient>[1];
   /**
-   * quests: the chat socket (`/ws`) and the notification socket (`/desktop-notifications`). The page server
-   * passes both through to the runner (server/modules/runner/runner-proxy.ts); the runner handles them itself.
+   * quests: the chat socket (`/ws`) and the notification socket (`/desktop-notifications`). The page server routes
+   * the chat socket's frames to each chat's own service (server/modules/chat-hosts).
    */
   chat: (ws: WebSocket, request: AuthenticatedWebSocketRequest) => void;
   notifications: (ws: WebSocket, request: AuthenticatedWebSocketRequest) => void;

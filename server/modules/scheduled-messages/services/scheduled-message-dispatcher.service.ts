@@ -95,8 +95,8 @@ function isSessionBusy(sessionId: string, runtime: ProviderRuntimeGateway): bool
 }
 
 /** Sends every persisted queued turn whose session is currently idle. */
-export async function dispatchQueuedMessages(runtime: ProviderRuntimeGateway): Promise<number> {
-  const candidates = sessionDraftsDb.listQueuedMessages();
+export async function dispatchQueuedMessages(runtime: ProviderRuntimeGateway, onlySession: string | null = null): Promise<number> {
+  const candidates = sessionDraftsDb.listQueuedMessages().filter((c) => !onlySession || c.sessionId === onlySession);
   let claimed = 0;
 
   await Promise.all(candidates.map(async (candidate) => {
@@ -153,10 +153,11 @@ async function sendClaimedMessage(
 export async function dispatchDueScheduledMessages(
   runtime: ProviderRuntimeGateway,
   now: Date = new Date(),
+  onlySession: string | null = null,
 ): Promise<number> {
   // Claimed before any of them runs, so a long turn cannot let the next poll
   // pick the same message up again.
-  const due = scheduledMessagesDb.claimDue(now);
+  const due = scheduledMessagesDb.claimDue(now, onlySession);
   if (due.length === 0) {
     return 0;
   }
@@ -176,8 +177,11 @@ export async function dispatchDueScheduledMessages(
  * The schedule lives in the database, so a message stays scheduled across a
  * restart and one that came due while the server was down is sent on the first
  * poll after it comes back, rather than being skipped.
+ *
+ * quests: each chat service runs this for its own chat only (`onlySession`); the manager starts the service of a
+ * chat with something due (server/modules/chat-hosts).
  */
-export function initializeScheduledMessageDispatcher(runtime: ProviderRuntimeGateway): void {
+export function initializeScheduledMessageDispatcher(runtime: ProviderRuntimeGateway, onlySession: string | null = null): void {
   if (pollTimer) {
     return;
   }
@@ -189,8 +193,8 @@ export function initializeScheduledMessageDispatcher(runtime: ProviderRuntimeGat
       return;
     }
     dispatchInFlight = true;
-    void dispatchDueScheduledMessages(runtime)
-      .then(() => dispatchQueuedMessages(runtime))
+    void dispatchDueScheduledMessages(runtime, new Date(), onlySession)
+      .then(() => dispatchQueuedMessages(runtime, onlySession))
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
         console.error('[ScheduledMessages] Dispatch pass failed', { error: message });

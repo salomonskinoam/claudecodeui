@@ -76,7 +76,7 @@ export const scheduledMessagesDb = {
    * message up instead of skipping it. Doing it in one transaction is what
    * stops two overlapping polls from sending the same message twice.
    */
-  claimDue(now: Date): ScheduledMessageRow[] {
+  claimDue(now: Date, sessionId: string | null = null): ScheduledMessageRow[] {
     const db = getConnection();
     const nowIso = now.toISOString();
 
@@ -84,10 +84,10 @@ export const scheduledMessagesDb = {
       const due = db
         .prepare(
           `SELECT ${COLUMNS} FROM scheduled_messages
-           WHERE status = 'pending' AND scheduled_for <= ?
+           WHERE status = 'pending' AND scheduled_for <= ? AND (? IS NULL OR session_id = ?)
            ORDER BY scheduled_for ASC`
         )
-        .all(nowIso) as ScheduledMessageRow[];
+        .all(nowIso, sessionId, sessionId) as ScheduledMessageRow[];
 
       for (const row of due) {
         db.prepare(
@@ -97,6 +97,13 @@ export const scheduledMessagesDb = {
 
       return due;
     })();
+  },
+
+  /** quests: the chats with a message due now; the manager starts their services, which send it. */
+  listDueSessionIds(now: Date): string[] {
+    return (getConnection()
+      .prepare(`SELECT DISTINCT session_id FROM scheduled_messages WHERE status = 'pending' AND scheduled_for <= ?`)
+      .all(now.toISOString()) as Array<{ session_id: string }>).map((r) => r.session_id);
   },
 
   markFailed(id: string, reason: string): void {

@@ -8,4 +8,5 @@ export { default as queueRoutes } from './queue.routes.js';
 export { initializeQueue, closeQueue } from './polls.js';
 export { noteTranscript } from './sources/transcripts.js';
 export { processStates } from './chats.js';
+export { getQueue } from './queue.service.js';
 export { hasLiveProcess } from './sources/live.js';

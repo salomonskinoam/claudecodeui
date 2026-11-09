@@ -17,8 +17,7 @@ import {
     sessionHistoryCache,
 } from '@/modules/providers/index.js';
 import { createWebSocketServer } from '@/modules/websocket/index.js';
-import { handleBrowserChat } from '@/modules/chat-hosts/index.js';
-import { proxyToRunner } from '@/modules/runner/index.js';
+import { handleBrowserChat, startManager } from '@/modules/chat-hosts/index.js';
 import { approvalsOf, runningRuns, setOnProcessChange, startRuntimeStatePoll } from '@/shared/runtime-state.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
@@ -61,7 +60,7 @@ import { worktreesRoutes } from './modules/worktrees/index.js';
 import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
 import { browserUseService } from './modules/browser-use/browser-use.service.js';
 import { initializeDatabase, sessionsDb } from './modules/database/index.js';
-import { configureWebPush } from './modules/notifications/index.js';
+import { configureWebPush, handleDesktopNotificationsConnection } from './modules/notifications/index.js';
 
 const __dirname = getModuleDirectory(import.meta.url);
 // The server source runs from /server, while the compiled output runs from /dist-server/server.
@@ -107,14 +106,15 @@ const agentRoutes = createAgentModule({
 
 // Single WebSocket server that handles chat, shell, and plugin proxy paths. quests: each chat runs in its own
 // service (server/modules/chat-hosts), so a restart of this server stops no chat: the chat socket's frames go to
-// each chat's service. The notification socket (used only by the Electron app) still passes to the old runner.
+// each chat's service. The notification socket is used only by the Electron app; the chats' notifications do not
+// reach it (ponytail: relay them from each chat service if the Electron app is ever used).
 createWebSocketServer(server, {
     verifyClient: {
         isPlatform: IS_PLATFORM,
         authenticateWebSocket,
     },
     chat: (ws, request) => handleBrowserChat(ws, request),
-    notifications: (ws, request) => proxyToRunner(ws, request, false),
+    notifications: (ws, request) => handleDesktopNotificationsConnection(ws, request),
     shell: {
         resolveProviderSessionId: (sessionId, provider) => {
             const dbSession = sessionsDb.getSessionById(sessionId);
@@ -512,11 +512,13 @@ async function startServer() {
 
             // Start watching the projects folder for changes
             await initializeSessionsWatcher();
-            // quests: scheduled messages are sent by the runner (server/runner.ts). The runner's state, read every
-            // second, then the priority queue's polls (tickets, live chats, closing lines).
+            // quests: the chat services' state, read every second, then the priority queue's polls (tickets, live
+            // chats, closing lines), then the manager's check (server/modules/chat-hosts/manager.ts), which also
+            // starts the service of a chat with a scheduled or queued message due.
             setOnProcessChange((id) => sessionHistoryCache.invalidate(id));
             startRuntimeStatePoll();
             initializeQueue();
+            if (process.env.QUESTS_MANAGER !== 'off') startManager();
 
             // Start server-side plugin processes for enabled plugins
             startEnabledPluginServers().catch(err => {

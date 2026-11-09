@@ -1,20 +1,14 @@
 #!/usr/bin/env node
-// quests: the runner. It owns the Claude (and Codex, Cursor, OpenCode) processes of chats, so a restart of the
-// page server (quests-ui.service) never stops a turn, a subagent or a background command. It listens on a Unix
-// socket only the user can open; the page server passes the page's chat and notification sockets through to it
-// and reads GET /state (server/shared/runtime-state.ts).
+// quests: one chat's service, the user unit quests-chat-<page session id> that the manager
+// (server/modules/chat-hosts) starts with scripts/start-chat.sh. It owns that chat's Claude (or Codex, Cursor,
+// OpenCode) process, so a restart of the page server (quests-ui.service) never stops a turn, a subagent or a
+// background command. It listens on its own Unix socket, which only the user can open; the manager passes the
+// browser's frames for this chat to it, reads GET /state, and hears at once on /control when the state changes.
 //
-// Two modes:
-// - QUESTS_CHAT=<page session id>: a chat service, the user unit quests-chat-<id> that the manager
-//   (server/modules/chat-hosts) starts. It runs that one chat, keeps its own record in the chat_hosts table, tells
-//   the manager at once when its state changes (the /control socket), and exits after 2 minutes with nothing
-//   running, so the chat's next message starts it on the newest build. SIGTERM (a deliberate stop or a shutdown)
-//   exits at once and leaves the record open, so the manager wakes the chat when it comes back.
-// - Without it: the old single runner (quests-runner.service), until its last chat has ended. It restarts only
-//   through a drain: on SIGTERM it refuses new turns, waits until no turn runs and no Claude process is held for
-//   background work, then exits. A second SIGTERM, or a machine that is shutting down, ends it at once.
+// It keeps its own record in the chat_hosts table, sends this chat's scheduled and queued messages, and exits after
+// 2 minutes with nothing running, so the chat's next message starts it on the newest build. SIGTERM (a deliberate
+// stop or a shutdown) exits at once and leaves the record open, so the manager wakes the chat when it comes back.
 import './load-env.js';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 
@@ -29,76 +23,29 @@ import {
   listClaudeSDKTurnsInFlight,
   providerRuntimeService,
 } from '@/modules/providers/index.js';
-import { CHATS_DIR, RUNNER_SOCKET, chatSocket, chatUnit, type RuntimeState } from '@/shared/runtime-state.js';
+import { CHATS_DIR, chatSocket, chatUnit, type RuntimeState } from '@/shared/runtime-state.js';
 import { initializeScheduledMessageDispatcher } from '@/modules/scheduled-messages/index.js';
-import { chatRunRegistry, type ProviderRuntimeGateway } from '@/modules/websocket/index.js';
+import { chatRunRegistry } from '@/modules/websocket/index.js';
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
 import { verifyWebSocketClient } from '@/modules/websocket/services/websocket-auth.service.js';
 import { attachWebSocketHeartbeat } from '@/modules/websocket/services/websocket-server.service.js';
 import type { AuthenticatedWebSocketRequest } from '@/shared/types.js';
 import { IS_PLATFORM } from '@/shared/utils.js';
 
-const CHAT = process.env.QUESTS_CHAT || null;
+const CHAT: string = process.env.QUESTS_CHAT ?? '';
+if (!CHAT) throw new Error('QUESTS_CHAT (the page session id of the chat to run) is required');
 const IDLE_EXIT_MS = Number(process.env.QUESTS_IDLE_EXIT_MS ?? 120_000);
-let draining = false;
-
-/** The runtime, except that a drain refuses new turns: a turn started now would hold the restart back. */
-const runtime: ProviderRuntimeGateway = {
-  ...providerRuntimeService,
-  run: (provider, command, options, writer) => (draining
-    ? Promise.reject(new Error('The chat runner is restarting for an update. Send the message again in a minute.'))
-    : providerRuntimeService.run(provider, command, options, writer)),
-};
 
 function runtimeState(): RuntimeState {
-  const runs = chatRunRegistry.listRuns();
+  const approvals = providerRuntimeService.getPendingApprovalsForSession(CHAT);
   return {
-    runs,
-    approvals: Object.fromEntries(runs.map((r) => [r.sessionId, providerRuntimeService.getPendingApprovalsForSession(r.sessionId)]).filter(([, a]) => (a as unknown[]).length > 0)),
+    runs: chatRunRegistry.listRuns(),
+    approvals: approvals.length > 0 ? { [CHAT]: approvals } : {},
     inFlight: listClaudeSDKTurnsInFlight(),
     lastSteps: listClaudeSDKLastSteps(),
     background: providerRuntimeService.listBackgroundWork(),
     startTimes: listClaudeSDKSessionStartTimes() as Record<string, number>,
   };
-}
-
-/** What still holds a drain: running turns and live Claude processes (held for background work). */
-function holders(): string[] {
-  const running = chatRunRegistry.listRunningRuns().map((r) => `turn ${r.sessionId}`);
-  const held = Object.keys(listClaudeSDKSessionStartTimes() as Record<string, number>).map((id) => `process ${id}`);
-  return [...running, ...held];
-}
-
-function machineStopping(): boolean {
-  try {
-    return execFileSync('systemctl', ['--user', 'is-system-running'], { encoding: 'utf8' }).trim() === 'stopping';
-  } catch (error) {
-    // is-system-running exits non-zero for every state but "running", and still prints the state.
-    return String((error as { stdout?: string }).stdout ?? '').trim() === 'stopping';
-  }
-}
-
-function drain(): void {
-  if (draining || machineStopping()) {
-    console.log('[runner] stopping now');
-    process.exit(0);
-  }
-  draining = true;
-  console.log('[runner] drain: no new turns; waiting for the running work to end');
-  let lastLog = 0;
-  const check = () => {
-    const held = holders();
-    if (held.length === 0) {
-      console.log('[runner] drain done');
-      process.exit(0);
-    }
-    if (Date.now() - lastLog > 60_000) {
-      lastLog = Date.now();
-      console.log(`[runner] drain waits for: ${held.join(', ')}`);
-    }
-  };
-  setInterval(check, 2000);
-  check();
 }
 
 /**
@@ -158,7 +105,7 @@ async function start(): Promise<void> {
     attachWebSocketHeartbeat(ws);
     const req = request as AuthenticatedWebSocketRequest;
     const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
-    if (pathname === '/ws') handleChatConnection(ws, req, { runtime });
+    if (pathname === '/ws') handleChatConnection(ws, req, { runtime: providerRuntimeService });
     else if (pathname === '/desktop-notifications') handleDesktopNotificationsConnection(ws, req);
     else if (pathname === '/control') {
       control.add(ws);
@@ -166,22 +113,19 @@ async function start(): Promise<void> {
     } else ws.close();
   });
 
-  const socket = CHAT ? chatSocket(CHAT) : RUNNER_SOCKET;
+  const socket = chatSocket(CHAT);
   fs.mkdirSync(CHATS_DIR, { recursive: true, mode: 0o700 });
   fs.rmSync(socket, { force: true });
   server.listen(socket, () => {
     fs.chmodSync(socket, 0o600);
-    console.log(`[runner] listening on ${socket}`);
-    if (CHAT) {
-      chatHostsDb.register(CHAT, chatUnit(CHAT), process.env.QUESTS_BUILD ?? 'dev', process.pid);
-      watchChat(CHAT, control);
-    } else {
-      // Sends anything that came due while no runner ran, then keeps polling.
-      initializeScheduledMessageDispatcher(runtime);
-    }
+    console.log(`[chat ${CHAT}] listening on ${socket}`);
+    chatHostsDb.register(CHAT, chatUnit(CHAT), process.env.QUESTS_BUILD ?? 'dev', process.pid);
+    watchChat(CHAT, control);
+    // Sends this chat's messages that came due while it had no service, then keeps polling.
+    initializeScheduledMessageDispatcher(providerRuntimeService, CHAT);
   });
 
-  process.on('SIGTERM', CHAT ? () => process.exit(0) : drain);
+  process.on('SIGTERM', () => process.exit(0));
   process.on('SIGINT', () => process.exit(0));
 }
 

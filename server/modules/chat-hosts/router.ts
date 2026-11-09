@@ -1,14 +1,14 @@
 import { WebSocket } from 'ws';
 
 import { connectedClients } from '@/modules/websocket/index.js';
-import { RUNNER_SOCKET, chatSocket, heldByOldRunner, refreshRuntimeState } from '@/shared/runtime-state.js';
+import { chatSocket, refreshRuntimeState } from '@/shared/runtime-state.js';
 import type { AuthenticatedWebSocketRequest } from '@/shared/types.js';
 
 import { ensureHost, fanOutUpsert, onHostStarted, socketAnswers } from './hosts.js';
 
 /**
  * quests: the browser's chat socket (`/ws`) in the manager. Every frame names its chat, so each goes to that chat's
- * own service (starting it for a send), or to the old single runner while that still holds the chat. Events come
+ * own service (starting it for a send). Events come
  * back on the same browser socket. A service that exits (idle, crash) closes only its own upstream; the browser
  * socket stays open.
  *
@@ -18,7 +18,6 @@ import { ensureHost, fanOutUpsert, onHostStarted, socketAnswers } from './hosts.
  */
 
 type Frame = { type?: string; sessionId?: string; sessions?: Array<{ sessionId?: string }>; requestId?: string };
-const OLD = '__old_runner__';
 const conns = new Set<Conn>();
 
 class Conn {
@@ -30,14 +29,10 @@ class Conn {
 
   constructor(readonly browser: WebSocket, readonly query: string) {}
 
-  socketOf(target: string): string {
-    return target === OLD ? RUNNER_SOCKET : chatSocket(target);
-  }
-
   upstream(target: string): Promise<WebSocket> {
     const open = this.upstreams.get(target);
     if (open && open.readyState === WebSocket.OPEN) return Promise.resolve(open);
-    const ws = open && open.readyState === WebSocket.CONNECTING ? open : new WebSocket(`ws+unix:${this.socketOf(target)}:/ws${this.query}`);
+    const ws = open && open.readyState === WebSocket.CONNECTING ? open : new WebSocket(`ws+unix:${chatSocket(target)}:/ws${this.query}`);
     if (ws !== open) {
       this.upstreams.set(target, ws);
       ws.on('message', (data, isBinary) => this.fromUpstream(target, data, isBinary));
@@ -66,14 +61,9 @@ class Conn {
     if (text.length < 4000 && text.includes('"kind":"complete"')) void refreshRuntimeState();
   }
 
-  /** Where a chat's frames go: the old runner while it holds the chat, else the chat's own service. */
-  targetOf(sessionId: string): string {
-    return heldByOldRunner(sessionId) ? OLD : sessionId;
-  }
-
   async forward(target: string, frame: Frame, start: boolean): Promise<void> {
-    if (target !== OLD && start) await ensureHost(target);
-    if (target !== OLD && !start && !(await socketAnswers(chatSocket(target)))) {
+    if (start) await ensureHost(target);
+    else if (!(await socketAnswers(chatSocket(target)))) {
       // No service: nothing runs for this chat. Answer as a service with no run would.
       if (frame.type === 'chat.subscribe') this.send({ kind: 'chat_subscribed', sessionId: target, isProcessing: false, lastSeq: 0, pendingPermissions: [], timestamp: new Date().toISOString() });
       else this.send({ kind: 'protocol_error', code: 'NO_ACTIVE_RUN', error: 'No run is active for this session.', sessionId: target, timestamp: new Date().toISOString() });
@@ -94,23 +84,23 @@ class Conn {
       case 'chat.edit-send':
         this.subscribed.add(sid);
         this.starting.add(sid);
-        await this.forward(this.targetOf(sid), frame, true).finally(() => setTimeout(() => this.starting.delete(sid), 1000));
+        await this.forward(sid, frame, true).finally(() => setTimeout(() => this.starting.delete(sid), 1000));
         // A send changes what runs: the queue and the dots read the state again at once.
         setTimeout(() => void refreshRuntimeState(), 300);
         return;
       case 'chat.abort':
-        await this.forward(this.targetOf(sid), frame, false);
+        await this.forward(sid, frame, false);
         setTimeout(() => void refreshRuntimeState(), 300);
         return;
       case 'chat.stop-task':
-        await this.forward(this.targetOf(sid), frame, false);
+        await this.forward(sid, frame, false);
         return;
       case 'chat.subscribe':
         for (const entry of frame.sessions ?? []) {
           const id = typeof entry?.sessionId === 'string' ? entry.sessionId.trim() : '';
           if (!id) continue;
           this.subscribed.add(id);
-          await this.forward(this.targetOf(id), { type: 'chat.subscribe', sessions: [entry] }, false);
+          await this.forward(id, { type: 'chat.subscribe', sessions: [entry] }, false);
         }
         return;
       case 'chat.permission-response': {

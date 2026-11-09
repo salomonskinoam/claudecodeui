@@ -6,13 +6,11 @@ import path from 'node:path';
 import type { BackgroundTaskSummary, LLMProvider } from '@/shared/types.js';
 
 /**
- * quests: the runner (server/runner.ts, its own service) owns the chats' Claude processes, so a restart of the
- * page server never stops a turn, a subagent or a background command. The page server keeps a copy of the
- * runner's state, read from the runner's socket every second and when a chat starts or ends, and everything in
- * the page server that asks "is this chat running" reads the copy.
+ * quests: each chat runs in its own service (server/runner.ts), so a restart of the page server never stops a
+ * turn, a subagent or a background command. The page server keeps a copy of the merged state of all chat
+ * services, read from their sockets every second and when a chat starts or ends, and everything in the page server
+ * that asks "is this chat running" reads the copy.
  */
-
-export const RUNNER_SOCKET = path.join(process.env.XDG_RUNTIME_DIR ?? os.tmpdir(), 'quests-runner.sock');
 /** quests: each chat service (server/runner.ts with QUESTS_CHAT set) listens on its own socket in this folder. */
 export const CHATS_DIR = path.join(process.env.XDG_RUNTIME_DIR ?? os.tmpdir(), 'quests');
 export const chatSocket = (sessionId: string): string => path.join(CHATS_DIR, `chat-${sessionId}.sock`);
@@ -62,10 +60,6 @@ export const startTimeOf = (sessionId: string): number | null => copy.startTimes
 const timedOut = new Set<string>();
 export const isUnanswering = (sessionId: string): boolean => timedOut.has(sessionId);
 
-/** The chats the old single runner (quests-runner.service) still holds: they stay there until they end. */
-let oldRunner = new Set<string>();
-export const heldByOldRunner = (sessionId: string): boolean => oldRunner.has(sessionId);
-
 /** The page session ids of the chat services with a socket file (a crashed one leaves its file behind). */
 export const chatSocketIds = (): string[] => {
   try {
@@ -75,14 +69,13 @@ export const chatSocketIds = (): string[] => {
   }
 };
 
-/** The old single runner's state plus every chat service's, merged; a socket that does not answer counts empty. */
+/** Every chat service's state, merged; a socket that does not answer counts empty. */
 async function fetchState(): Promise<RuntimeState> {
   const ids = chatSocketIds();
-  const parts = await Promise.all([RUNNER_SOCKET, ...ids.map(chatSocket)].map((socket, i) => fetchOne(socket).then(
-    (state) => { if (i > 0) timedOut.delete(ids[i - 1]); return state; },
-    (error: Error) => { if (i > 0 && error.message === 'timed out') timedOut.add(ids[i - 1]); return EMPTY_RUNTIME_STATE; },
+  const parts = await Promise.all(ids.map((id) => fetchOne(chatSocket(id)).then(
+    (state) => { timedOut.delete(id); return state; },
+    (error: Error) => { if (error.message === 'timed out') timedOut.add(id); return EMPTY_RUNTIME_STATE; },
   )));
-  oldRunner = new Set([...parts[0].runs.map((r) => r.sessionId), ...Object.keys(parts[0].startTimes)]);
   return {
     runs: parts.flatMap((p) => p.runs),
     approvals: Object.assign({}, ...parts.map((p) => p.approvals)),
@@ -112,7 +105,7 @@ function fetchOne(socketPath: string): Promise<RuntimeState> {
   });
 }
 
-/** Reads the runner's state now. With the runner down nothing runs: the copy is empty. */
+/** Reads the chat services' state now. */
 export async function refreshRuntimeState(): Promise<void> {
   const next = await fetchState();
   // A session's history says whether its background agents run from whether its process is live: a process that
@@ -130,3 +123,13 @@ export function startRuntimeStatePoll(): void {
   timer = setInterval(() => void refreshRuntimeState(), 1000);
   timer.unref?.();
 }
+
+/**
+ * quests: what the manager's check (server/modules/chat-hosts/reconcile.ts) found about each chat, by page session
+ * id, for the queue and the dots: a listener runs or is silent, a listener ended unseen, the chat may be hung, or it
+ * keeps dying.
+ */
+export type ChatMark = 'listener' | 'listenerSilent' | 'listenerEnded' | 'hung' | 'keepsDying';
+let marks: Record<string, ChatMark[]> = {};
+export const setChatMarks = (next: Record<string, ChatMark[]>): void => { marks = next; };
+export const marksOf = (sessionId: string): ChatMark[] => marks[sessionId] ?? [];

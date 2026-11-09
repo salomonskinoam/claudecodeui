@@ -76,7 +76,7 @@ function systemToken(): string {
  * Sends a message to a chat as Noam would from the composer, starting its service when needed: the wake after a
  * crash, a listener's result, a scheduled message. The connection stays open while the turn runs, then closes.
  */
-export async function sendToChat(sessionId: string, content: string, options: Record<string, unknown> = {}): Promise<void> {
+export async function sendToChat(sessionId: string, content: string, options: Record<string, unknown> = { permissionMode: 'auto' }): Promise<void> {
   await ensureHost(sessionId);
   const ws = new WebSocket(`ws+unix:${chatSocket(sessionId)}:/ws?token=${systemToken()}`);
   await new Promise<void>((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject); });
@@ -87,6 +87,8 @@ export async function sendToChat(sessionId: string, content: string, options: Re
     if (e.kind === 'complete' || e.kind === 'protocol_error') ws.close();
   });
   ws.send(JSON.stringify({ type: 'chat.send', sessionId, content, options }));
+  // The browsers showing this chat subscribe to the run this message starts.
+  for (const f of startListeners) f(sessionId);
 }
 
 const recentUpserts = new Map<string, number>();
