@@ -14,7 +14,7 @@ summary="$(python3 -I "$(dirname "$0")/summary_check.py" <<<"$in")"
 [ -n "$closing" ] && echo "$closing" >&2
 [ -n "$summary" ] && echo "$summary" >&2
 cat >&2 <<EOF
-Summary rule: the final message of a turn (the text after the last tool call) is the Summary and the closing lines, nothing else. It opens with the line **Summary**. Under it, every numbered item open or answered in this turn, condensed: first line "- **N.**" and the quote it answers, in quotation marks; then context and information in one or two lines; then the question if it is open. Then **Running:** and **Required from you:**, each on its own line.
+Summary rule: the final message of a turn (the text after the last tool call) is the Summary and the closing lines, nothing else. It opens with the line **Summary**. Under it, every numbered item open or answered in this turn. First line "- **N.**" and the quote it answers, in quotation marks. An open item then has four sub-bullets: **History:** (what came before, his words quoted), **Context:** (what the thing is, full names, what is wrong), **Information:** (everything he needs to decide; he remembers nothing), **Question:** (one). An answered item: what was done or found and where. Then **Running:** and **Required from you:**, each on its own line.
 Queue rule: the reply ends with one more line after "Running:" and "Required from you:". It is exactly one of:
   waiting for <what>   you wait for something that is not Noam (an eval, another chat)
   question <what>      Noam must answer; the question carries its background and history

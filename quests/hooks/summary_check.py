@@ -11,6 +11,7 @@ import sys
 
 ITEM = re.compile(r'^\s*(?:-\s*)?\*\*(\d+(?:\.\d+)*)\.\*\*')
 SUMMARY = re.compile(r'^\s*\*\*Summary:?\*\*:?\s*$')
+PARTS = ('History', 'Context', 'Information', 'Question')
 CLOSING = re.compile(r'^\s*\**(running|required from you)\b', re.I)
 QUOTES = '"“”«'
 
@@ -63,8 +64,15 @@ def failures(final, earlier):
         if not any(q in b[0] for q in QUOTES):
             out.append(f'Summary item {n} has no quotation mark in its first line: open it with the words it answers.')
         # The tag counts on the item's first line only: "[blocks]" written further down is text about the tag.
-        if '[blocks]' in b[0] and '?' not in '\n'.join(b):
+        text = '\n'.join(b)
+        if '[blocks]' in b[0] and '?' not in text:
             out.append(f'Summary item {n} is tagged [blocks] but asks no question.')
+        # An open item is decided from this message alone: its four parts, each labelled (Noam, 9 Nov: "the summary
+        # is one-liners instead of the elaborate thing i asked for").
+        is_open = '[blocks]' in b[0] or re.search(r'\bQuestion:', text)
+        missing_parts = [part for part in PARTS if is_open and not re.search(rf'\b{part}:', text)]
+        if missing_parts:
+            out.append(f'Summary item {n} is open but has no {", ".join(missing_parts)} part: give it History, Context, Information and Question, each as its own sub-bullet.')
     return out
 
 
@@ -80,7 +88,9 @@ def main():
 
 
 def test():
-    good = '**Summary**\n\n- **5.** "fix it". Done in abc123.\n- **6.** "which drawer" [blocks]\n  - Question: left or right?\n\n**Running:** nothing'
+    good = ('**Summary**\n\n- **5.** "fix it". Done in abc123.\n- **6.** "which drawer" [blocks]\n  - **History:** you asked "x".\n'
+            '  - **Context:** the drawer.\n  - **Information:** two places.\n  - **Question:** left or right?\n\n**Running:** nothing')
+    assert 'no History, Context, Information part' in failures('**Summary**\n- **6.** "x" [blocks]\n  - Question: left or right?', [])[0]
     assert failures(good, ['- **5.** started']) == []
     assert failures('Plain answer.\n\n**Running:** nothing', ['looking']) == []
     assert 'missing' in failures(good, ['- **7.** x'])[0]
@@ -88,6 +98,7 @@ def test():
     assert 'quotation' in failures('**Summary**\n- **5.** done', [])[0]
     assert 'asks no question' in failures('**Summary**\n- **5.** "x" [blocks] go.', [])[0]
     assert failures('**Summary**\n- **5.** "x" done.\n  - a [blocks] item asks no question: checked.', []) == []
+    assert failures('**Summary**\n- **43.** "is it gpu?" No, CPU only.', []) == []  # a quoted question is not an open item
     assert failures('1. restart the server\n2. reload', []) == []  # plain numbered lists are not items
     import os, tempfile
     rows = [
