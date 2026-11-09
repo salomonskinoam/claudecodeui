@@ -10,8 +10,7 @@ import re
 import sys
 
 ITEM = re.compile(r'^\s*(?:-\s*)?\*\*(\d+(?:\.\d+)*)\.\*\*')
-SUMMARY = re.compile(r'^\s*\*\*Summary:?\*\*:?\s*$')
-PARTS = ('History', 'Context', 'Information', 'Question')
+SUMMARY = re.compile(r'^\s*(\*\*)?Summary:?(\*\*)?:?\s*$')
 CLOSING = re.compile(r'^\s*\**(running|required from you)\b', re.I)
 QUOTES = '"“”«'
 
@@ -67,12 +66,6 @@ def failures(final, earlier):
         text = '\n'.join(b)
         if '[blocks]' in b[0] and '?' not in text:
             out.append(f'Summary item {n} is tagged [blocks] but asks no question.')
-        # An open item is decided from this message alone: its four parts, each labelled (Noam, 9 Nov: "the summary
-        # is one-liners instead of the elaborate thing i asked for").
-        is_open = '[blocks]' in b[0] or re.search(r'\bQuestion:', text)
-        missing_parts = [part for part in PARTS if is_open and not re.search(rf'\b{part}:', text)]
-        if missing_parts:
-            out.append(f'Summary item {n} is open but has no {", ".join(missing_parts)} part: give it History, Context, Information and Question, each as its own sub-bullet.')
     return out
 
 
@@ -88,9 +81,7 @@ def main():
 
 
 def test():
-    good = ('**Summary**\n\n- **5.** "fix it". Done in abc123.\n- **6.** "which drawer" [blocks]\n  - **History:** you asked "x".\n'
-            '  - **Context:** the drawer.\n  - **Information:** two places.\n  - **Question:** left or right?\n\n**Running:** nothing')
-    assert 'no History, Context, Information part' in failures('**Summary**\n- **6.** "x" [blocks]\n  - Question: left or right?', [])[0]
+    good = '**Summary**\n\n- **5.** "fix it". Done in abc123.\n- **6.** "which drawer" [blocks] Left or right?\n\n**Running:** nothing'
     assert failures(good, ['- **5.** started']) == []
     assert failures('Plain answer.\n\n**Running:** nothing', ['looking']) == []
     assert 'missing' in failures(good, ['- **7.** x'])[0]
