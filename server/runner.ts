@@ -1,21 +1,27 @@
 #!/usr/bin/env node
-// quests: the runner. It owns the Claude (and Codex, Cursor, OpenCode) processes of the chats the page runs, so a
-// restart of the page server (quests-ui.service) never stops a turn, a subagent or a background command. It
-// listens on a Unix socket only the user can open; the page server passes the page's chat and notification
-// sockets through to it and reads GET /state (server/modules/runner/runtime-state.ts).
+// quests: the runner. It owns the Claude (and Codex, Cursor, OpenCode) processes of chats, so a restart of the
+// page server (quests-ui.service) never stops a turn, a subagent or a background command. It listens on a Unix
+// socket only the user can open; the page server passes the page's chat and notification sockets through to it
+// and reads GET /state (server/shared/runtime-state.ts).
 //
-// It restarts only through a drain: on SIGTERM (systemctl --user restart quests-runner) it refuses new turns,
-// waits until no turn runs and no Claude process is held for background work, then exits, and systemd starts the
-// new code. A second SIGTERM, or a machine that is shutting down, ends it at once.
+// Two modes:
+// - QUESTS_CHAT=<page session id>: a chat service, the user unit quests-chat-<id> that the manager
+//   (server/modules/chat-hosts) starts. It runs that one chat, keeps its own record in the chat_hosts table, tells
+//   the manager at once when its state changes (the /control socket), and exits after 2 minutes with nothing
+//   running, so the chat's next message starts it on the newest build. SIGTERM (a deliberate stop or a shutdown)
+//   exits at once and leaves the record open, so the manager wakes the chat when it comes back.
+// - Without it: the old single runner (quests-runner.service), until its last chat has ended. It restarts only
+//   through a drain: on SIGTERM it refuses new turns, waits until no turn runs and no Claude process is held for
+//   background work, then exits. A second SIGTERM, or a machine that is shutting down, ends it at once.
 import './load-env.js';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 
-import { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 
 import { authenticateWebSocket } from '@/modules/auth/index.js';
-import { initializeDatabase } from '@/modules/database/index.js';
+import { chatHostsDb, initializeDatabase } from '@/modules/database/index.js';
 import { configureWebPush, handleDesktopNotificationsConnection } from '@/modules/notifications/index.js';
 import {
   listClaudeSDKLastSteps,
@@ -23,7 +29,7 @@ import {
   listClaudeSDKTurnsInFlight,
   providerRuntimeService,
 } from '@/modules/providers/index.js';
-import { RUNNER_SOCKET, type RuntimeState } from '@/shared/runtime-state.js';
+import { CHATS_DIR, RUNNER_SOCKET, chatSocket, chatUnit, type RuntimeState } from '@/shared/runtime-state.js';
 import { initializeScheduledMessageDispatcher } from '@/modules/scheduled-messages/index.js';
 import { chatRunRegistry, type ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
@@ -32,6 +38,8 @@ import { attachWebSocketHeartbeat } from '@/modules/websocket/services/websocket
 import type { AuthenticatedWebSocketRequest } from '@/shared/types.js';
 import { IS_PLATFORM } from '@/shared/utils.js';
 
+const CHAT = process.env.QUESTS_CHAT || null;
+const IDLE_EXIT_MS = Number(process.env.QUESTS_IDLE_EXIT_MS ?? 120_000);
 let draining = false;
 
 /** The runtime, except that a drain refuses new turns: a turn started now would hold the restart back. */
@@ -93,12 +101,47 @@ function drain(): void {
   check();
 }
 
+/**
+ * Chat service: keeps the chat's record (turn open, process held, last event) and tells the manager's /control
+ * sockets at once when the state the queue shows changes. Read every 250 ms in memory, which costs nothing.
+ */
+function watchChat(sessionId: string, control: Set<WebSocket>): void {
+  let signature = '';
+  let turn = false;
+  let held = false;
+  let lastStep = '';
+  let lastTouch = 0;
+  let idleSince = Date.now();
+  setInterval(() => {
+    const s = runtimeState();
+    const running = s.runs.some((r) => r.status === 'running');
+    const live = Object.keys(s.startTimes).length > 0;
+    const approvals = Object.values(s.approvals).flat().length;
+    const next = JSON.stringify([running, live, approvals, s.inFlight.length, s.background.map((b) => b.tasks.length)]);
+    if (next !== signature) {
+      signature = next;
+      for (const ws of control) if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ kind: 'quests_state_changed', sessionId }));
+    }
+    if (running !== turn) { turn = running; chatHostsDb.setTurn(sessionId, running); }
+    if (live !== held) { held = live; chatHostsDb.setHeld(sessionId, live); }
+    const step = JSON.stringify(Object.values(s.lastSteps));
+    if (step !== lastStep && Date.now() - lastTouch > 10_000) { lastStep = step; lastTouch = Date.now(); chatHostsDb.touch(sessionId); }
+    if (running || live || approvals > 0) idleSince = Date.now();
+    else if (Date.now() - idleSince > IDLE_EXIT_MS) {
+      console.log(`[chat ${sessionId}] idle; exiting so the next message starts the newest build`);
+      chatHostsDb.end(sessionId);
+      process.exit(0);
+    }
+  }, 250);
+}
+
 async function start(): Promise<void> {
   await initializeDatabase();
   configureWebPush();
   // A completed run stays subscribable while its session's background work is still reporting through it.
   chatRunRegistry.setRetentionGuard((sessionId) => providerRuntimeService.hasBackgroundWork(sessionId));
 
+  const control = new Set<WebSocket>();
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/state') {
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -117,18 +160,28 @@ async function start(): Promise<void> {
     const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
     if (pathname === '/ws') handleChatConnection(ws, req, { runtime });
     else if (pathname === '/desktop-notifications') handleDesktopNotificationsConnection(ws, req);
-    else ws.close();
+    else if (pathname === '/control') {
+      control.add(ws);
+      ws.on('close', () => control.delete(ws));
+    } else ws.close();
   });
 
-  fs.rmSync(RUNNER_SOCKET, { force: true });
-  server.listen(RUNNER_SOCKET, () => {
-    fs.chmodSync(RUNNER_SOCKET, 0o600);
-    console.log(`[runner] listening on ${RUNNER_SOCKET}`);
-    // Sends anything that came due while no runner ran, then keeps polling.
-    initializeScheduledMessageDispatcher(runtime);
+  const socket = CHAT ? chatSocket(CHAT) : RUNNER_SOCKET;
+  fs.mkdirSync(CHATS_DIR, { recursive: true, mode: 0o700 });
+  fs.rmSync(socket, { force: true });
+  server.listen(socket, () => {
+    fs.chmodSync(socket, 0o600);
+    console.log(`[runner] listening on ${socket}`);
+    if (CHAT) {
+      chatHostsDb.register(CHAT, chatUnit(CHAT), process.env.QUESTS_BUILD ?? 'dev', process.pid);
+      watchChat(CHAT, control);
+    } else {
+      // Sends anything that came due while no runner ran, then keeps polling.
+      initializeScheduledMessageDispatcher(runtime);
+    }
   });
 
-  process.on('SIGTERM', drain);
+  process.on('SIGTERM', CHAT ? () => process.exit(0) : drain);
   process.on('SIGINT', () => process.exit(0));
 }
 

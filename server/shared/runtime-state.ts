@@ -12,6 +12,10 @@ import type { BackgroundTaskSummary, LLMProvider } from '@/shared/types.js';
  */
 
 export const RUNNER_SOCKET = path.join(process.env.XDG_RUNTIME_DIR ?? os.tmpdir(), 'quests-runner.sock');
+/** quests: each chat service (server/runner.ts with QUESTS_CHAT set) listens on its own socket in this folder. */
+export const CHATS_DIR = path.join(process.env.XDG_RUNTIME_DIR ?? os.tmpdir(), 'quests');
+export const chatSocket = (sessionId: string): string => path.join(CHATS_DIR, `chat-${sessionId}.sock`);
+export const chatUnit = (sessionId: string): string => `quests-chat-${sessionId}`;
 
 export type RuntimeRun = {
   sessionId: string;
