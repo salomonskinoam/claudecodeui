@@ -36,7 +36,7 @@ test('step 2: the state of a reply is what it asks of Noam', () => {
   assert.equal(replyState('second done'), 'second done');
 });
 
-test('step 3: only report-started turns fold, all but the last of a run with one state', () => {
+test('step 3: only turns Noam did not start fold, all but the last of a run with one state', () => {
   const m = [
     typed('t0', 'watch the runs'),
     reply('t1', `started.\n${STATE}`), // the answer to Noam's message: never folds
@@ -56,13 +56,29 @@ test('step 3: only report-started turns fold, all but the last of a run with one
   assert.equal(folds.has(m[12]), false);
 });
 
-test('step 3: a turn the hook forced is no reply; a reply already seen never folds later', () => {
+test('step 3: a turn the hook forced is no reply; agents and listeners join a run; a woken turn without a reply is skipped', () => {
+  const agent = (ts: string): ChatMessage => ({ id: ts, type: 'assistant', agentReportFrom: 'noam-worlds-cf', content: 'sdk notice', timestamp: ts } as ChatMessage);
   const m = [
     typed('t0', 'brief'),
     reply('t1', `the brief.\n${STATE}`), hook('t2'), reply('t3', `Running: nothing\n${STATE}`),
-    report('t4'), reply('t5', `a.\n${STATE}`), report('t6'), reply('t7', `b.\n${STATE}`),
+    report('t4'), reply('t5', `a.\n${STATE}`),
+    agent('t6'), reply('t7', `b.\n${STATE}`),
+    agent('t8'),
+    typed('t9', 'Message from the quests manager: your listener "x" ended'), reply('t10', `c.\n${STATE}`),
   ];
-  assert.deepEqual([...foldRepeatedReplies(m).keys()].map((x) => x.timestamp), ['t4', 't5']);
-  // Noam had t5 on screen already: it stays.
-  assert.equal(foldRepeatedReplies(m, new Set(['t5'])).size, 0);
+  assert.equal(starterOf(m[9]), 'report');
+  // t5 and t7 fold; the reply-less agent turn t8 stays drawn and does not break the run; t10 is the last and shows.
+  assert.deepEqual([...foldRepeatedReplies(m).keys()].map((x) => x.timestamp), ['t4', 't5', 't6', 't7']);
+});
+
+test('step 1: a finished reply starts the next woken turn, since the server does not serve what woke the chat', () => {
+  const end = (what: string) => `Running: x\nRequired from you: nothing\n**Done:** ${what}`;
+  const m = [
+    typed('t0', 'is it live?'), reply('t1', `**Summary**\n- **201.** "is it live?" Partly.\n${end('the hook is live')}`),
+    reply('t2', end('the hook is live')), tool('t3'), reply('t4', end('the hook is live')),
+    typed('t5', 'next'), tool('t6'), reply('t7', 'working'), reply('t8', end('next')),
+  ];
+  assert.deepEqual(segmentTurns(m).map((t) => [t.starter, t.start, t.reply]), [['typed', 0, 1], ['report', 2, 2], ['report', 3, 4], ['typed', 5, 8]]);
+  // The answer to Noam stays; of the two equal woken replies the last shows.
+  assert.deepEqual([...foldRepeatedReplies(m).keys()].map((x) => x.timestamp), ['t2']);
 });

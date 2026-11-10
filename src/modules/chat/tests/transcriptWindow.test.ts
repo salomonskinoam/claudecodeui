@@ -53,13 +53,16 @@ test('a typed message is drawn until the transcript has a typed row at or after 
   assert.deepEqual(view(before, notes, null).map((m) => m.id).slice(-2), ['r19', 'local_1']);
 });
 
-test('the streamed reply is drawn last; folds look back only', () => {
+test('the streamed reply is drawn last; of equal replies the last shows', () => {
   const stream = { ...row(0), id: '__stream_s1', kind: 'stream_delta' } as NormalizedMessage;
   const report = (n: number) => row(n, 'user', '<task-notification>tick</task-notification>');
   const reply = (n: number) => row(n, 'assistant', 'Running: x\nRequired from you: nothing\nwaiting for x');
   const w = { start: 0, rows: [row(0, 'user', 'go'), reply(1), report(2), reply(3), report(4), reply(5)] };
   const drawn = view(w, [], stream);
   assert.equal(drawn.at(-1)?.id, '__stream_s1');
-  // The first report turn shows; the next ones state the same and fold under one run.
-  assert.deepEqual(drawn.slice(0, 6).map((m) => m.foldId ?? null), [null, null, null, null, 'r5', 'r5']);
+  // The report turns state the same: the earlier one folds, the last shows.
+  assert.deepEqual(drawn.slice(0, 6).map((m) => m.foldId ?? null), [null, null, 'r3', 'r3', null, null]);
+  // A third equal turn arrives: the one drawn last before folds now, under the same fold id.
+  const more = { start: 0, rows: [...w.rows, report(6), reply(7)] };
+  assert.deepEqual(view(more, [], null).map((m) => m.foldId ?? null), [null, null, 'r3', 'r3', 'r3', 'r3', null, null]);
 });

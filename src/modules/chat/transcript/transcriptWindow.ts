@@ -1,6 +1,6 @@
 import type { NormalizedMessage } from '@/shared/types';
 import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
-import { replyState, rowIdOf, segmentTurns } from '@/modules/chat/utils/repeatedReplies';
+import { foldRepeatedReplies, rowIdOf } from '@/modules/chat/utils/repeatedReplies';
 
 /**
  * quests: the chat view draws the transcript (requirement 52, Noam, 9 Nov: "there is a ssot. just display it").
@@ -66,32 +66,14 @@ export function settleNotes(w: TranscriptWindow, notes: Note[]): Note[] {
   });
 }
 
-/**
- * Requirement 39, looking back only, so a row drawn shown never folds later: a report turn whose reply states the
- * same as the report turn before it is hidden under that run's fold line. A typed or an agent's turn ends the run;
- * a hook's turn neither joins nor ends it.
- */
+/** Requirement 39 and 114: of equal replies in turns Noam did not start, the last shows and the earlier ones fold. */
 function foldIds(rows: NormalizedMessage[]): Map<string, string> {
   const messages = normalizedToChatMessages(rows);
   const ids = new Set(rows.map((m) => m.id));
   // A drawn message's id is its row's id, or the row's id plus "_<n>" when one row draws as several.
   const recordOf = (m: (typeof messages)[number]) => { const id = rowIdOf(m); return ids.has(id) ? id : id.replace(/_\d+$/, ''); };
   const byRecord = new Map<string, string>();
-  let last: string | null = null;
-  let runId: string | null = null;
-  for (const turn of segmentTurns(messages)) {
-    if (turn.starter === 'hook') continue;
-    if (turn.starter !== 'report' || turn.reply < 0) { last = null; runId = null; continue; }
-    const reply = messages[turn.reply];
-    const state = replyState(String(reply.content ?? ''));
-    if (state === last) {
-      runId ??= rowIdOf(reply);
-      for (let i = turn.start; i < turn.end; i += 1) byRecord.set(recordOf(messages[i]), runId);
-    } else {
-      runId = null;
-    }
-    last = state;
-  }
+  for (const [m, fold] of foldRepeatedReplies(messages)) byRecord.set(recordOf(m), fold.id);
   return byRecord;
 }
 
