@@ -15,6 +15,7 @@ summary="$(python3 -I "$(dirname "$0")/summary_check.py" <<<"$in")"
 [ -n "$summary" ] && echo "$summary" >&2
 cat >&2 <<EOF
 Summary rule (the noam output style, "Ending"): the reply ends with a Summary part: every numbered item that is OPEN or ANSWERED in this turn, one bullet each, each written as "Shape of an item that passed the gate" and "Short or complete" say, condensed. Then the two closing lines, bold, each on its own line. All at the end and together, nothing written twice, no tool call after the Summary. Every item opens with a short quote of what it answers.
+Summary run rule: a run is everything from Noam's last message until a reply that ends with question, blocker or Done. Turns woken by an agent, a notification or a listener are part of the run. Only the reply that ends the run has a Summary, and it carries every item written in the run, with the same numbers. A reply that ends with "waiting for" has no Summary. Noam, 10 Nov: "a single summary in the end and no summary while the turn was running, and the end one should contain all of the bullets above, with the same numbers".
 Queue rule: the reply ends with one more line after "Running:" and "Required from you:". It is exactly one of:
   waiting for <what>   you wait for something that is not Noam (an eval, another chat)
   question <what>      Noam must answer; the question carries its background and history
