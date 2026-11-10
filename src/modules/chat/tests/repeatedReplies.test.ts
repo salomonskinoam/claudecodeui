@@ -67,8 +67,8 @@ test('step 3: a turn the hook forced is no reply; agents and listeners join a ru
     typed('t9', 'Message from the quests manager: your listener "x" ended'), reply('t10', `c.\n${STATE}`),
   ];
   assert.equal(starterOf(m[9]), 'report');
-  // t5 and t7 fold; the reply-less agent turn t8 stays drawn and does not break the run; t10 is the last and shows.
-  assert.deepEqual([...foldRepeatedReplies(m).keys()].map((x) => x.timestamp), ['t4', 't5', 't6', 't7']);
+  // t1, sent back by the hook, folds under its rewrite t3; t5 and t7 fold; the reply-less agent turn t8 stays drawn and does not break the run; t10 is the last and shows.
+  assert.deepEqual([...foldRepeatedReplies(m).keys()].map((x) => x.timestamp), ['t1', 't2', 't4', 't5', 't6', 't7']);
 });
 
 test('step 1: a finished reply starts the next woken turn, since the server does not serve what woke the chat', () => {
@@ -81,4 +81,15 @@ test('step 1: a finished reply starts the next woken turn, since the server does
   assert.deepEqual(segmentTurns(m).map((t) => [t.starter, t.start, t.reply]), [['typed', 0, 1], ['report', 2, 2], ['report', 3, 4], ['typed', 5, 8]]);
   // The answer to Noam stays; of the two equal woken replies the last shows.
   assert.deepEqual([...foldRepeatedReplies(m).keys()].map((x) => x.timestamp), ['t2']);
+});
+
+test('step 3: a reply the stop hook sent back folds under its rewrite', () => {
+  const end = 'Running: x\nRequired from you: nothing\nwaiting for: the agents';
+  const m = [
+    typed('t0', 'do the dupe analysis'), tool('t1'), reply('t2', `- **175.** "dupe analysis" started.\n${end}`),
+    hook('t3'), reply('t4', `**Summary**\n- **175.** "dupe analysis" started.\n${end}`),
+  ];
+  const folds = foldRepeatedReplies(m);
+  assert.deepEqual([...folds.keys()].map((x) => x.timestamp), ['t2', 't3']);
+  assert.deepEqual(folds.get(m[2]), { id: 't2', count: 1, from: 't2', to: 't2', first: true });
 });

@@ -50,7 +50,7 @@ export type Note = {
 };
 
 const isTypedUserRow = (m: NormalizedMessage): boolean =>
-  m.kind === 'text' && m.role === 'user' && !String(m.content ?? '').trimStart().startsWith('<');
+  m.kind === 'text' && m.role === 'user' && !/^(<|Stop hook feedback)/.test(String(m.content ?? '').trimStart());
 
 /**
  * The typed messages the transcript has taken over: a typed message goes when the transcript has a typed user row

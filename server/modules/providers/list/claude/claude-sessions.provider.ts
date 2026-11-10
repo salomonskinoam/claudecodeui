@@ -1114,6 +1114,12 @@ const INTERNAL_CONTENT_PREFIXES = [
   'Base directory for this skill:',
 ] as const;
 
+function isStopHookFeedback(content: unknown): boolean {
+  const text = typeof content === 'string' ? content
+    : Array.isArray(content) ? content.map((part: AnyRecord) => (part?.type === 'text' ? String(part.text ?? '') : '')).join('') : '';
+  return text.trimStart().startsWith('Stop hook feedback');
+}
+
 function isInternalContent(content: string): boolean {
   return INTERNAL_CONTENT_PREFIXES.some((prefix) => content.startsWith(prefix));
 }
@@ -1496,7 +1502,9 @@ export class ClaudeSessionsProvider implements IProviderSessions {
       return messages;
     }
 
-    if (raw.message?.role === 'user' && raw.message?.content && raw.isMeta !== true) {
+    // quests: the stop hook's feedback is a meta row, served anyway: the page folds the reply it sent back
+    // (requirement 39, Step 3), so of a reply and its rewrite only the rewrite shows (Noam, 10 Nov).
+    if (raw.message?.role === 'user' && raw.message?.content && (raw.isMeta !== true || isStopHookFeedback(raw.message.content))) {
       if (Array.isArray(raw.message.content)) {
         // Image attachments sent through the SDK are persisted as base64
         // `image` blocks next to the prompt text. Collect them so the UI can
