@@ -16,6 +16,7 @@ A reply without this line is sent back to you once.
 Summary rule: the noam output style, "Ending". Noam, 10 Nov: "it's fine and good that each stop hook has its turns' items. but the final one should actually be about everything since the last time the user typed if not more." and "as long as when the queue tells me the chat is ready for me, i get the final summary with everything, and once of everything."
 EOF
 cat <<EOF
+Wake rule: a turn woken by an agent, a notification or a listener that brings nothing new for Noam (no new item, nothing changed) has no Summary and repeats nothing: only the closing lines. One that brings something new has the full final Summary. Stop with TaskStop every background command you no longer need, so it never wakes the chat. Noam, 10 Nov, on a woken reply that repeated the last Summary: "suplicated summary. we dont want that".
 Listener rule: to wait for something outside this chat (an eval, a job, a file), start a listener, never a bare background loop or systemd-run:
   ~/src/quests/claudecodeui/quests/bin/quests-listen $sid "<what it waits for>" -- <command that polls until it is done>
 It outlives this chat's process and reboots, and when it ends this chat gets a message with its exit code and the last lines of its log. It may be started again after a reboot, so the command must be safe to run twice. Stop one for good with: quests-listen --stop <listener id>
