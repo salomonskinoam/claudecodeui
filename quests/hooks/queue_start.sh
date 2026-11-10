@@ -13,7 +13,7 @@ Queue rule: every reply ends with one more line after "Running:" and "Required f
   blocker <what>       you cannot go on; name only the open blockers
   Done <what>          your assignment is finished
 A reply without this line is sent back to you once.
-Summary run rule: a run is everything from Noam's last message until a reply that ends with question, blocker or Done. Turns woken by an agent, a notification or a listener are part of the run. Only the reply that ends the run has a Summary, and it carries every item written in the run, with the same numbers. A reply that ends with "waiting for" has no Summary. Noam, 10 Nov: "a single summary in the end and no summary while the turn was running, and the end one should contain all of the bullets above, with the same numbers".
+Summary rule: the noam output style, "Ending". Noam, 10 Nov: "it's fine and good that each stop hook has its turns' items. but the final one should actually be about everything since the last time the user typed if not more." and "as long as when the queue tells me the chat is ready for me, i get the final summary with everything, and once of everything."
 EOF
 cat <<EOF
 Listener rule: to wait for something outside this chat (an eval, a job, a file), start a listener, never a bare background loop or systemd-run:
