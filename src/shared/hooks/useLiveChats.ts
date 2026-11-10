@@ -32,6 +32,7 @@ export const CHAT_DOT_STYLE: Record<ChatDot, { color: string; label: string; gly
 type LiveState = 'running' | 'waiting' | 'workers' | 'listener' | 'listenerSilent' | 'hung';
 // The states in which the chat itself works; a chat that leaves them while out of view becomes unseen.
 const WORKING: ReadonlySet<string> = new Set(['running', 'waiting', 'workers', 'hung']);
+const LISTENING: ReadonlySet<string> = new Set(['listener', 'listenerSilent']);
 
 let live: Record<string, LiveState> = {};
 const unseen = new Set<string>();
@@ -46,9 +47,11 @@ let timer: number | null = null;
 
 function publish(): void {
   const next: Record<string, ChatDot> = { ...live };
-  // A turn that ended unseen shows orange, over a listener's pink, never over a chat that works.
+  // A turn that ended unseen shows orange, never over a chat that works or waits on a listener: a listener's pink
+  // says the chat is not done, so it shows before the chat is opened (Noam, 10 Nov: "it should have known before
+  // that"). When the listener ends unseen, orange shows.
   unseen.forEach((id) => {
-    if (!WORKING.has(next[id])) next[id] = 'done';
+    if (!WORKING.has(next[id]) && !LISTENING.has(next[id])) next[id] = 'done';
   });
   snapshot = next;
   listeners.forEach((listener) => listener());
