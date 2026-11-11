@@ -4,7 +4,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { ServerEvent,MarkSessionIdle,MarkSessionProcessing,PendingPermissionRequest,ProjectSession,LLMProvider,NormalizedMessage,GetSessionActivity,MarkSessionBackground } from '@/shared/types';
 import { showCompletionTitleIndicator } from '@/modules/chat/utils/pageTitleNotification';
 import { playChatCompletionSound, playNotificationSound } from '@/shared/utils';
-import { settleQueue } from '@/modules/queue';
+import { isChat, settleQueue, type QueueEntry } from '@/modules/queue';
 import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
 import { collectRunningBackgroundTasks } from '@/modules/chat/utils/backgroundTasks';
@@ -299,12 +299,16 @@ export function useChatRealtimeHandlers({
           }
 
           // Celebrate only successful runs (failed runs end with success: false).
-          // The sound comes with the queue's change: the queue is read again first (settleQueue), at most 3 s.
+          // The sound comes with the queue's change: the queue is read again first (settleQueue). It plays only when
+          // the chat now waits for Noam, in Pending (Noam, 11 Nov: "after beep i expect another pending, otherwise,
+          // why beep"); a turn that ends with "waiting for" stays silent.
           if (msg.success !== false && !isHiddenTabRef.current) {
-            const finished = () => { showCompletionTitleIndicator(); void playChatCompletionSound(); };
             if (sid) {
-              void Promise.race([settleQueue(sid).catch(() => undefined), new Promise((resolve) => { setTimeout(resolve, 3000); })]).then(finished);
-            } else finished();
+              void settleQueue(sid)
+                .then((q) => (q as { entries: QueueEntry[] }).entries.some((e) => isChat(e, sid) && e.waitsForMe))
+                .catch(() => false)
+                .then((waits) => { showCompletionTitleIndicator(); if (waits) void playChatCompletionSound(); });
+            } else showCompletionTitleIndicator();
           }
 
           // The session id is stable for the whole conversation (allocated
