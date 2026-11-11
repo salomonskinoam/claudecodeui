@@ -5,6 +5,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 
 import { getConnection, sessionsDb } from '@/modules/database/index.js';
+import { logEvent } from '@/modules/events/index.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
@@ -111,8 +112,14 @@ export function ask(sessionId: string, text: string, fresh: boolean): About {
   const live: Live = { startedAt: Date.now(), thinking: '', text: '' };
   busy.set(sessionId, live);
   errors.delete(sessionId);
+  logEvent('server', 'about.asked', sessionId, { fresh });
   run(sessionId, text, fresh, live)
-    .catch((error: unknown) => errors.set(sessionId, error instanceof Error ? error.message : String(error)))
+    .then(() => logEvent('server', 'about.answered', sessionId, { seconds: Math.round((Date.now() - live.startedAt) / 1000) }))
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.set(sessionId, message);
+      logEvent('server', 'about.failed', sessionId, { error: message });
+    })
     .finally(() => busy.delete(sessionId));
   return getAbout(sessionId);
 }

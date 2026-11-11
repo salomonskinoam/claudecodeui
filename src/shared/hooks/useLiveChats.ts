@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-import { authenticatedFetch } from '@/shared/api';
+import { authenticatedFetch, logPageEvent } from '@/shared/api';
 
 /**
  * quests: one status dot per chat, the same on the tabs and in the sidebar.
@@ -53,6 +53,10 @@ function publish(): void {
   unseen.forEach((id) => {
     if (!WORKING.has(next[id]) && !LISTENING.has(next[id])) next[id] = 'done';
   });
+  // The event log: each dot that changed, with what the server said and whether the chat was seen.
+  for (const id of new Set([...Object.keys(snapshot), ...Object.keys(next)])) {
+    if (snapshot[id] !== next[id]) logPageEvent('dot', id, { from: snapshot[id] ?? null, to: next[id] ?? null, live: live[id] ?? null, unseen: unseen.has(id) });
+  }
   snapshot = next;
   listeners.forEach((listener) => listener());
 }

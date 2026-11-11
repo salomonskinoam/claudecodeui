@@ -49,8 +49,9 @@ import {
     closeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
-import { closeQueue, initializeQueue, onClosingLineChange, processStates, queueRoutes } from './modules/queue/index.js';
+import { closeQueue, getQueue, initializeQueue, onClosingLineChange, processStates, queueRoutes } from './modules/queue/index.js';
 import { aboutRoutes } from './modules/about/index.js';
+import { eventRoutes, noteStates, pruneEvents } from './modules/events/index.js';
 import { findTaskOutputFile, isTaskOutputFile, readOutputTail } from './modules/queue/work.js';
 import { readWorkState } from './modules/queue/work-state.js';
 import { readClaudeSubagentTab } from './modules/providers/list/claude/claude-sessions.provider.js';
@@ -206,6 +207,8 @@ app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 app.use('/api/quests/queue', authenticateToken, queueRoutes);
 // quests: the About side chat of the Summary drawer.
 app.use('/api/quests/about', authenticateToken, aboutRoutes);
+// quests: the event log; the page posts its own events here.
+app.use('/api/quests/events', authenticateToken, eventRoutes);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
@@ -341,7 +344,7 @@ app.get('/api/quests/work/output/*', authenticateToken, async (req: Request, res
 // quests: live state of every chat, for the tab dots. { appSessionId: 'running' | 'waiting' | 'workers' }; idle
 // chats are absent. From the chats model (Claude Code's registry and the runner's state), plus the runner's runs
 // of chats the chats model does not know yet (a new chat before Claude names it).
-app.get('/api/quests/live', authenticateToken, async (_req: Request, res: Response) => {
+function liveStates(): Record<string, string> {
     const states: Record<string, string> = processStates();
     for (const run of runningRuns()) {
         states[run.sessionId] = approvalsOf(run.sessionId).length > 0 ? 'waiting' : 'running';
@@ -354,8 +357,22 @@ app.get('/api/quests/live', authenticateToken, async (_req: Request, res: Respon
         } else if (!states[id] && marks.includes('listenerSilent')) states[id] = 'listenerSilent';
         else if (!states[id] && marks.includes('listener')) states[id] = 'listener';
     }
-    res.json(states);
+    return states;
+}
+app.get('/api/quests/live', authenticateToken, async (_req: Request, res: Response) => {
+    res.json(liveStates());
 });
+
+// quests: the event log's state rows. Each chat's live state (its dot) and its queue facts; a change is one row.
+function noteAllStates(): void {
+    const states: Record<string, Record<string, string>> = {};
+    for (const [id, live] of Object.entries(liveStates())) states[id] = { live };
+    for (const e of getQueue().entries) {
+        const id = e.sessionId ?? `ticket:${e.number}`;
+        states[id] = { ...states[id], queue: e.state, placement: e.placement, line: e.closingLine ?? '' };
+    }
+    noteStates(states);
+}
 
 // Serve public files (like api-docs.html)
 app.use(express.static(path.join(APP_ROOT, 'public')));
@@ -533,7 +550,15 @@ async function startServer() {
             // quests: a chat started, stopped, asked, got a listener, or moved in the queue: every page reads its
             // dots and its queue again at once (src/shared/hooks/useLiveChats.ts); the 10 s polls are the backup.
             const liveChanged = JSON.stringify({ kind: 'quests_live_changed' });
-            const tellPages = () => { for (const c of connectedClients) if (c.readyState === 1) c.send(liveChanged); };
+            const tellPages = () => {
+                for (const c of connectedClients) if (c.readyState === 1) c.send(liveChanged);
+                noteAllStates();
+            };
+            // The event log: its first state read, a read every 10 s for changes no event announces, a week kept.
+            noteAllStates();
+            setInterval(noteAllStates, 10_000).unref();
+            pruneEvents();
+            setInterval(pruneEvents, 6 * 3600_000).unref();
             onChatsChanged(tellPages);
             onClosingLineChange(tellPages);
 

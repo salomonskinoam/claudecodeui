@@ -4,6 +4,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { ServerEvent,MarkSessionIdle,MarkSessionProcessing,PendingPermissionRequest,ProjectSession,LLMProvider,NormalizedMessage,GetSessionActivity,MarkSessionBackground } from '@/shared/types';
 import { showCompletionTitleIndicator } from '@/modules/chat/utils/pageTitleNotification';
 import { playChatCompletionSound, playNotificationSound } from '@/shared/utils';
+import { logPageEvent } from '@/shared/api';
 import { isChat, settleQueue, type QueueEntry } from '@/modules/queue';
 import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
@@ -305,9 +306,13 @@ export function useChatRealtimeHandlers({
           if (msg.success !== false && !isHiddenTabRef.current) {
             if (sid) {
               void settleQueue(sid)
-                .then((q) => (q as { entries: QueueEntry[] }).entries.some((e) => isChat(e, sid) && e.waitsForMe))
-                .catch(() => false)
-                .then((waits) => { showCompletionTitleIndicator(); if (waits) void playChatCompletionSound(); });
+                .then((q) => (q as { entries: QueueEntry[] }).entries.find((e) => isChat(e, sid)) ?? null)
+                .catch(() => null)
+                .then((entry) => {
+                  showCompletionTitleIndicator();
+                  logPageEvent(entry?.waitsForMe ? 'beep.played' : 'beep.skipped', sid, { queue: entry?.state ?? null });
+                  if (entry?.waitsForMe) void playChatCompletionSound();
+                });
             } else showCompletionTitleIndicator();
           }
 

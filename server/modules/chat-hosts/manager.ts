@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { chatHostsDb, listenersDb, scheduledMessagesDb, sessionDraftsDb, sessionsDb } from '@/modules/database/index.js';
 import type { ListenerRow } from '@/modules/database/index.js';
 import { getQueue } from '@/modules/queue/index.js';
+import { logEvent } from '@/modules/events/index.js';
 import { isUnanswering, refreshRuntimeState, runtimeState, setChatMarks } from '@/shared/runtime-state.js';
 import { findApplicationRoot, getModuleDirectory } from '@/shared/utils.js';
 
@@ -86,6 +87,7 @@ async function gather(): Promise<Facts> {
 }
 
 async function apply(a: Action, listeners: ListenerRow[]): Promise<void> {
+  logEvent('server', `manager.${a.kind}`, 'sessionId' in a ? a.sessionId : null, 'listenerId' in a ? { listener: a.listenerId } : {});
   switch (a.kind) {
     case 'wake':
       console.log(`[manager] waking ${a.sessionId}: its service ended with work open`);
@@ -163,6 +165,20 @@ export async function check(): Promise<void> {
   }
 }
 
+// The event log: a listener that started, or ended with its exit code. The first read only learns what is there.
+let knownListeners: Map<string, boolean> | null = null;
+function noteListeners(): void {
+  const rows = listenersDb.list();
+  if (knownListeners) {
+    for (const l of rows) {
+      const ended = Boolean(l.ended_at);
+      if (!knownListeners.has(l.id)) logEvent('server', 'listener.started', l.session_id, { listener: l.id, name: l.name });
+      if (ended && knownListeners.get(l.id) !== true) logEvent('server', 'listener.ended', l.session_id, { listener: l.id, name: l.name, exit: l.exit_code });
+    }
+  }
+  knownListeners = new Map(rows.map((l) => [l.id, Boolean(l.ended_at)]));
+}
+
 let timer: NodeJS.Timeout | null = null;
 let listenerSignature = '';
 export function startManager(): void {
@@ -176,7 +192,7 @@ export function startManager(): void {
   // its result comes at once. One small read every second.
   const listenerWatch = setInterval(() => {
     const next = listenersDb.signature();
-    if (next !== listenerSignature) { listenerSignature = next; void check(); }
+    if (next !== listenerSignature) { listenerSignature = next; noteListeners(); void check(); }
   }, 1000);
   listenerWatch.unref?.();
 }

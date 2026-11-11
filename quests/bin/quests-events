@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""quests event log (requirement 120): print the page's events as a table, oldest first, in Paraguay time.
+
+  quests-events                          the last hour
+  quests-events --since 30m              m, h or d
+  quests-events --chat "#72"             a part of the chat's name, or of its id
+  quests-events --kind beep              a part of the event's name
+The rows: server/modules/events (the server and the page), quests/hooks/log_event.py (the stop hook). A week kept.
+"""
+import argparse
+import datetime
+import json
+import os
+import sqlite3
+from zoneinfo import ZoneInfo
+
+ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+ap.add_argument('--since', default='1h')
+ap.add_argument('--chat', default='')
+ap.add_argument('--kind', default='')
+a = ap.parse_args()
+
+span = datetime.timedelta(**{{'m': 'minutes', 'h': 'hours', 'd': 'days'}[a.since[-1]]: float(a.since[:-1])})
+since = (datetime.datetime.now(datetime.timezone.utc) - span).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+db = sqlite3.connect(f"file:{os.path.expanduser('~/.cloudcli/auth.db')}?mode=ro", uri=True)
+names = {}
+for sid, pid, name in db.execute('SELECT session_id, provider_session_id, custom_name FROM sessions'):
+    names[sid] = name or sid
+    if pid:
+        names[pid] = name or sid
+local = ZoneInfo('America/Asuncion')
+for at, source, kind, sid, detail in db.execute(
+        'SELECT at, source, kind, session_id, detail FROM ui_events WHERE at >= ? ORDER BY id', (since,)):
+    d = json.loads(detail)
+    chat = names.get(sid, sid or d.get('chat', '') or '')
+    if a.chat and a.chat not in chat and a.chat not in (sid or ''):
+        continue
+    if a.kind and a.kind not in kind:
+        continue
+    t = datetime.datetime.fromisoformat(at.replace('Z', '+00:00')).astimezone(local).strftime('%d %b %H:%M:%S')
+    d.pop('chat', None)
+    print(f'{t}  {source:<6} {kind:<20} {chat[:40]:<40} {json.dumps(d, ensure_ascii=False)[:300]}')

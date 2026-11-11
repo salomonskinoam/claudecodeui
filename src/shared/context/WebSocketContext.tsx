@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { useAuth } from '@/modules/auth';
 import { IS_PLATFORM } from '@/shared/utils';
+import { logPageEvent } from '@/shared/api';
+import { QUESTS_VERSION } from '@/shared/constants';
 import { expireAuthSession, isAuthTokenExpired } from '@/shared/authToken';
 import { questsChanged } from '@/shared/hooks/useLiveChats';
 import type { ServerEvent } from '@/shared/types';
@@ -106,6 +108,7 @@ const useWebSocketProviderState = (): WebSocketContextType => {
 
       websocket.onopen = () => {
         setConnectionStatus('connected');
+        logPageEvent(hasConnectedRef.current ? 'socket.reconnected' : 'page.loaded', null, { build: QUESTS_VERSION });
         if (hasConnectedRef.current) {
           // This is a reconnect — signal so components can catch up on missed messages
           dispatch({ kind: 'websocket_reconnected', timestamp: Date.now() });

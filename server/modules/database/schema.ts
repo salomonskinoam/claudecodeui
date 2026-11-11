@@ -152,6 +152,17 @@ CREATE TABLE IF NOT EXISTS about_chats (
     turns TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL
 );
+-- The page's event log, for debugging (server/modules/events; read with quests/bin/quests-events). source is server,
+-- page or hook; session_id the chat's page session id (or Claude's, from the hook); detail a JSON object. A week kept.
+CREATE TABLE IF NOT EXISTS ui_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    session_id TEXT,
+    detail TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_ui_events_at ON ui_events(at);
 `;
 
 export const SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL = `

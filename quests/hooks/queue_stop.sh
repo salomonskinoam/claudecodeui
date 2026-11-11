@@ -29,4 +29,6 @@ Queue rule: the reply ends with one more line after "Running:" and "Required fro
   Done <what>          your assignment is finished
 Write the final message again, fixed.
 EOF
+# The event log (requirement 120): which reply went back, and why.
+python3 -I "$(dirname "$0")/log_event.py" hook stop.sentBack "$(jq -r '.session_id // ""' <<<"$in")" "$(jq -cn --arg closing "$closing" --arg summary "$summary" '{closing: $closing, summary: $summary}')"
 exit 2

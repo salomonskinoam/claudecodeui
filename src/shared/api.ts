@@ -670,3 +670,13 @@ export function synthesizeVoice(text: string, signal: AbortSignal): Promise<Resp
 
   return api.voice.tts(text, { headers: voiceConfigHeaders(), signal });
 }
+
+// quests (requirement 120): which page window wrote an event; several windows log the same change each.
+const EVENT_WINDOW = Math.random().toString(36).slice(2, 8);
+/** One row of the event log (server/modules/events), from the page. Logging never breaks the page. */
+export const logPageEvent = (kind: string, sessionId: string | null = null, detail: Record<string, unknown> = {}): void => {
+  void authenticatedFetch('/api/quests/events', {
+    method: 'POST',
+    body: JSON.stringify({ kind, sessionId, detail: { window: EVENT_WINDOW, ...detail } }),
+  }).catch(() => undefined);
+};
