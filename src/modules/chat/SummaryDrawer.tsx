@@ -5,7 +5,14 @@ import { lastSummary } from '@/modules/chat/utils/lastSummary';
 import { authenticatedFetch } from '@/shared/api';
 import type { ChatMessage } from '@/shared/types';
 
-type About = { turns: Array<{ role: 'user' | 'assistant'; text: string; at: string }>; busy: boolean; error: string | null };
+type About = {
+  turns: Array<{ role: 'user' | 'assistant'; text: string; at: string }>;
+  busy: boolean;
+  error: string | null;
+  seconds: number | null;
+  thinking: string;
+  text: string;
+};
 
 // Noam, 11 Nov: "the default text should be to make "what is this world about, what is the basic prompt" and output
 // those as two lines with bold "world" and "basic prompt"".
@@ -22,13 +29,16 @@ function AboutSection({ sessionId }: { sessionId: string }) {
   const url = `/api/quests/about/${encodeURIComponent(sessionId)}`;
   const load = useCallback(async () => {
     const response = await authenticatedFetch(url);
-    if (!response.ok) { setAbout({ turns: [], busy: false, error: `The page server does not answer (HTTP ${response.status}).` }); return; }
+    if (!response.ok) {
+      setAbout({ turns: [], busy: false, error: `The page server does not answer (HTTP ${response.status}).`, seconds: null, thinking: '', text: '' });
+      return;
+    }
     setAbout((await response.json() as { data: About }).data);
   }, [url]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!about?.busy) return undefined;
-    const timer = setInterval(() => { void load(); }, 2000);
+    const timer = setInterval(() => { void load(); }, 1000);
     return () => clearInterval(timer);
   }, [about?.busy, load]);
   const send = async () => {
@@ -44,6 +54,15 @@ function AboutSection({ sessionId }: { sessionId: string }) {
       {about?.turns.map((turn) => (turn.role === 'user'
         ? <p key={turn.at} className="mb-1 whitespace-pre-wrap text-xs text-muted-foreground">You: {turn.text}</p>
         : <div key={turn.at} className="mb-2"><Markdown>{turn.text}</Markdown></div>))}
+      {about?.busy && (
+        <div className="mb-2" data-about-live>
+          <p className="mb-1 text-xs text-muted-foreground">Making… {about.seconds ?? 0} s{about.thinking && !about.text ? ', thinking' : ''}</p>
+          {about.thinking && !about.text && (
+            <p className="mb-1 max-h-32 overflow-y-auto whitespace-pre-wrap text-xs italic text-muted-foreground">{about.thinking}</p>
+          )}
+          {about.text && <Markdown>{about.text}</Markdown>}
+        </div>
+      )}
       {about?.error && <p className="mb-2 text-xs text-red-500">{about.error}</p>}
       <textarea
         value={draft}

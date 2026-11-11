@@ -19,13 +19,16 @@ import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils
 
 type Turn = { role: 'user' | 'assistant'; text: string; at: string };
 type Row = { side_session_id: string; session_id: string; turns: string };
-export type About = { turns: Turn[]; busy: boolean; error: string | null };
+// While it answers: the seconds since Send, and the thinking and text streamed so far (Noam, 11 Nov: "it took a
+// while with no liveness indication").
+type Live = { startedAt: number; thinking: string; text: string };
+export type About = { turns: Turn[]; busy: boolean; error: string | null; seconds: number | null; thinking: string; text: string };
 
 const SIDE = 'This message is a side question asked from the quests page about this conversation. You have no tools: '
   + 'answer in words only, from what the conversation holds. Write no Summary, no "Running" line, no "Required from '
   + 'you" line and no queue closing line.';
 
-const busy = new Set<string>();
+const busy = new Map<string, Live>();
 const errors = new Map<string, string>();
 
 const current = (sessionId: string) => getConnection()
@@ -42,10 +45,18 @@ export function isSideChat(providerSessionId: string): boolean {
 
 export function getAbout(sessionId: string): About {
   const row = current(sessionId);
-  return { turns: row ? JSON.parse(row.turns) as Turn[] : [], busy: busy.has(sessionId), error: errors.get(sessionId) ?? null };
+  const live = busy.get(sessionId);
+  return {
+    turns: row ? JSON.parse(row.turns) as Turn[] : [],
+    busy: Boolean(live),
+    error: errors.get(sessionId) ?? null,
+    seconds: live ? Math.round((Date.now() - live.startedAt) / 1000) : null,
+    thinking: live?.thinking ?? '',
+    text: live?.text ?? '',
+  };
 }
 
-async function run(sessionId: string, text: string, fresh: boolean): Promise<void> {
+async function run(sessionId: string, text: string, fresh: boolean, live: Live): Promise<void> {
   const chat = sessionsDb.getSessionById(sessionId);
   if (!chat?.provider_session_id || !chat.project_path || chat.provider !== 'claude') {
     throw new Error('This chat has no Claude transcript to copy yet.');
@@ -76,10 +87,15 @@ async function run(sessionId: string, text: string, fresh: boolean): Promise<voi
       mcpServers: {},
       // No settings: no hooks, so the queue's stop hook asks this copy for nothing.
       settingSources: [],
+      includePartialMessages: true,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: SIDE },
       ...(old ? { resume: sideId } : { resume: chat.provider_session_id, forkSession: true, sessionId: sideId }),
     },
   })) {
+    if (m.type === 'stream_event' && m.event.type === 'content_block_delta') {
+      if (m.event.delta.type === 'thinking_delta') live.thinking += m.event.delta.thinking;
+      if (m.event.delta.type === 'text_delta') live.text += m.event.delta.text;
+    }
     if (m.type === 'result') {
       if (m.subtype !== 'success') throw new Error(`The side chat ended with ${m.subtype}.`);
       answer = m.result;
@@ -92,9 +108,10 @@ async function run(sessionId: string, text: string, fresh: boolean): Promise<voi
 /** Starts an answer in the background; the page reads the state until `busy` is false. */
 export function ask(sessionId: string, text: string, fresh: boolean): About {
   if (busy.has(sessionId)) throw new AppError('The side chat is still answering.', { code: 'BUSY', statusCode: 409 });
-  busy.add(sessionId);
+  const live: Live = { startedAt: Date.now(), thinking: '', text: '' };
+  busy.set(sessionId, live);
   errors.delete(sessionId);
-  run(sessionId, text, fresh)
+  run(sessionId, text, fresh, live)
     .catch((error: unknown) => errors.set(sessionId, error instanceof Error ? error.message : String(error)))
     .finally(() => busy.delete(sessionId));
   return getAbout(sessionId);
