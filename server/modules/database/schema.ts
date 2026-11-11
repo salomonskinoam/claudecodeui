@@ -143,6 +143,15 @@ CREATE TABLE IF NOT EXISTS listeners (
     delivered_at TEXT,
     restarts INTEGER NOT NULL DEFAULT 0
 );
+-- One row per About side chat of the Summary drawer (server/modules/about): a copy of a chat's conversation that
+-- answers Noam's side questions. side_session_id is the copy's Claude session id; the indexer never lists it.
+-- turns is the JSON list of {role, text, at}. A chat's newest row is its current side chat.
+CREATE TABLE IF NOT EXISTS about_chats (
+    side_session_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    turns TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
 `;
 
 export const SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL = `

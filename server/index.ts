@@ -50,6 +50,7 @@ import {
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
 import { closeQueue, initializeQueue, onClosingLineChange, processStates, queueRoutes } from './modules/queue/index.js';
+import { aboutRoutes } from './modules/about/index.js';
 import { findTaskOutputFile, isTaskOutputFile, readOutputTail } from './modules/queue/work.js';
 import { readWorkState } from './modules/queue/work-state.js';
 import { readClaudeSubagentTab } from './modules/providers/list/claude/claude-sessions.provider.js';
@@ -203,6 +204,8 @@ app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 // quests: the priority queue of chats and tickets.
 app.use('/api/quests/queue', authenticateToken, queueRoutes);
+// quests: the About side chat of the Summary drawer.
+app.use('/api/quests/about', authenticateToken, aboutRoutes);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);

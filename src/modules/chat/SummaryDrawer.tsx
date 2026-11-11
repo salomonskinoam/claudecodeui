@@ -1,8 +1,80 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Markdown } from '@/modules/chat/transcript/Markdown';
 import { lastSummary } from '@/modules/chat/utils/lastSummary';
+import { authenticatedFetch } from '@/shared/api';
 import type { ChatMessage } from '@/shared/types';
+
+type About = { turns: Array<{ role: 'user' | 'assistant'; text: string; at: string }>; busy: boolean; error: string | null };
+
+// Noam, 11 Nov: "the default text should be to make "what is this world about, what is the basic prompt" and output
+// those as two lines with bold "world" and "basic prompt"".
+const DEFAULT_ASK = 'what is this world about, what is the basic prompt? Answer in two lines: one starting with **World:**, one starting with **Basic prompt:**.';
+
+/**
+ * quests (requirement 117): the About side chat, at the top of the drawer. Made only when Noam sends; the answer
+ * stays as it is until he sends again. "New" starts a fresh copy of the chat (server/modules/about).
+ */
+function AboutSection({ sessionId }: { sessionId: string }) {
+  const [about, setAbout] = useState<About | null>(null);
+  const [draft, setDraft] = useState(DEFAULT_ASK);
+  const [fresh, setFresh] = useState(false);
+  const url = `/api/quests/about/${encodeURIComponent(sessionId)}`;
+  const load = useCallback(async () => {
+    const response = await authenticatedFetch(url);
+    if (!response.ok) { setAbout({ turns: [], busy: false, error: `The page server does not answer (HTTP ${response.status}).` }); return; }
+    setAbout((await response.json() as { data: About }).data);
+  }, [url]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!about?.busy) return undefined;
+    const timer = setInterval(() => { void load(); }, 2000);
+    return () => clearInterval(timer);
+  }, [about?.busy, load]);
+  const send = async () => {
+    const response = await authenticatedFetch(url, { method: 'POST', body: JSON.stringify({ text: draft, fresh }) });
+    const body = await response.json() as { data?: About; error?: { message?: string } };
+    if (body.data) { setAbout(body.data); setDraft(DEFAULT_ASK); setFresh(false); }
+    else setAbout((a) => a && { ...a, error: body.error?.message ?? `HTTP ${response.status}` });
+  };
+  const busy = about?.busy ?? false;
+  return (
+    <section className="mb-4 border-b border-border/50 pb-3" data-about>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">About</div>
+      {about?.turns.map((turn) => (turn.role === 'user'
+        ? <p key={turn.at} className="mb-1 whitespace-pre-wrap text-xs text-muted-foreground">You: {turn.text}</p>
+        : <div key={turn.at} className="mb-2"><Markdown>{turn.text}</Markdown></div>))}
+      {about?.error && <p className="mb-2 text-xs text-red-500">{about.error}</p>}
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        rows={3}
+        className="w-full rounded border border-border bg-background p-2 text-xs"
+      />
+      <div className="mt-1 flex gap-2">
+        <button
+          type="button"
+          disabled={busy || !draft.trim()}
+          onClick={() => { void send(); }}
+          className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50"
+        >
+          {busy ? 'Making…' : 'Send'}
+        </button>
+        {(about?.turns.length ?? 0) > 0 && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => { setFresh(true); setDraft(DEFAULT_ASK); }}
+            title="Start a fresh side chat from the chat as it is now"
+            className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+          >
+            New
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
 
 const storageKey = (sessionId: string) => `quests.summaryDrawer.${sessionId}`;
 const readOpen = (sessionId: string | null): boolean => {
@@ -35,6 +107,8 @@ function SummaryDrawer({ sessionId, chatMessages }: { sessionId: string | null; 
       </button>
       {open && (
         <div className="w-[400px] overflow-y-auto px-4 py-3 text-sm" data-summary-body>
+          <AboutSection key={sessionId} sessionId={sessionId} />
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Summary</div>
           {summary ? <Markdown>{summary}</Markdown> : <p className="text-muted-foreground">No Summary yet.</p>}
         </div>
       )}

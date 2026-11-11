@@ -11,6 +11,7 @@ import {
   readFileTimestamps,
 } from '@/shared/utils.js';
 import type { IProviderSessionSynchronizer } from '@/shared/interfaces.js';
+import { isSideChat } from '@/modules/about/index.js';
 
 type ParsedSession = {
   sessionId: string;
@@ -137,7 +138,8 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       };
     });
 
-    if (!parsed) {
+    // quests: an About side chat of the Summary drawer is a copy of a chat, not a chat.
+    if (!parsed || isSideChat(parsed.sessionId)) {
       return null;
     }
 
