@@ -1,6 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { open, readFile } from 'node:fs/promises';
 
 import { sessionsDb } from '@/modules/database/index.js';
 import {
@@ -24,6 +24,13 @@ type ParsedSession = {
 /**
  * Session indexer for Claude transcript artifacts.
  */
+/** quests: per transcript, how far the title scan has read and the last titles it saw. */
+const titleScans = new Map<string, { size: number; custom: string | undefined; ai: string | undefined }>();
+const TITLE_EVENTS: Array<[Buffer, string, string]> = [
+  [Buffer.from('"type":"custom-title"'), 'custom-title', 'customTitle'],
+  [Buffer.from('"type":"ai-title"'), 'ai-title', 'aiTitle'],
+];
+
 export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
   private readonly provider = 'claude' as const;
   private readonly claudeHome = path.join(os.homedir(), '.claude');
@@ -144,7 +151,6 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
     }
 
     // quests: the name set with /rename (in an IDE or the CLI) wins over every other name.
-    // ponytail: reads the whole transcript on each sync, fine at tens of MB.
     const renamed = await this.extractCustomTitle(filePath);
     if (renamed) {
       const sessionName = normalizeSessionName(renamed, 'Untitled Claude Session');
@@ -181,21 +187,49 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
    * with neither keeps its stored name (the first prompt).
    */
   private async extractCustomTitle(filePath: string): Promise<string | undefined> {
-    const text = await readFile(filePath, 'utf8');
-    const lastTitle = (type: string, field: string): string | undefined => {
-      const at = text.lastIndexOf(`"type":"${type}"`);
-      if (at < 0) {
-        return undefined;
+    // A transcript only grows: each sync reads only the bytes added since the last one, in 1 MB pieces, and keeps
+    // the last titles seen. Reading the whole file on every write (a 200 MB transcript, about 9 writes a minute)
+    // ran the server out of memory (12 Nov). A file that shrank (an edit) is read again from the start.
+    const handle = await open(filePath, 'r');
+    try {
+      const { size } = await handle.stat();
+      const known = titleScans.get(filePath);
+      const scan = known && known.size <= size ? known : { size: 0, custom: undefined, ai: undefined };
+      let at = scan.size;
+      let carry = Buffer.alloc(0);
+      while (at < size) {
+        const piece = Buffer.alloc(Math.min(1 << 20, size - at));
+        const { bytesRead } = await handle.read(piece, 0, piece.length, at);
+        if (bytesRead === 0) break;
+        at += bytesRead;
+        // ponytail: a line longer than 1 MB is joined piece by piece; rare (a pasted image), fine.
+        const data = carry.length ? Buffer.concat([carry, piece.subarray(0, bytesRead)]) : piece.subarray(0, bytesRead);
+        const lastLineEnd = data.lastIndexOf(10);
+        if (lastLineEnd < 0) {
+          carry = data;
+          continue;
+        }
+        for (const [needle, type, field] of TITLE_EVENTS) {
+          for (let hit = data.indexOf(needle); hit >= 0 && hit <= lastLineEnd; hit = data.indexOf(needle, hit + 1)) {
+            const lineStart = data.lastIndexOf(10, hit) + 1;
+            const lineEnd = data.indexOf(10, hit);
+            try {
+              const event = JSON.parse(data.toString('utf8', lineStart, lineEnd)) as Record<string, unknown>;
+              const title = event.type === type ? event[field] : undefined;
+              if (typeof title === 'string' && title.trim()) scan[type === 'custom-title' ? 'custom' : 'ai'] = title;
+            } catch {
+              // a line that is not JSON holds no title
+            }
+          }
+        }
+        carry = Buffer.from(data.subarray(lastLineEnd + 1));
       }
-      const end = text.indexOf('\n', at);
-      try {
-        const title = JSON.parse(text.slice(text.lastIndexOf('\n', at) + 1, end < 0 ? undefined : end))[field];
-        return typeof title === 'string' && title.trim() ? title : undefined;
-      } catch {
-        return undefined;
-      }
-    };
-    return lastTitle('custom-title', 'customTitle') ?? lastTitle('ai-title', 'aiTitle');
+      scan.size = at - carry.length;
+      titleScans.set(filePath, scan);
+      return scan.custom ?? scan.ai;
+    } finally {
+      await handle.close();
+    }
   }
 
   /**
