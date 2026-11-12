@@ -10,7 +10,7 @@ import SplitDropZone, { type SplitSide } from '@/modules/project-workspace/Split
 import { useTabDragging } from '@/modules/project-workspace/tabDrag';
 import { PlanView, WorkView, registerWorkNavigate, useWorkTitles } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
-import { ChatColorStrip, noteShownChat, reportPageTabs, TicketView, useQueueNames, useTicketFolders } from '@/modules/queue';
+import { ChatColorStrip, noteShownChat, openNextInQueue, reportPageTabs, TicketView, useQueueNames, useTicketFolders } from '@/modules/queue';
 import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -198,6 +198,13 @@ function ProjectWorkspaceShell({
     navigate(id === NEW_CHAT_TAB ? '/' : plan ? `/plan/${plan}` : work ? `/work/${work.kind}/${work.ref}` : ticket !== null ? `/ticket/${ticket}` : `/session/${id}`);
   }, [navigate]);
   const closeLeft = useCallback((id: string) => {
+    // Closing the shown tab is "Next": the next chat in line that waits for Noam (Noam, 12 Nov: "closing a tab
+    // should also \"click next\" and show the actually next tab, not by the order the tabs are layed out"). With
+    // nothing waiting, the tab beside it.
+    if (id === leftActive && openNextInQueue(true)) {
+      closeLeftTab(id);
+      return;
+    }
     if (id === leftActive) {
       const next = neighbor(panes.left, id);
       // The last tab closed: the new chat screen, not the chat that was just closed (Noam, 2 Nov: "when closing

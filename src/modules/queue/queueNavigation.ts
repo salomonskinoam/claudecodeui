@@ -37,13 +37,15 @@ const steps: Step[] = [];
 const stepListeners = new Set<() => void>();
 const changed = () => stepListeners.forEach((l) => l());
 
-export function openNextInQueue(): boolean {
+/** `quiet`: when nothing waits, answer false with no popup (closing a tab falls back to its neighbor). */
+export function openNextInQueue(quiet = false): boolean {
   const { entries, view } = currentQueue();
   const byKey = new Map(entries.map((e) => [e.key, e]));
   const from = entryOfChat(entries, currentShownChat());
   const key = view.find((k) => k !== from?.key && byKey.get(k)?.waitsForMe);
   if (!opener) return false;
   if (!key) {
+    if (quiet) return false;
     // Noam, 9 Nov: "maybe because there is nothing up next. in that case there should be a popup saying so, with one OK option."
     window.alert('Nothing is up next: no other chat waits for you.');
     return false;
