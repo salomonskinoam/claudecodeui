@@ -2,7 +2,6 @@ import { useSyncExternalStore } from 'react';
 
 import { authenticatedFetch } from '@/shared/api';
 import { onLiveChange } from '@/shared/hooks/useLiveChats';
-import { isEmbedded } from '@/shared/hooks/useSplitPane';
 import type { Queue, TicketGroup, Where } from '@/modules/queue/types';
 
 /**
@@ -74,7 +73,7 @@ let offLive: (() => void) | null = null;
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (timer === null && !isEmbedded) {
+  if (timer === null) {
     const poll = () => void refresh().catch((error: unknown) => console.error(error));
     poll();
     timer = window.setInterval(poll, POLL_MS);

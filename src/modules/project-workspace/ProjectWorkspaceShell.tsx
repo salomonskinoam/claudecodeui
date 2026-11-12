@@ -10,7 +10,7 @@ import SplitDropZone, { type SplitSide } from '@/modules/project-workspace/Split
 import { useTabDragging } from '@/modules/project-workspace/tabDrag';
 import { PlanView, WorkView, registerWorkNavigate, useWorkTitles } from '@/modules/chat';
 import { type ChatDot, setChatsInView, useChatDots } from '@/shared/hooks/useLiveChats';
-import { noteShownChat, reportPageTabs, TicketView, useQueueNames, useTicketFolders } from '@/modules/queue';
+import { ChatColorStrip, noteShownChat, reportPageTabs, TicketView, useQueueNames, useTicketFolders } from '@/modules/queue';
 import { api } from '@/shared/api';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
 import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
@@ -251,6 +251,8 @@ function ProjectWorkspaceShell({
       style={{ bottom: 'var(--keyboard-height, 0px)' }}
     >
       <ProjectEffects navigate={navigate} />
+      {/* quests (requirement 121): the shown chat's color and name at the left edge; the right pane draws its own. */}
+      {sessionId && !workTab && !ticketTab && !planName && <ChatColorStrip sessionId={sessionId} name={nameOf(sessionId)} />}
 
       <div ref={panesRef} className="flex min-w-0 flex-1">
         <div

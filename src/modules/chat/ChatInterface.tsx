@@ -601,6 +601,7 @@ function ChatInterface({
           onClearInput={handleClearInput}
           onSubmit={handleSubmit}
           sessionId={selectedSession?.id || currentSessionId || null}
+          chatName={String(selectedSession?.summary || selectedSession?.name || 'New chat')}
           onSendText={(text) => void handleSubmit({ preventDefault() {} } as unknown as Parameters<typeof handleSubmit>[0], { content: text, attachments: [] })}
           isDragActive={isDragActive}
           queuedDraft={queuedDraft}

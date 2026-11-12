@@ -37,7 +37,7 @@ import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessageP
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
-import { BackButton, DoneButton, openNextInQueue } from '@/modules/queue';
+import { BackButton, ChatNameTab, DoneButton, openNextInQueue } from '@/modules/queue';
 
 type MentionableFile = {
   name: string;
@@ -74,6 +74,8 @@ type ChatComposerProps = {
   onSubmit: (event: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => void;
   /** quests: the page's session id of this chat (null for a new chat) and a way to send a message as if typed, for the DONE button. */
   sessionId: string | null;
+  /** quests: the chat's name, for the name tab when the queue has none. */
+  chatName: string;
   onSendText: (text: string) => void;
   isDragActive: boolean;
   queuedDraft: QueuedDraft | null;
@@ -151,6 +153,7 @@ export default function ChatComposer({
   onClearInput,
   onSubmit,
   sessionId,
+  chatName,
   onSendText,
   isDragActive,
   queuedDraft,
@@ -331,6 +334,7 @@ export default function ChatComposer({
       )}
 
       {!hasQuestionPanel && <div className="relative mx-auto">
+        {sessionId && <ChatNameTab sessionId={sessionId} fallbackName={chatName} />}
         {showFileDropdown && filteredFiles.length > 0 && (
           <div
             ref={fileDropdownRef}
