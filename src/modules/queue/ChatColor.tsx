@@ -25,12 +25,12 @@ export function ChatColorStrip({ sessionId, name }: { sessionId: string; name: s
   );
 }
 
-/** The tab on the top left edge of the input box; the queue's name first, as the tabs do. */
+/** The tab under the input box, at its left (Noam, 12 Nov: "move it to not hide where i write"); the queue's name first, as the tabs do. */
 export function ChatNameTab({ sessionId, fallbackName }: { sessionId: string; fallbackName: string }) {
   const name = useQueueNames()[sessionId] ?? fallbackName;
   return (
     <div
-      className="pointer-events-none absolute left-3 top-0 z-20 max-w-[calc(100%-1.5rem)] -translate-y-1/2 break-words rounded-md px-2 py-0.5 text-xs font-semibold text-white"
+      className="pointer-events-none absolute left-3 top-full z-20 mt-0.5 max-w-[calc(100%-1.5rem)] break-words rounded-md px-2 text-[11px] leading-[14px] font-semibold text-white"
       style={{ background: useChatColor(sessionId) }}
     >
       {name}
