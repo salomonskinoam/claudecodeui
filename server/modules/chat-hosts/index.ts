@@ -3,3 +3,4 @@
 // copy is server/shared/runtime-state.ts.
 export { handleBrowserChat } from './router.js';
 export { check, onChatsChanged, startManager } from './manager.js';
+export { reviveRoutes } from './revive.js';
