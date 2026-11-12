@@ -49,7 +49,7 @@ import {
     closeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
-import { closeQueue, getQueue, initializeQueue, onClosingLineChange, processStates, queueRoutes } from './modules/queue/index.js';
+import { closeQueue, getQueue, initializeQueue, queueReady, onClosingLineChange, processStates, queueRoutes } from './modules/queue/index.js';
 import { aboutRoutes } from './modules/about/index.js';
 import { eventRoutes, noteStates, pruneEvents } from './modules/events/index.js';
 import { findTaskOutputFile, isTaskOutputFile, readOutputTail } from './modules/queue/work.js';
@@ -365,6 +365,7 @@ app.get('/api/quests/live', authenticateToken, async (_req: Request, res: Respon
 
 // quests: the event log's state rows. Each chat's live state (its dot) and its queue facts; a change is one row.
 function noteAllStates(): void {
+    if (!queueReady()) return;
     const states: Record<string, Record<string, string>> = {};
     for (const [id, live] of Object.entries(liveStates())) states[id] = { live };
     for (const e of getQueue().entries) {

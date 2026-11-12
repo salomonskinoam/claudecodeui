@@ -1,10 +1,12 @@
 import { getChats, isHeldOutside, isOpen, type Chat } from '@/modules/queue/chats.js';
 import { pageClaims } from '@/modules/queue/page-claims.js';
+import { queueReady } from '@/modules/queue/polls.js';
 import { readPlacements, resolvePlacement, type Where } from '@/modules/queue/placement.js';
 import { groupOf, rootOf, waitsForMe, type QueueGroup, type QueueKind, type QueueOrderEntry, type QueueState } from '@/modules/queue/queue-order.js';
 import { getTickets, openBlockersOf, type Ticket } from '@/modules/queue/sources/tickets.js';
 import { isUnstarted } from '@/modules/queue/sources/transcripts.js';
 import { marksOf, type ChatMark } from '@/shared/runtime-state.js';
+import { AppError } from '@/shared/utils.js';
 
 /**
  * quests priority queue: the entries, built from the tickets and the chats on every read. One entry per open
@@ -118,6 +120,7 @@ export function resolveClaims(
 }
 
 export function buildEntries(): QueueEntry[] {
+  if (!queueReady()) throw new AppError('The queue is still loading.', { code: 'QUEUE_LOADING', statusCode: 503 });
   const tickets = getTickets();
   const chats = getChats();
   const openTickets = new Set(tickets.map((t) => t.number));

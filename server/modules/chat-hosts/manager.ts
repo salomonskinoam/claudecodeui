@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 
 import { chatHostsDb, listenersDb, scheduledMessagesDb, sessionDraftsDb, sessionsDb } from '@/modules/database/index.js';
 import type { ListenerRow } from '@/modules/database/index.js';
-import { getQueue } from '@/modules/queue/index.js';
+import { getQueue, queueReady } from '@/modules/queue/index.js';
 import { logEvent } from '@/modules/events/index.js';
 import { isUnanswering, refreshRuntimeState, runtimeState, setChatMarks } from '@/shared/runtime-state.js';
 import { findApplicationRoot, getModuleDirectory } from '@/shared/utils.js';
@@ -143,6 +143,7 @@ let lastMarks = '';
 export async function check(): Promise<void> {
   // One check at a time; a check asked for meanwhile runs right after, so no change waits for the next 30 s.
   if (running) { again = true; return; }
+  if (!queueReady()) return; // the next check, at most 30 s later, finds it loaded
   running = true;
   again = false;
   try {
