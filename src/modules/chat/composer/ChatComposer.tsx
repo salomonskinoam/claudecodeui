@@ -334,7 +334,6 @@ export default function ChatComposer({
       )}
 
       {!hasQuestionPanel && <div className="relative mx-auto">
-        {sessionId && <ChatNameTab sessionId={sessionId} fallbackName={chatName} />}
         {showFileDropdown && filteredFiles.length > 0 && (
           <div
             ref={fileDropdownRef}
@@ -446,6 +445,7 @@ export default function ChatComposer({
 
         <PromptInputFooter className="flex-wrap gap-y-1">
           <PromptInputTools className="min-w-0">
+            {sessionId && <ChatNameTab sessionId={sessionId} fallbackName={chatName} />}
             <PromptInputButton
               tooltip={{ content: t('input.attachFiles') }}
               onClick={openAttachmentPicker}
