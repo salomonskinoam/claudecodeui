@@ -30,7 +30,7 @@ export default function DoneButton({ sessionId, hasInput, onSendText }: DoneButt
 
   const finish = async (finalizeFirst: boolean) => {
     setAsking(false);
-    if (finalizeFirst) onSendText('/finalize-chat');
+    if (finalizeFirst) onSendText('/quests:finalize-chat');
     if (entry) await placeQueueEntry(entry.key, 'hold').catch((error: unknown) => console.error(error));
     openNextInQueue();
   };
@@ -51,7 +51,7 @@ export default function DoneButton({ sessionId, hasInput, onSendText }: DoneButt
         <Dialog open onOpenChange={(open) => { if (!open) setAsking(false); }}>
           <DialogContent className="max-w-md bg-[#1E1F22] text-[#cccccc]" data-quests-done="popup">
             <DialogTitle>Do you want to finalize the chat first?</DialogTitle>
-            <p className="text-[13px]">Yes runs /finalize-chat in this chat, then hides it from the queue and brings the next one. No only hides it and brings the next one.</p>
+            <p className="text-[13px]">Yes runs /quests:finalize-chat in this chat, then hides it from the queue and brings the next one. No only hides it and brings the next one.</p>
             <div className="mt-3 flex gap-2">
               <button type="button" className={btn} onClick={() => void finish(true)}>Yes</button>
               <button type="button" className={btn} onClick={() => void finish(false)}>No</button>

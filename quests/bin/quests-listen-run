@@ -7,7 +7,9 @@ import sys
 from datetime import datetime, timezone
 import os
 
-DB = os.path.expanduser('~/.cloudcli/auth.db')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
+from quests_env import current  # noqa: E402
+DB = current()['DATABASE_PATH']
 lid = sys.argv[1]
 db = sqlite3.connect(DB, timeout=30)
 command, log = db.execute('SELECT command, log_path FROM listeners WHERE id = ?', (lid,)).fetchone()

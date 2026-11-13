@@ -8,6 +8,7 @@ import type { ListenerRow } from '@/modules/database/index.js';
 import { getQueue, queueReady } from '@/modules/queue/index.js';
 import { logEvent } from '@/modules/events/index.js';
 import { isUnanswering, refreshRuntimeState, runtimeState, setChatMarks } from '@/shared/runtime-state.js';
+import { unitPrefix } from '@/shared/quests-instance.js';
 import { findApplicationRoot, getModuleDirectory } from '@/shared/utils.js';
 
 import { controlConnection, ensureHost, onHostStarted, sendToChat } from './hosts.js';
@@ -37,7 +38,7 @@ function tail(file: string, lines = 20): string {
 }
 
 async function gather(): Promise<Facts> {
-  const [units, listenerUnits] = await Promise.all([activeUnits('quests-chat-'), activeUnits('quests-listen-')]);
+  const [units, listenerUnits] = await Promise.all([activeUnits(`${unitPrefix()}-chat-`), activeUnits(`${unitPrefix()}-listen-`)]);
   const state = runtimeState();
   const hosts = chatHostsDb.list();
   const listeners = listenersDb.list();
@@ -109,7 +110,7 @@ async function apply(a: Action, listeners: ListenerRow[]): Promise<void> {
       const l = listeners.find((x) => x.id === a.listenerId);
       console.log(`[manager] listener ${a.listenerId} (${l?.name}) died without an exit; starting it again`);
       listenersDb.markRestarted(a.listenerId);
-      await run('systemd-run', ['--user', '--collect', '--unit', `quests-listen-${a.listenerId}`, `--description=quests listener ${l?.name ?? a.listenerId}`, LISTEN_RUN, a.listenerId]);
+      await run('systemd-run', ['--user', '--collect', '--unit', `${unitPrefix()}-listen-${a.listenerId}`, `--description=quests listener ${l?.name ?? a.listenerId}`, `--setenv=QUESTS_INSTANCE=${process.env.QUESTS_INSTANCE}`, LISTEN_RUN, a.listenerId]);
       return;
     }
     case 'start':

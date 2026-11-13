@@ -12,11 +12,11 @@ type About = {
   seconds: number | null;
   thinking: string;
   text: string;
+  question: string;
 };
 
-// Noam, 11 Nov: "the default text should be to make "what is this world about, what is the basic prompt" and output
-// those as two lines with bold "world" and "basic prompt"".
-const DEFAULT_ASK = 'what is this world about, what is the basic prompt? Answer in two lines: one starting with **World:**, one starting with **Basic prompt:**.';
+// The first question comes from the chat's repo: drawer_question in its quests.json (quests/INTERFACE.md), served
+// with the About state.
 
 /**
  * quests (requirement 117): the About side chat, at the top of the drawer. Made only when Noam sends; the answer
@@ -24,16 +24,18 @@ const DEFAULT_ASK = 'what is this world about, what is the basic prompt? Answer 
  */
 function AboutSection({ sessionId }: { sessionId: string }) {
   const [about, setAbout] = useState<About | null>(null);
-  const [draft, setDraft] = useState(DEFAULT_ASK);
+  const [draft, setDraft] = useState<string | null>(null);
   const [fresh, setFresh] = useState(false);
   const url = `/api/quests/about/${encodeURIComponent(sessionId)}`;
   const load = useCallback(async () => {
     const response = await authenticatedFetch(url);
     if (!response.ok) {
-      setAbout({ turns: [], busy: false, error: `The page server does not answer (HTTP ${response.status}).`, seconds: null, thinking: '', text: '' });
+      setAbout({ turns: [], busy: false, error: `The page server does not answer (HTTP ${response.status}).`, seconds: null, thinking: '', text: '', question: '' });
       return;
     }
-    setAbout((await response.json() as { data: About }).data);
+    const data = (await response.json() as { data: About }).data;
+    setAbout(data);
+    setDraft((d) => d ?? data.question);
   }, [url]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -44,7 +46,7 @@ function AboutSection({ sessionId }: { sessionId: string }) {
   const send = async () => {
     const response = await authenticatedFetch(url, { method: 'POST', body: JSON.stringify({ text: draft, fresh }) });
     const body = await response.json() as { data?: About; error?: { message?: string } };
-    if (body.data) { setAbout(body.data); setDraft(DEFAULT_ASK); setFresh(false); }
+    if (body.data) { setAbout(body.data); setDraft(body.data.question); setFresh(false); }
     else setAbout((a) => a && { ...a, error: body.error?.message ?? `HTTP ${response.status}` });
   };
   const busy = about?.busy ?? false;
@@ -65,7 +67,7 @@ function AboutSection({ sessionId }: { sessionId: string }) {
       )}
       {about?.error && <p className="mb-2 text-xs text-red-500">{about.error}</p>}
       <textarea
-        value={draft}
+        value={draft ?? ''}
         onChange={(e) => setDraft(e.target.value)}
         rows={3}
         className="w-full rounded border border-border bg-background p-2 text-xs"
@@ -73,7 +75,7 @@ function AboutSection({ sessionId }: { sessionId: string }) {
       <div className="mt-1 flex gap-2">
         <button
           type="button"
-          disabled={busy || !draft.trim()}
+          disabled={busy || !(draft ?? '').trim()}
           onClick={() => { void send(); }}
           className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50"
         >
@@ -83,7 +85,7 @@ function AboutSection({ sessionId }: { sessionId: string }) {
           <button
             type="button"
             disabled={busy}
-            onClick={() => { setFresh(true); setDraft(DEFAULT_ASK); }}
+            onClick={() => { setFresh(true); setDraft(about?.question ?? ''); }}
             title="Start a fresh side chat from the chat as it is now"
             className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
           >

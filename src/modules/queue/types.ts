@@ -35,7 +35,7 @@ export type QueueEntry = {
   sessionId: string | null;
   providerSessionId: string | null;
   projectPath: string | null;
-  world: string | null;
+  area: string | null;
   rootKey: string;
   group: QueueGroup;
   /** Waits for Noam's input: a permission prompt, or a question or Done he has not dismissed. The list shows these. */

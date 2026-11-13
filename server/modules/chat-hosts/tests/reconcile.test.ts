@@ -5,6 +5,9 @@ import type { ChatHostRow, ListenerRow } from '@/modules/database/index.js';
 
 import { HUNG_MS, SILENT_MS, decide, type Facts } from '../reconcile.js';
 
+// The wake texts carry the user's time zone (quests-instance.ts); the test is its own user.
+process.env.QUESTS_TZ = 'America/Asuncion';
+
 // quests: one case per row of the check's table (reconcile.ts), through decide() alone.
 
 const NOW = Date.parse('2026-11-09T15:00:00Z');

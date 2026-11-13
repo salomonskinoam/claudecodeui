@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/run.sh\" queue_start.sh",
+            "timeout": 30,
+            "statusMessage": "queue"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/run.sh\" queue_stop.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

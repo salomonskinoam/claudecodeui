@@ -1,4 +1,4 @@
-import { TICKETS_REPO, gh } from '@/modules/queue/gh.js';
+import { ticketsRepo, gh } from '@/modules/queue/gh.js';
 
 /**
  * quests priority queue: the order's backup, one file on a branch of the tickets repository, written 10 seconds
@@ -18,13 +18,13 @@ let chain: Promise<void> = Promise.resolve();
 
 async function write(read: () => MirrorState): Promise<void> {
   const body = JSON.stringify({ ...read(), updatedAt: new Date().toISOString() }, null, 1);
-  const branch = await gh(['api', `repos/${TICKETS_REPO}/git/ref/heads/${BRANCH}`]).catch(() => null);
+  const branch = await gh(['api', `repos/${ticketsRepo()}/git/ref/heads/${BRANCH}`]).catch(() => null);
   if (!branch) {
-    const main = await gh(['api', `repos/${TICKETS_REPO}/git/ref/heads/main`, '--jq', '.object.sha']);
-    await gh(['api', '-X', 'POST', `repos/${TICKETS_REPO}/git/refs`, '-f', `ref=refs/heads/${BRANCH}`, '-f', `sha=${main.trim()}`]);
+    const main = await gh(['api', `repos/${ticketsRepo()}/git/ref/heads/main`, '--jq', '.object.sha']);
+    await gh(['api', '-X', 'POST', `repos/${ticketsRepo()}/git/refs`, '-f', `ref=refs/heads/${BRANCH}`, '-f', `sha=${main.trim()}`]);
   }
-  const sha = (await gh(['api', `repos/${TICKETS_REPO}/contents/${PATH}?ref=${BRANCH}`, '--jq', '.sha']).catch(() => '')).trim();
-  await gh(['api', '-X', 'PUT', `repos/${TICKETS_REPO}/contents/${PATH}`, '-f', 'message=queue order',
+  const sha = (await gh(['api', `repos/${ticketsRepo()}/contents/${PATH}?ref=${BRANCH}`, '--jq', '.sha']).catch(() => '')).trim();
+  await gh(['api', '-X', 'PUT', `repos/${ticketsRepo()}/contents/${PATH}`, '-f', 'message=queue order',
     '-f', `content=${Buffer.from(body).toString('base64')}`, '-f', `branch=${BRANCH}`, ...(sha ? ['-f', `sha=${sha}`] : [])]);
 }
 
@@ -40,7 +40,7 @@ export function scheduleMirror(read: () => MirrorState): void {
 
 /** The saved state, or null when no mirror exists yet. */
 export async function readMirror(): Promise<MirrorState | null> {
-  const content = await gh(['api', `repos/${TICKETS_REPO}/contents/${PATH}?ref=${BRANCH}`, '--jq', '.content']).catch(() => null);
+  const content = await gh(['api', `repos/${ticketsRepo()}/contents/${PATH}?ref=${BRANCH}`, '--jq', '.content']).catch(() => null);
   if (!content) return null;
   const saved = JSON.parse(Buffer.from(content, 'base64').toString('utf8'));
   return { order: saved.order ?? [], latch: saved.latch ?? null };

@@ -13,6 +13,8 @@ export type LiveProcess = {
   statusUpdatedAt: number;
   /** When the process started (epoch ms); with two processes on one chat, the older start. */
   startedAt: number;
+  /** The folder the process runs in, which says which quests server the chat belongs to. */
+  cwd: string | null;
 };
 
 const STATUS_RANK = { busy: 2, waiting: 1, idle: 0 } as const;
@@ -44,6 +46,7 @@ export async function refreshLive(): Promise<void> {
       name: entry.name ?? null,
       statusUpdatedAt: entry.statusUpdatedAt ?? entry.updatedAt ?? 0,
       startedAt: entry.startedAt ?? 0,
+      cwd: entry.cwd ?? null,
     };
     const had = next.get(p.sessionId);
     if (!had || STATUS_RANK[p.status] > STATUS_RANK[had.status]) next.set(p.sessionId, { ...p, startedAt: Math.min(p.startedAt, had?.startedAt ?? p.startedAt) });

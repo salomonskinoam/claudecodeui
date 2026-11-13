@@ -6,6 +6,8 @@ import { groupOf, rootOf, waitsForMe, type QueueGroup, type QueueKind, type Queu
 import { getTickets, openBlockersOf, type Ticket } from '@/modules/queue/sources/tickets.js';
 import { isUnstarted } from '@/modules/queue/sources/transcripts.js';
 import { marksOf, type ChatMark } from '@/shared/runtime-state.js';
+import { repoOf } from '@/shared/quests-instance.js';
+import { areasOf } from '@/shared/quests-repo.js';
 import { AppError } from '@/shared/utils.js';
 
 /**
@@ -30,7 +32,8 @@ export type QueueEntry = QueueOrderEntry & {
   sessionId: string | null;
   providerSessionId: string | null;
   projectPath: string | null;
-  world: string | null;
+  /** For tickets: its area label, one of the areas of this server's repos (quests/INTERFACE.md). */
+  area: string | null;
   rootKey: string;
   group: QueueGroup;
   /** Waits for Noam's input: a permission prompt, or a question or Done he has not dismissed. The list shows these. */
@@ -59,7 +62,6 @@ export type QueueEntry = QueueOrderEntry & {
 };
 
 const KINDS: QueueKind[] = ['quest', 'sidequest', 'blocker'];
-const NOT_WORLDS = new Set([...KINDS, 'priority-high', 'waiting on Noam']);
 const LINE_STATE: Record<string, QueueState> = { question: 'question', done: 'done', 'waiting for': 'waiting', blocker: 'blocker' };
 
 const kindOf = (t: Ticket): QueueKind => KINDS.find((k) => t.labels.includes(k)) ?? 'quest';
@@ -123,6 +125,9 @@ export function buildEntries(): QueueEntry[] {
   if (!queueReady()) throw new AppError('The queue is still loading.', { code: 'QUEUE_LOADING', statusCode: 503 });
   const tickets = getTickets();
   const chats = getChats();
+  // The areas of every repo this server's chats are in: a ticket's area is its label that is one of them.
+  const repos = new Set([...chats.values()].flatMap((c) => (c.projectPath ? [repoOf(c.projectPath)] : [])));
+  const areas = new Set([...repos].flatMap(areasOf));
   const openTickets = new Set(tickets.map((t) => t.number));
   // A chat started from a ticket's tab claims it at once (page-claims.ts), by Claude's id once the chat has one.
   const claudeIdOf = new Map([...chats.values()].filter((c) => c.pageSessionId).map((c) => [c.pageSessionId as string, c.sid]));
@@ -144,8 +149,8 @@ export function buildEntries(): QueueEntry[] {
       parentKey: t.parent && t.parent.state === 'OPEN' && openTickets.has(t.parent.number) ? `ticket:${t.parent.number}` : null,
       blocks: kind === 'blocker' ? t.blocksSids.map((s) => (ticketOf.has(s) ? `ticket:${ticketOf.get(s)}` : `chat:${s}`)) : [],
       state: st.state, since: st.since || time(t.createdAt),
-      world: t.labels.find((l) => !NOT_WORLDS.has(l)) ?? null, parentChatSid: t.parentChatSid, openBlockers: openBlockersOf(t.number),
-      startFolder: opener?.projectPath?.replace(/\/\.claude\/worktrees\/[^/]+$/, '') ?? null,
+      area: t.labels.find((l) => areas.has(l)) ?? null, parentChatSid: t.parentChatSid, openBlockers: openBlockersOf(t.number),
+      startFolder: opener?.projectPath ? repoOf(opener.projectPath) : null,
       ...chatFields(chat),
     });
   }
@@ -160,7 +165,7 @@ export function buildEntries(): QueueEntry[] {
     const st = stateOf(c);
     entries.push({
       key: `chat:${c.sid}`, kind: 'chat', title: c.name, ticketTitle: null, url: null, number: null, parentKey: null, blocks: [],
-      state: st.state, since: st.since, world: null, parentChatSid: null, openBlockers: [], startFolder: null,
+      state: st.state, since: st.since, area: null, parentChatSid: null, openBlockers: [], startFolder: null,
       ...chatFields(c),
     });
   }

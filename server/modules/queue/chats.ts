@@ -3,6 +3,7 @@ import { getCursorTabs } from '@/modules/queue/sources/cursor-tabs.js';
 import { getLive, type LiveProcess } from '@/modules/queue/sources/live.js';
 import { getPageTabs } from '@/modules/queue/sources/page-tabs.js';
 import { getOpenTasks, getTitles, type OpenTask } from '@/modules/queue/sources/transcripts.js';
+import { servesPath } from '@/shared/quests-instance.js';
 import { approvalsOf, isTurnInFlight, runningRuns } from '@/shared/runtime-state.js';
 
 /**
@@ -62,7 +63,7 @@ function withPageRun(p: LiveProcess | null, sid: string, pageId: string | undefi
   return {
     sessionId: sid, status: asks ? 'waiting' : 'busy', waitingFor: asks ? 'permission prompt' : null,
     entrypoint: p?.entrypoint ?? null, name: p?.name ?? null,
-    statusUpdatedAt: Math.max(p?.statusUpdatedAt ?? 0, run.startedAt), startedAt: p?.startedAt ?? run.startedAt,
+    statusUpdatedAt: Math.max(p?.statusUpdatedAt ?? 0, run.startedAt), startedAt: p?.startedAt ?? run.startedAt, cwd: p?.cwd ?? null,
   };
 }
 
@@ -78,6 +79,8 @@ export function getChats(): Map<string, Chat> {
   const chats = new Map<string, Chat>();
   for (const sid of new Set([...sessions.keys(), ...lines.keys(), ...live.keys(), ...cursor, ...page])) {
     const s = sessions.get(sid);
+    // quests: a chat of another server's repo is not on this queue (quests-instance.ts).
+    if (!servesPath(s?.project_path ?? live.get(sid)?.cwd)) continue;
     const l = lines.get(sid);
     const p = withPageRun(live.get(sid) ?? null, sid, s?.session_id, s ? pageRuns.get(s.session_id) : undefined);
     const places: Place[] = [];

@@ -1,0 +1,16 @@
+[Unit]
+Description=Quests server %i (CloudCLI UI fork, quests/INTERFACE.md), its port in ~/.config/quests/%i.env
+
+[Service]
+Environment=PATH=%h/.nvm/versions/node/v22.23.3/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=%h/.config/quests/user.env
+EnvironmentFile=%h/.config/quests/%i.env
+ExecStart=/bin/bash -c 'exec "$QUESTS_CHECKOUT/scripts/start-local.sh" %i'
+Restart=on-failure
+RestartSec=3
+# The machine is shared with other chats and editors: a server never holds more than this.
+MemoryMax=2G
+MemorySwapMax=0
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,6 @@
+{
+  "name": "quests",
+  "version": "1.1.0",
+  "description": "quests for any repo with a quests.json (quests/INTERFACE.md): the reply format and chat name rules at chat start, the closing-line check at every stop, and the skill finalize-chat. Every hook runs the live code of the quests server that serves the repo, so the copy Claude Code caches holds no code that can go stale.",
+  "hooks": "./hooks/hooks.json"
+}

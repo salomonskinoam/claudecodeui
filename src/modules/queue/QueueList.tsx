@@ -17,7 +17,7 @@ import { useLineDrag } from '@/modules/queue/useLineDrag';
 import { useOpenEntry } from '@/modules/queue/useOpenEntry';
 
 type QueueListProps = {
-  /** The sidebar's search box: only the lines whose name, title, ticket number or world contain it, every drawer open. */
+  /** The sidebar's search box: only the lines whose name, title, ticket number or area contain it, every drawer open. */
   filter: string;
   onNewSession: () => void;
 };
@@ -32,7 +32,7 @@ export default function QueueList({ filter, onNewSession }: QueueListProps) {
   const queue = useQueue();
   const view = useQueueView();
   const q = filter.trim().toLowerCase();
-  const hit = (e: QueueEntry) => [e.title, e.ticketTitle, e.number !== null ? `#${e.number}` : '', e.world, e.closingLine].filter(Boolean).join(' ').toLowerCase().includes(q);
+  const hit = (e: QueueEntry) => [e.title, e.ticketTitle, e.number !== null ? `#${e.number}` : '', e.area, e.closingLine].filter(Boolean).join(' ').toLowerCase().includes(q);
   const show = (xs: QueueEntry[]) => (q ? xs.filter(hit) : xs);
   const { mode } = view;
   const [lines, active, hold, unclaimed, archived] = [view.lines, view.active, view.hold, view.unclaimed, view.archived].map(show);

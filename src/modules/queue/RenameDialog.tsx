@@ -34,7 +34,7 @@ export default function RenameDialog({ sessionId, current, onDone }: { sessionId
           onKeyDown={(event) => { if (event.key === 'Enter') save(); }}
           className="mt-3 w-full rounded-sm border border-[#454647] bg-[#161718] px-3 py-2 text-[14px] text-[#cccccc] outline-none focus:border-[#3794ff]"
         />
-        <p className="mt-2 text-[13px] leading-relaxed text-[#9a9a9a]">The chats' format is "mon_dd world two words", plus " #ticket" for a ticket's chat.</p>
+        <p className="mt-2 text-[13px] leading-relaxed text-[#9a9a9a]">The chats' format is "mon_dd area two words" (the area is one of the repo's areas), plus " #ticket" for a ticket's chat.</p>
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" className={secondary} disabled={busy} onClick={onDone}>Cancel</button>
           <button type="button" className={primary} disabled={busy || !name.trim()} onClick={save}>Save</button>

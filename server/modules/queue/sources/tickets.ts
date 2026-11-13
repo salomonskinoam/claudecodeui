@@ -1,4 +1,5 @@
-import { TICKETS_REPO, gh } from '@/modules/queue/gh.js';
+import { questsUser } from '@/shared/quests-instance.js';
+import { ticketsRepo, gh } from '@/modules/queue/gh.js';
 
 /**
  * quests priority queue, source: the open tickets. One paged GraphQL call every 15 seconds keeps them in memory;
@@ -31,7 +32,7 @@ export const getTickets = () => tickets;
 const section = (body: string, name: string): string =>
   body.match(new RegExp(`## ${name}([\\s\\S]*?)(\\n## |$)`))?.[1] ?? '';
 
-const QUERY = `query($cursor: String) { repository(owner: "salomonskinoam", name: "tickets") {
+const QUERY = `query($owner: String!, $name: String!, $cursor: String) { repository(owner: $owner, name: $name) {
   issues(states: OPEN, first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes {
     number title url body createdAt labels(first: 20) { nodes { name } } parent { number state }
     comments(last: 50) { nodes { body createdAt } } } } } }`;
@@ -46,7 +47,8 @@ export async function refreshTickets(): Promise<void> {
   const nodes: IssueNode[] = [];
   let cursor: string | null = null;
   do {
-    const stdout = await gh(['api', 'graphql', '-f', `query=${QUERY}`, ...(cursor ? ['-f', `cursor=${cursor}`] : [])], 64 * 1024 * 1024);
+    const [owner, name] = ticketsRepo().split('/');
+    const stdout = await gh(['api', 'graphql', '-f', `query=${QUERY}`, '-f', `owner=${owner}`, '-f', `name=${name}`, ...(cursor ? ['-f', `cursor=${cursor}`] : [])], 64 * 1024 * 1024);
     const page = JSON.parse(stdout).data.repository.issues;
     nodes.push(...page.nodes);
     cursor = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
@@ -79,7 +81,7 @@ export type CloseChoice = 'close' | 'blockers-to-quest' | 'blockers-to-sidequest
 
 /** Closes a ticket from the page, after doing what `choice` says with its open blockers. */
 export async function closeTicket(number: number, choice: CloseChoice): Promise<void> {
-  const R = ['-R', TICKETS_REPO];
+  const R = ['-R', ticketsRepo()];
   const toKind = choice === 'blockers-to-quest' ? 'quest' : choice === 'blockers-to-sidequest' ? 'sidequest'
     : choice.startsWith('kind:') ? choice.slice(5) : null;
   for (const b of openBlockersOf(number)) {
@@ -87,7 +89,7 @@ export async function closeTicket(number: number, choice: CloseChoice): Promise<
     if (choice === 'close-blockers') await gh(['issue', 'close', String(b), ...R]);
   }
   const when = new Date().toLocaleString('sv-SE').slice(0, 16);
-  await gh(['issue', 'comment', String(number), ...R, '--body', `Closed from the quests page by Noam, ${when}.`]);
+  await gh(['issue', 'comment', String(number), ...R, '--body', `Closed from the quests page by ${questsUser()}, ${when}.`]);
   await gh(['issue', 'close', String(number), ...R]);
   await refreshTickets();
 }

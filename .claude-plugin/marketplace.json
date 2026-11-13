@@ -1,0 +1,14 @@
+{
+  "name": "quests",
+  "description": "quests: the chat queue page and its server. A repo turns the plugin on to put its chats on a quests server.",
+  "owner": {
+    "name": "quests"
+  },
+  "plugins": [
+    {
+      "name": "quests",
+      "source": "./quests/plugin",
+      "description": "The reply format, the chat name, the listeners and the finalize skill of a quests server, for any repo with a quests.json (quests/INTERFACE.md)."
+    }
+  ]
+}

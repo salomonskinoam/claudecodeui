@@ -10,7 +10,9 @@ import { queueDb } from '@/modules/database/index.js';
  */
 
 const CLOSING = /^(waiting for|question|blocker|done)\b[ :]*(.+)$/i;
-const FINALIZE = '<command-name>/finalize-chat</command-name>';
+// The skill is quests:finalize-chat since quests became a plugin; chats finalized before that ran finalize-chat.
+const FINALIZE_NAMES = ['quests:finalize-chat', 'finalize-chat'];
+const FINALIZE_COMMANDS = FINALIZE_NAMES.map((n) => `<command-name>/${n}</command-name>`);
 // A /finalize-chat run writes a lot (merges, audits): the command can sit hundreds of KB before the end
 // (371 KB on 2026-10-14's "oct_12 Argus and rubrics before delivery"), so read 8 MB back.
 const TAIL_BYTES = 8 * 1024 * 1024;
@@ -130,16 +132,16 @@ function parse(line: string): Record<string, any> | null {
  * that talk about it), or the chat invoked the finalize-chat skill by words (a Skill tool call; the "oct_27 grpo
  * dupe check #45" chat finalized that way and stayed listed).
  */
-const FINALIZE_SKILL = '"skill":"finalize-chat"';
+const FINALIZE_SKILLS = FINALIZE_NAMES.map((n) => `"skill":"${n}"`);
 const isFinalizeCommand = (line: string): boolean => {
-  if (line.includes(FINALIZE) && line.includes('"type":"user"')) {
+  if (FINALIZE_COMMANDS.some((c) => line.includes(c)) && line.includes('"type":"user"')) {
     const row = parse(line);
-    return row?.type === 'user' && typeof row.message?.content === 'string' && row.message.content.includes(FINALIZE);
+    return row?.type === 'user' && typeof row.message?.content === 'string' && FINALIZE_COMMANDS.some((c) => row.message.content.includes(c));
   }
-  if (line.includes(FINALIZE_SKILL) && line.includes('"name":"Skill"')) {
+  if (FINALIZE_SKILLS.some((k) => line.includes(k)) && line.includes('"name":"Skill"')) {
     const row = parse(line);
     return row?.type === 'assistant' && (row.message?.content ?? []).some(
-      (b: { type: string; name?: string; input?: { skill?: string } }) => b.type === 'tool_use' && b.name === 'Skill' && b.input?.skill === 'finalize-chat',
+      (b: { type: string; name?: string; input?: { skill?: string } }) => b.type === 'tool_use' && b.name === 'Skill' && FINALIZE_NAMES.includes(b.input?.skill ?? ''),
     );
   }
   return false;

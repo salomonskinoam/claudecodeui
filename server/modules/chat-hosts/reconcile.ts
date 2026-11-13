@@ -1,4 +1,5 @@
 import type { ChatHostRow, ListenerRow } from '@/modules/database/index.js';
+import { questsTz } from '@/shared/quests-instance.js';
 import type { ChatMark } from '@/shared/runtime-state.js';
 
 /**
@@ -66,7 +67,7 @@ export type Action =
   | { kind: 'start'; sessionId: string };
 
 const at = (iso: string | null): number => (iso ? Date.parse(iso) : 0);
-const time = (ms: number): string => new Date(ms).toLocaleString('en-GB', { timeZone: 'America/Asuncion', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const time = (ms: number): string => new Date(ms).toLocaleString('en-GB', { timeZone: questsTz(), day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 export function wakeText(endedAt: number): string {
   return `Message from the quests manager: your process ended at ${time(endedAt)} (a crash or a reboot). Its subagents, background commands, monitors and workflows died with it. Check what still runs, start again what you need, and continue what you were doing.`;

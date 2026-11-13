@@ -5,6 +5,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 
 import { getConnection, sessionsDb } from '@/modules/database/index.js';
+import { manifestOf } from '@/shared/quests-repo.js';
 import { logEvent } from '@/modules/events/index.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
@@ -23,7 +24,8 @@ type Row = { side_session_id: string; session_id: string; turns: string };
 // While it answers: the seconds since Send, and the thinking and text streamed so far (Noam, 11 Nov: "it took a
 // while with no liveness indication").
 type Live = { startedAt: number; thinking: string; text: string };
-export type About = { turns: Turn[]; busy: boolean; error: string | null; seconds: number | null; thinking: string; text: string };
+/** `question`: the first question the drawer offers, the chat's repo's drawer_question (quests/INTERFACE.md). */
+export type About = { turns: Turn[]; busy: boolean; error: string | null; seconds: number | null; thinking: string; text: string; question: string };
 
 const SIDE = 'This message is a side question asked from the quests page about this conversation. You have no tools: '
   + 'answer in words only, from what the conversation holds. Write no Summary, no "Running" line, no "Required from '
@@ -54,7 +56,14 @@ export function getAbout(sessionId: string): About {
     seconds: live ? Math.round((Date.now() - live.startedAt) / 1000) : null,
     thinking: live?.thinking ?? '',
     text: live?.text ?? '',
+    question: drawerQuestion(sessionId),
   };
+}
+
+function drawerQuestion(sessionId: string): string {
+  const path = sessionsDb.getSessionById(sessionId)?.project_path;
+  const manifest = path ? manifestOf(path) : null;
+  return manifest?.drawer_question ?? '';  // a repo that did not turn quests on offers no first question
 }
 
 async function run(sessionId: string, text: string, fresh: boolean, live: Live): Promise<void> {

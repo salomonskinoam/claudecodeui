@@ -10,7 +10,7 @@ Three things exist, each with one home, and the views read them.
 | Thing | What it is | Home | Who reads it |
 |---|---|---|---|
 | Chats | One record per chat this machine knows: its name, its running process (if any), where it is open right now (Cursor, the Claude desktop app, a terminal, this page), its last closing line, whether /finalize-chat ran. A chat is open when a process runs it or a tab holds it somewhere. | `server/modules/queue/chats.ts`, joined on every read from the readers in `sources/` | The queue (its entries, the open group, read-only in the page) and the status dots (`/api/quests/live`) |
-| Tickets | The open GitHub issues of salomonskinoam/tickets, with their kind, parent, blocks and claims | `server/modules/queue/sources/tickets.ts` | The queue |
+| Tickets | The open GitHub issues of the user's tickets repo (`TICKETS_REPO`, `INTERFACE.md`), with their kind, parent, blocks and claims | `server/modules/queue/sources/tickets.ts` | The queue |
 | The queue | The entries (a ticket with its claiming chat, or a chat without a ticket), the stored order with the "on top" mark, and the rules (`queue-order.ts`) that give the view | `server/modules/queue/queue.service.ts` | The list and the forest in the sidebar; the tab rows, for a tab's color, sign and hover |
 | The dismissals | Which reply of which chat Noam dismissed (the trash icon): the chat is hidden while that reply is its last one | `server/modules/queue/dismissals.ts`, in the local database | The entries (`waitsForMe`) |
 | The family colors | Which color each family wears: the palette, the rule (a pure function, `assignColors`) and the memory in the browser that keeps a color for good | `src/modules/queue/familyColors.ts`, test `src/modules/queue/tests/familyColors.test.ts` | The list, the forest and the tab rows, by a root key lookup only |
@@ -37,20 +37,22 @@ and the entries, never a source. On the page (`src/modules/queue/`), each piece 
 
 | Path | What | Installed as |
 |---|---|---|
-| `system/quests-ui.service` | The page's server as a user service, on 127.0.0.1:3001, started at login | Link: `~/.config/systemd/user/quests-ui.service`, enabled (`default.target.wants`) |
-| `../scripts/start-chat.sh` | One chat's service, `quests-chat-<page session id>`, started by the page server's manager (`server/modules/chat-hosts`) with systemd-run from the newest build in `~/.local/share/quests/builds/current`. Restarting quests-ui.service never stops a chat. Record table `chat_hosts` | Started on demand |
-| `bin/quests-listen` | Starts a listener for a chat as its own unit `quests-listen-<id>`; the manager sends the chat its result and starts it again after a reboot | `quests-listen <chat id> <name> -- <command>` |
+| `system/quests-ui@.service` | One quests server as a user service, `quests-ui@<instance>`, its port and repos in `~/.config/quests/<instance>.env` (`INTERFACE.md`), capped at 2 GB, started at login | Link: `~/.config/systemd/user/quests-ui@.service`; `default.target.wants/quests-ui@<instance>.service` links to it |
+| `../scripts/start-chat.sh` | One chat's service, `<prefix>-chat-<page session id>`, started by the page server's manager (`server/modules/chat-hosts`) with systemd-run from the newest build in `~/.local/share/<prefix>/builds/current`. Restarting quests-ui@<instance>.service never stops a chat. Record table `chat_hosts` | Started on demand |
+| `bin/quests-listen` | Starts a listener for a chat as its own unit `<prefix>-listen-<id>`; the manager sends the chat its result and starts it again after a reboot | `quests-listen <chat id> <name> -- <command>` |
 | `system/quests-ide.desktop` | "Quests IDE": the page in its own Firefox window (profile `quests-ide`, window class `QuestsIDE`), rainbow icon | Link: `~/.local/share/applications/quests-ide.desktop` |
-| `../scripts/start-local.sh` | Starts the server (used by the service) | |
+| `../scripts/start-local.sh` | Starts one server, `start-local.sh <instance>` (used by the service) | |
 | `../scripts/quests-update.sh` | The in-app Update: merges the original project's newest release into ours, rebuilds, pushes, restarts; rolls back on failure | Run by the page's Update button |
 | `tests/headless.cjs` | Headless checks of the running page: live feed, pin, bottom, fast scroll, tabs, mode, plan, and the priority queue (queue, drag, next, latch, readonly, forest, ticketchat) | `node quests/tests/headless.cjs <check> <sessionId>` |
 | `tools/set_window_class.py` | Gives an open X11 window the `QuestsIDE` class | |
 | `tools/mockup.py` | The first throwaway mockup of the chat graph page | |
-| `hooks/queue_start.sh` | Priority queue: at every chat start, the closing-line rule, the chat's family, and (fresh start) the name rule | `~/.claude/settings.json`, SessionStart |
-| `hooks/queue_stop.sh` | Priority queue: sends a reply without its closing line back to the chat once | `~/.claude/settings.json`, Stop |
+| `hooks/` | The hooks of the plugin: `queue_start.sh` (the rules at chat start), `queue_stop.sh` (a reply without its closing line goes back once), `rules.sh` (the reply format) | `plugin/hooks/hooks.json`, through `plugin/run.sh` |
+| `plugin/` | The Claude Code plugin `quests@quests`: hooks and the skill finalize-chat | `claude plugin install quests@quests --scope user` (`INTERFACE.md`) |
+| `lib/quests_env.py` | Which server a folder belongs to, and its environment | |
+| `INTERFACE.md` | The contract between quests, the user and a repo | |
 | `tools/rename_chat.mjs` | Names a chat in the one format, or lets Claude Haiku choose (`--haiku <text>`) | `node quests/tools/rename_chat.mjs <session id> "<name>"` |
 | `tests/api.cjs` | Calls the running page's API as the user, for checks | `node quests/tests/api.cjs GET /api/quests/queue` |
 | `priority-queue/` | The priority queue's requirements (Noam's words verbatim) and plan | |
 | `examples/` | Use-case examples for the chat management design (side quest) | |
 
-Setting up a new machine: clone, `npm install && npm run build`, `git remote add upstream https://github.com/siteboon/claudecodeui.git && git fetch upstream --tags`, then create the two links above, `systemctl --user daemon-reload`, `systemctl --user enable --now quests-ui.service`.
+Setting up a new machine: clone, `npm install`, write `~/.config/quests/user.env` and one `<instance>.env` per server (`INTERFACE.md`), `npm run build`, `git remote add upstream https://github.com/siteboon/claudecodeui.git && git fetch upstream --tags`, link `system/quests-ui@.service` into `~/.config/systemd/user/`, `systemctl --user daemon-reload`, start `quests-ui@<instance>` and link it into `default.target.wants`, then install the plugin (`INTERFACE.md`).

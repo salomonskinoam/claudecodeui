@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-/** The tickets repository (GitHub issues of kind quest, sidequest, blocker) and the one way the queue talks to it. */
-export const TICKETS_REPO = 'salomonskinoam/tickets';
+/** The user's tickets repository (GitHub issues of kind quest, sidequest, blocker; quests/INTERFACE.md), and the one way the queue talks to it. */
+export { ticketsRepo } from '@/shared/quests-instance.js';
 
 const run = promisify(execFile);
 

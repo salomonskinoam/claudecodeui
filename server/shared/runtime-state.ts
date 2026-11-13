@@ -3,6 +3,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
+import { unitPrefix } from '@/shared/quests-instance.js';
 import type { BackgroundTaskSummary, LLMProvider } from '@/shared/types.js';
 
 /**
@@ -12,9 +13,10 @@ import type { BackgroundTaskSummary, LLMProvider } from '@/shared/types.js';
  * that asks "is this chat running" reads the copy.
  */
 /** quests: each chat service (server/runner.ts with QUESTS_CHAT set) listens on its own socket in this folder. */
-export const CHATS_DIR = path.join(process.env.XDG_RUNTIME_DIR ?? os.tmpdir(), 'quests');
-export const chatSocket = (sessionId: string): string => path.join(CHATS_DIR, `chat-${sessionId}.sock`);
-export const chatUnit = (sessionId: string): string => `quests-chat-${sessionId}`;
+/** One folder per server (quests-instance.ts unitPrefix), so a server reads only its own chats' sockets. */
+export const chatsDir = (): string => path.join(process.env.XDG_RUNTIME_DIR ?? os.tmpdir(), unitPrefix());
+export const chatSocket = (sessionId: string): string => path.join(chatsDir(), `chat-${sessionId}.sock`);
+export const chatUnit = (sessionId: string): string => `${unitPrefix()}-chat-${sessionId}`;
 
 export type RuntimeRun = {
   sessionId: string;
@@ -63,7 +65,7 @@ export const isUnanswering = (sessionId: string): boolean => timedOut.has(sessio
 /** The page session ids of the chat services with a socket file (a crashed one leaves its file behind). */
 export const chatSocketIds = (): string[] => {
   try {
-    return fs.readdirSync(CHATS_DIR).filter((f) => f.startsWith('chat-') && f.endsWith('.sock')).map((f) => f.slice(5, -5));
+    return fs.readdirSync(chatsDir()).filter((f) => f.startsWith('chat-') && f.endsWith('.sock')).map((f) => f.slice(5, -5));
   } catch {
     return [];
   }

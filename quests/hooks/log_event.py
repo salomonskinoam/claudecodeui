@@ -11,7 +11,9 @@ import sys
 
 source, kind, session = sys.argv[1], sys.argv[2], sys.argv[3] or None
 detail = json.loads(sys.argv[4]) if len(sys.argv) > 4 else {}
-db = sqlite3.connect(os.path.expanduser('~/.cloudcli/auth.db'), timeout=10)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
+from quests_env import current  # noqa: E402
+db = sqlite3.connect(current()['DATABASE_PATH'], timeout=10)
 at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 with db:
     db.execute('INSERT INTO ui_events (at, source, kind, session_id, detail) VALUES (?, ?, ?, ?, ?)',

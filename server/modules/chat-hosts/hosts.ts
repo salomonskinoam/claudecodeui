@@ -49,7 +49,7 @@ export function ensureHost(sessionId: string): Promise<void> {
   const p = (async () => {
     if (await socketAnswers(chatSocket(sessionId))) return;
     if (!(await unitActive(sessionId))) {
-      await run('systemd-run', ['--user', '--collect', '--unit', chatUnit(sessionId), `--description=quests chat ${sessionId}`, START_SCRIPT, sessionId]);
+      await run('systemd-run', ['--user', '--collect', '--unit', chatUnit(sessionId), `--description=quests chat ${sessionId}`, `--setenv=QUESTS_INSTANCE=${process.env.QUESTS_INSTANCE}`, START_SCRIPT, sessionId]);
     }
     for (let i = 0; i < 300; i += 1) {
       if (await socketAnswers(chatSocket(sessionId))) {

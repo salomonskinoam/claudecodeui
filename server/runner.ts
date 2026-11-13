@@ -23,7 +23,7 @@ import {
   listClaudeSDKTurnsInFlight,
   providerRuntimeService,
 } from '@/modules/providers/index.js';
-import { CHATS_DIR, chatSocket, chatUnit, type RuntimeState } from '@/shared/runtime-state.js';
+import { chatsDir, chatSocket, chatUnit, type RuntimeState } from '@/shared/runtime-state.js';
 import { initializeScheduledMessageDispatcher } from '@/modules/scheduled-messages/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
@@ -114,7 +114,7 @@ async function start(): Promise<void> {
   });
 
   const socket = chatSocket(CHAT);
-  fs.mkdirSync(CHATS_DIR, { recursive: true, mode: 0o700 });
+  fs.mkdirSync(chatsDir(), { recursive: true, mode: 0o700 });
   fs.rmSync(socket, { force: true });
   server.listen(socket, () => {
     fs.chmodSync(socket, 0o600);

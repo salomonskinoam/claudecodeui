@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# quests: set up a tickets repo once (quests/INTERFACE.md): the kind labels and priority-high, plus one label per
+# area given. Safe to run twice. The queue-state branch is made by the server on its first order backup
+# (server/modules/queue/mirror.ts); the repo needs one commit for it (gh repo create --add-readme).
+# Usage: quests-init-tickets <owner/name> [<area> ...]
+set -eu
+R="${1:?usage: quests-init-tickets <owner/name> [<area> ...]}"; shift
+label() { gh label create "$1" -R "$R" --color "$2" --force >/dev/null; echo "label $1"; }
+label quest 0e8a16
+label sidequest c5def5
+label blocker d93f0b
+label priority-high b60205
+for area in "$@"; do label "$area" ededed; done
