@@ -9,15 +9,14 @@ chats = json.loads(subprocess.run(["claude", "agents", "--json"], capture_output
 
 # mock quests, keyed to real chat names where they exist
 QUESTS = {
-    "oct_07 rag4_ideation": dict(kind="main quest", status="waiting on you", prio="P0",
-        children=[dict(title="side quest: keyed id shuffle into the SDK", kind="side quest",
+    "oct_07 search_design": dict(kind="main quest", status="waiting on you", prio="P0",
+        children=[dict(title="side quest: one shared id shuffle", kind="side quest",
                        status="not started", prio="P1")]),
     "oct_7 chat management": dict(kind="main quest", status="in progress", prio="P2", children=[]),
 }
-NEEDS_YOU = dict(chat="oct_07 rag4_ideation", prio="P0", title="rag4: a clearer name for the per-round runner",
-    context="The server code that runs the student's code once per round (start a fresh sandboxed process, "
-            "hand it the round's inputs, take back its one output, end the process) needs a clearer name.")
-BACKLOG = [("P2", "labelnoise: ablation wave candidates"), ("P3", "distill: discuss the badly evaluated runs")]
+NEEDS_YOU = dict(chat="oct_07 search_design", prio="P0", title="search: a clearer name for the per-round runner",
+    context="The server code that runs one job per round needs a clearer name.")
+BACKLOG = [("P2", "api: speed up the search"), ("P3", "docs: discuss the failed runs")]
 
 def esc(s): return html.escape(str(s))
 def start_link(title): return OPEN + "prompt=" + quote(f"MOCKUP TEST from the quests page, do nothing: {title}")

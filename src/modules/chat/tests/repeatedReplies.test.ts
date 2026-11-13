@@ -30,7 +30,7 @@ test('step 1: starters and turns', () => {
 });
 
 test('step 2: the state of a reply is what it asks of Noam', () => {
-  assert.equal(replyState(`rag-hotpot-base completed.\n\n${STATE}`), replyState(`I restarted the watcher.\n${STATE2}`));
+  assert.equal(replyState(`search-base completed.\n\n${STATE}`), replyState(`I restarted the watcher.\n${STATE2}`));
   assert.notEqual(replyState(`x\nRequired from you: nothing.\nwaiting for y`), replyState(`x\nRequired from you: item 3.\nquestion the restart`));
   assert.notEqual(replyState(`x\nRequired from you: item 3.\nquestion the restart`), replyState(`x\nRequired from you: item 3.\nquestion the lock`));
   assert.equal(replyState('second done'), 'second done');
@@ -40,9 +40,9 @@ test('step 3: only turns Noam did not start fold, all but the last of a run with
   const m = [
     typed('t0', 'watch the runs'),
     reply('t1', `started.\n${STATE}`), // the answer to Noam's message: never folds
-    report('t2'), tool('t3'), reply('t4', `rag completed.\n${STATE}`),
+    report('t2'), tool('t3'), reply('t4', `search completed.\n${STATE}`),
     report('t5'), reply('t6', `restarted the watcher.\n${STATE2}`),
-    report('t7'), reply('t8', `rag graded.\n${STATE}`),
+    report('t7'), reply('t8', `search graded.\n${STATE}`),
     report('t9'), reply('t10', 'all back.\nRunning: nothing.\nRequired from you: nothing.\nDone the catalogue.'),
     typed('t11', 'thanks'),
     reply('t12', 'ok.\nRunning: nothing.\nRequired from you: nothing.\nDone the catalogue.'),
@@ -57,7 +57,7 @@ test('step 3: only turns Noam did not start fold, all but the last of a run with
 });
 
 test('step 3: a turn the hook forced is no reply; agents and listeners join a run; a woken turn without a reply is skipped', () => {
-  const agent = (ts: string): ChatMessage => ({ id: ts, type: 'assistant', agentReportFrom: 'noam-worlds-cf', content: 'sdk notice', timestamp: ts } as ChatMessage);
+  const agent = (ts: string): ChatMessage => ({ id: ts, type: 'assistant', agentReportFrom: 'main-cf', content: 'sdk notice', timestamp: ts } as ChatMessage);
   const m = [
     typed('t0', 'brief'),
     reply('t1', `the brief.\n${STATE}`), hook('t2'), reply('t3', `Running: nothing\n${STATE}`),
@@ -86,8 +86,8 @@ test('step 1: a finished reply starts the next woken turn, since the server does
 test('step 3: a reply the stop hook sent back folds under its rewrite', () => {
   const end = 'Running: x\nRequired from you: nothing\nwaiting for: the agents';
   const m = [
-    typed('t0', 'do the dupe analysis'), tool('t1'), reply('t2', `- **175.** "dupe analysis" started.\n${end}`),
-    hook('t3'), reply('t4', `**Summary**\n- **175.** "dupe analysis" started.\n${end}`),
+    typed('t0', 'do the analysis'), tool('t1'), reply('t2', `- **175.** "the analysis" started.\n${end}`),
+    hook('t3'), reply('t4', `**Summary**\n- **175.** "the analysis" started.\n${end}`),
   ];
   const folds = foldRepeatedReplies(m);
   assert.deepEqual([...folds.keys()].map((x) => x.timestamp), ['t2', 't3']);

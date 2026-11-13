@@ -1,6 +1,6 @@
 We are going to design, and later build, two features for quests. First we brainstorm together; you build nothing until I approve a written plan. After I approve, you build it.
 
-What quests is. "quests" is my chat-management setup: a web page on http://localhost:3001 (user service quests-ui.service) that shows my Claude Code chats, including the ones I run in Cursor. It lives entirely in one repo: ~/src/quests/claudecodeui (GitHub salomonskinoam/claudecodeui, a fork of the open-source CloudCLI UI; remote "upstream" = siteboon/claudecodeui). Nothing of it goes into the noam_worlds repo. Read first, they are short: local_features_noam.md (every feature I asked for, by behavior, built or asked) and quests/README.md (where each piece lives). There is also quests/prompts/priority-ideation.md, an earlier, broader prompt about priority; this one supersedes it for the two features below.
+What quests is. "quests" is my chat-management setup: a web page on http://localhost:3001 (user service quests-ui.service) that shows my Claude Code chats, including the ones I run in Cursor. It lives entirely in one repo: ~/src/quests/claudecodeui (GitHub salomonskinoam/claudecodeui, a fork of the open-source CloudCLI UI; remote "upstream" = siteboon/claudecodeui). Nothing of it goes into the repos it serves. Read first, they are short: local_features_noam.md (every feature I asked for, by behavior, built or asked) and quests/README.md (where each piece lives). There is also quests/prompts/priority-ideation.md, an earlier, broader prompt about priority; this one supersedes it for the two features below.
 
 The two features:
 1. A priority queue of chats that are done and wait for me. I want to always talk to the chat at the top of the queue, without wasting hours scrolling and switching between chats. The queue decides which chat needs me next; I answer it, it leaves the queue, the next one comes up.
@@ -9,7 +9,7 @@ The two features:
 What exists today that you can build on:
 - One status dot per chat, the same on tabs and in the session list: blue = waiting for me (permission prompt or question), green = running, orange = finished while not on screen and not seen since, no dot = idle and seen. Live state comes from GET /api/quests/live (server/index.ts), which reads Claude Code's own registry (~/.claude/sessions/*.json: status busy / waiting / idle, plus a waitingFor reason) for chats in Cursor or a terminal, and the page's server for chats run from the page. Polled every 2 seconds (src/shared/hooks/useLiveChats.ts).
 - Tabs per pane, a split screen, a session list on the right, a pinned last user message at the top of each chat.
-- Each chat's transcript is ~/.claude/projects/<folder>/<session>.jsonl; I name chats with rename (for example "oct_07 rag4_ideation").
+- Each chat's transcript is ~/.claude/projects/<folder>/<session>.jsonl; I name chats with rename (for example "oct_07 search_design").
 - The page already runs Claude through the Claude Agent SDK with my subscription login, so a Haiku call may be possible the same way. Check this; do not assume.
 
 Questions to settle with me before any plan:

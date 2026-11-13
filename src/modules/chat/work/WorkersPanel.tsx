@@ -16,7 +16,7 @@ import { revealLastToolRow } from '@/modules/chat/ledger/rowOpen';
 
 export type MainState = {
   state: 'answering' | 'permission' | 'question' | 'done' | 'waiting' | 'blocker' | 'idle';
-  /** The current step while answering ("Bash: python hor.py status"). */
+  /** The current step while answering ("Bash: python app.py status"). */
   step: string | null;
   /** The closing line's text for question, done, waiting and blocker. */
   text: string | null;

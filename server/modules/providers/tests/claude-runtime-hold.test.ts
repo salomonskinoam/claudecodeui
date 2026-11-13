@@ -390,8 +390,8 @@ test('quests: a message sent while the turn runs joins that turn; its tools keep
     const firstRun = queryClaudeSDK('run the checks', { sessionId: SESSION_ID, cwd }, writer as never, { ...context, createQuery: first.createQuery });
     await settle();
     first.script.emit(init());
-    first.script.emit(toolUse('toolu_bash', 'Bash', { command: 'python hor.py status', description: 'status' }));
-    await waitFor(() => sent.some((message) => message.kind === 'status' && message.text === 'Bash: python hor.py status'));
+    first.script.emit(toolUse('toolu_bash', 'Bash', { command: 'python app.py status', description: 'status' }));
+    await waitFor(() => sent.some((message) => message.kind === 'status' && message.text === 'Bash: python app.py status'));
     assert.equal(canJoinClaudeSDKTurn(SESSION_ID), true, 'the running process takes a message');
 
     let secondDone = false;
@@ -448,10 +448,10 @@ test('quests: a result that closes the turn the message was pushed into does not
 
     // The watcher reports: the CLI runs a follow-up turn, which is at its last text when the user's message lands.
     first.script.emit(taskNotification('m1', 'toolu_monitor', 'completed'));
-    first.script.emit(text('The inrun result is in.'));
-    await waitFor(() => sent.some((message) => typeof message.content === 'string' && message.content.includes('inrun result')));
+    first.script.emit(text('The build result is in.'));
+    await waitFor(() => sent.some((message) => typeof message.content === 'string' && message.content.includes('build result')));
     let secondDone = false;
-    const secondRun = queryClaudeSDK('argus must pass only if it can run', { sessionId: SESSION_ID, cwd }, writer as never, { ...context, createQuery: second.createQuery })
+    const secondRun = queryClaudeSDK('the check must pass only if it can run', { sessionId: SESSION_ID, cwd }, writer as never, { ...context, createQuery: second.createQuery })
       .then(() => { secondDone = true; });
     await waitFor(() => first.script.read.length === 2);
     first.script.emit(result());
@@ -461,9 +461,9 @@ test('quests: a result that closes the turn the message was pushed into does not
     assert.equal(secondDone, false, 'the message\'s turn has not run yet');
     assert.equal(first.script.released(), false, 'the process stays for the message\'s turn');
 
-    first.script.emit(toolUse('toolu_bash', 'Bash', { command: 'python hor.py rubrics status', description: 'rubrics' }));
+    first.script.emit(toolUse('toolu_bash', 'Bash', { command: 'python app.py report', description: 'report' }));
     first.script.emit(ack('toolu_bash', 'ok', {}));
-    first.script.emit(text('Argus passes only when it can run.'));
+    first.script.emit(text('The check passes only when it can run.'));
     first.script.emit(result());
     await waitFor(() => completes() === 2);
     await waitFor(() => secondDone);

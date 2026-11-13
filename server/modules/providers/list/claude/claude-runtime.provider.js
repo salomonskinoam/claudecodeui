@@ -1035,7 +1035,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   // quests: true from a pushed user message until the first assistant message after it. A `result` that arrives
   // in between closes the turn that was ending when the message was pushed (a follow-up turn of background work,
   // or a turn past its last model call); the message then starts the next turn, and that turn's result is the one
-  // the client waits for. Seen 2026-10-29 22:35 on "oct_28 all catalogue samples": the watcher turn's result
+  // the client waits for. Seen 2026-10-29 22:35 on "oct_28 all samples": the watcher turn's result
   // completed the user's message before the model had read it, so the page beeped and showed no work.
   let pushedAwaitingAssistant = false;
   // Set once a turn publishes a budget read from an assistant message, so the
@@ -1059,7 +1059,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       return;
     }
   }
-  // quests: a second process on one chat is a defect (seen 2026-10-29 22:11 on "oct_28 all catalogue samples");
+  // quests: a second process on one chat is a defect (seen 2026-10-29 22:11 on "oct_28 all samples");
   // this line names why the held process was passed over, so the next time it happens the cause is in the log.
   if (held) {
     console.warn(`[quests] held process of ${sessionKey()} not taken (status ${held.status}, beginTurn ${Boolean(held.beginTurn)}, cwd ${options.cwd}): a new process starts`);
@@ -1315,7 +1315,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // quests: priority "next": the CLI reads the message at its next model call, after the tool it is on.
         // Without it a message that lands while a tool call is pending cancels that tool ("The user doesn't want
         // to proceed with this tool use", "[Request interrupted by user]") and the message itself is lost, as
-        // happened on 2 Nov 23:56 in "oct_30 fusion argus-reward-hack fix".
+        // happened on 2 Nov 23:56 in "oct_30 api fix".
         return heldPrompt.push(messages.map((m) => ({ ...m, priority: 'next' })));
       }
       return new Promise((resolve) => {

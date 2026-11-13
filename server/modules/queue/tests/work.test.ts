@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { findTaskOutputFile, isTaskOutputFile, readOutputTail } from '../work.js';
 
 test('quests: only a file under a /tmp/claude-* folder is served', () => {
-  assert.equal(isTaskOutputFile('/tmp/claude-1000/-home-noam-src-noam-worlds/0fbea6ac-4450-4870-a6ab-d42aa8c20c96/tasks/bwy06286r.output'), true);
+  assert.equal(isTaskOutputFile('/tmp/claude-1000/-home-user-src-app/0fbea6ac-4450-4870-a6ab-d42aa8c20c96/tasks/bwy06286r.output'), true);
   assert.equal(isTaskOutputFile('/tmp/claude-0fbea6ac/watch_all.log'), true);
   assert.equal(isTaskOutputFile('/tmp/claude-1000/-home-noam/../../etc/passwd'), false);
   assert.equal(isTaskOutputFile('/home/noam/.claude/plans/x.md'), false);

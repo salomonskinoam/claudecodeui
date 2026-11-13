@@ -499,7 +499,7 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
     /**
      * quests: every file of the project as one flat list, for name search ("@" in the input box, the command
      * palette, file references in the chat). ripgrep lists them with the ignore rules, hidden files included and
-     * no entry cap: the tree walk above stops at 10,000 entries (noam_worlds has about 22,000 files), and then
+     * no entry cap: the tree walk above stops at 10,000 entries (a big repo has 20,000 files or more), and then
      * "@" found nothing.
      */
     async listProjectFilePaths(projectId) {

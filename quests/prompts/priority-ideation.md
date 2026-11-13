@@ -1,6 +1,6 @@
 We are ideating, not building. Your job in this chat: work out how quests should decide the priority of my chats and work items, and how the page should show that order. Deliver options and a recommendation, then stop. Do not change any code until I approve a plan.
 
-What quests is. "quests" is my chat-management setup. It lives entirely in one repo: ~/src/quests/claudecodeui (GitHub salomonskinoam/claudecodeui, a fork of the open-source CloudCLI UI, remote "upstream" = siteboon/claudecodeui). Nothing of it belongs in the noam_worlds repo. It is a web page on http://localhost:3001 (user service quests-ui.service) that shows my Claude Code chats, including the ones I run in Cursor. Read these first, they are short: local_features_noam.md (every feature I asked for, by behavior, marked built or asked) and quests/README.md (where each piece lives).
+What quests is. "quests" is my chat-management setup. It lives entirely in one repo: ~/src/quests/claudecodeui (GitHub salomonskinoam/claudecodeui, a fork of the open-source CloudCLI UI, remote "upstream" = siteboon/claudecodeui). Nothing of it belongs in the repos it serves. It is a web page on http://localhost:3001 (user service quests-ui.service) that shows my Claude Code chats, including the ones I run in Cursor. Read these first, they are short: local_features_noam.md (every feature I asked for, by behavior, marked built or asked) and quests/README.md (where each piece lives).
 
 The problem I am solving, in my own words: my mental bandwidth runs out from switching between many chats, approving each one and remembering all the details. Ideas and issues that come up inside a chat cause rabbit-holing instead of short chats that end. I want prioritization that can be set by a chat, by me manually, and automatically by an evolving, live policy, so that I only ever handle the first priority.
 
@@ -8,7 +8,7 @@ What exists today (built):
 - Session list on the right, one lean row per chat, plus tabs per pane and a split screen.
 - One status dot per chat, the same on tabs and in the list: blue = waiting for me (permission prompt or question), green = running, orange = finished while not on screen and not seen since, none = idle and seen.
 - Sources of live state: Claude Code's own registry (~/.claude/sessions/*.json, one file per live process, status busy / waiting / idle, plus a waitingFor reason) for chats in Cursor or a terminal; the page's server for chats run from the page. Merged by GET /api/quests/live, polled every 2 seconds.
-- Each chat's transcript (~/.claude/projects/<folder>/<session>.jsonl), its rename title (I name chats like "oct_07 rag4_ideation"), its last activity time, its project folder.
+- Each chat's transcript (~/.claude/projects/<folder>/<session>.jsonl), its rename title (I name chats like "oct_07 search_design"), its last activity time, its project folder.
 - A pinned last user message at the top of each chat.
 
 Asked but not built (see local_features_noam.md, rows 10 and 34 to 37):

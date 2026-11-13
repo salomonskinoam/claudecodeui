@@ -8,7 +8,7 @@ import { agentRef, monitoredFileOf, outputFileOf, outputRef, setWorkTitle, taskR
 test('quests: a work tab id round-trips its kind and ref, slashes included', () => {
   const agent = workTabId('agent', agentRef('8ade61bb-1', 'a3f9'));
   assert.deepEqual(workOf(agent), { kind: 'agent', ref: '8ade61bb-1/a3f9' });
-  const file = '/tmp/claude-1000/-home-noam-src-noam-worlds/0fbea6ac-4450-4870-a6ab-d42aa8c20c96/tasks/bwy06286r.output';
+  const file = '/tmp/claude-1000/-home-user-src-app/0fbea6ac-4450-4870-a6ab-d42aa8c20c96/tasks/bwy06286r.output';
   const output = workTabId('output', outputRef(file));
   assert.deepEqual(workOf(output), { kind: 'output', ref: file.slice(1) });
   assert.deepEqual(workOf(workTabId('task', taskRef('8ade61bb-1', 'bplomq0l1'))), { kind: 'task', ref: '8ade61bb-1/bplomq0l1' });
@@ -24,7 +24,7 @@ test('quests: the output file comes from the live task event, else from the laun
 });
 
 test('quests: a watcher opens the file it tails', () => {
-  const input = JSON.stringify({ command: 'cd /home/noam/src/x && tail -n 0 -f /tmp/claude-0fbea6ac/watch_all.log /tmp/claude-0fbea6ac/w2.log', description: 'rlhf runs' });
+  const input = JSON.stringify({ command: 'cd /home/noam/src/x && tail -n 0 -f /tmp/claude-0fbea6ac/watch_all.log /tmp/claude-0fbea6ac/w2.log', description: 'nightly runs' });
   assert.equal(monitoredFileOf({ toolName: 'Monitor', toolInput: input }), '/tmp/claude-0fbea6ac/watch_all.log');
   assert.equal(monitoredFileOf({ toolName: 'Monitor', toolInput: JSON.stringify({ command: 'python watch.py' }) }), undefined);
   assert.equal(monitoredFileOf({ toolName: 'Bash', toolInput: input }), undefined);

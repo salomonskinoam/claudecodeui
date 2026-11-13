@@ -14,7 +14,7 @@ const CLOSING = /^(waiting for|question|blocker|done)\b[ :]*(.+)$/i;
 const FINALIZE_NAMES = ['quests:finalize-chat', 'finalize-chat'];
 const FINALIZE_COMMANDS = FINALIZE_NAMES.map((n) => `<command-name>/${n}</command-name>`);
 // A /finalize-chat run writes a lot (merges, audits): the command can sit hundreds of KB before the end
-// (371 KB on 2026-10-14's "oct_12 Argus and rubrics before delivery"), so read 8 MB back.
+// (371 KB on 2026-10-14's "oct_12 review before delivery"), so read 8 MB back.
 const TAIL_BYTES = 8 * 1024 * 1024;
 
 const titles = new Map<string, string>();
@@ -129,8 +129,8 @@ function parse(line: string): Record<string, any> | null {
 
 /**
  * The chat was finalized: a user turn ran the /finalize-chat command (the text alone also appears in replies
- * that talk about it), or the chat invoked the finalize-chat skill by words (a Skill tool call; the "oct_27 grpo
- * dupe check #45" chat finalized that way and stayed listed).
+ * that talk about it), or the chat invoked the finalize-chat skill by words (a Skill tool call; the "oct_27 api
+ * cleanup #45" chat finalized that way and stayed listed).
  */
 const FINALIZE_SKILLS = FINALIZE_NAMES.map((n) => `"skill":"${n}"`);
 const isFinalizeCommand = (line: string): boolean => {

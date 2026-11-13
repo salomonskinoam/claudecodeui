@@ -53,6 +53,6 @@ and the entries, never a source. On the page (`src/modules/queue/`), each piece 
 | `tools/rename_chat.mjs` | Names a chat in the one format, or lets Claude Haiku choose (`--haiku <text>`) | `node quests/tools/rename_chat.mjs <session id> "<name>"` |
 | `tests/api.cjs` | Calls the running page's API as the user, for checks | `node quests/tests/api.cjs GET /api/quests/queue` |
 | `priority-queue/` | The priority queue's requirements (Noam's words verbatim) and plan | |
-| `examples/` | Use-case examples for the chat management design (side quest) | |
+| `examples/` | A use-case example for the chat management design (side quest) | |
 
 Setting up a new machine: clone, `npm install`, write `~/.config/quests/user.env` and one `<instance>.env` per server (`INTERFACE.md`), `npm run build`, `git remote add upstream https://github.com/siteboon/claudecodeui.git && git fetch upstream --tags`, link `system/quests-ui@.service` into `~/.config/systemd/user/`, `systemctl --user daemon-reload`, start `quests-ui@<instance>` and link it into `default.target.wants`, then install the plugin (`INTERFACE.md`).

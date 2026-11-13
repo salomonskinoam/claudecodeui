@@ -74,7 +74,7 @@ One pure function `decide(rows, units, listeners, now) → actions`, in `server/
   command with its output in `~/.local/state/quests/listeners/<id>.log`, then writes `ended_at` and `exit_code`.
   Python 3 stdlib (`sqlite3`), no new dependency.
 - A listener must be safe to start again (a poll loop is). The command's help says so.
-- A quests SessionStart hook tells every chat its id and the command. Nothing goes into noam_worlds.
+- A quests SessionStart hook tells every chat its id and the command. Nothing goes into the repo the chat works in.
 
 ### Dots
 

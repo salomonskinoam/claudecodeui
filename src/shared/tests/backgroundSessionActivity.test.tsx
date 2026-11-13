@@ -138,13 +138,13 @@ test('a message sent into a running turn keeps the tool as the step and counts a
   const { result } = renderHook(() => useSessionProtection());
   act(() => {
     result.current.markSessionProcessing('session-1', { canInterrupt: true, joins: true });
-    result.current.markSessionProcessing('session-1', { statusText: 'Bash: python hor.py status' });
+    result.current.markSessionProcessing('session-1', { statusText: 'Bash: python app.py status' });
   });
   act(() => {
     result.current.markSessionProcessing('session-1', { canInterrupt: true, joins: true });
   });
   let activity = result.current.getSessionActivity('session-1');
-  assert.equal(activity?.statusText, 'Bash: python hor.py status', 'the tool keeps running: it stays the step');
+  assert.equal(activity?.statusText, 'Bash: python app.py status', 'the tool keeps running: it stays the step');
   assert.equal(activity?.queued, 1);
   // The tool's result is in: the chat reads the message now.
   act(() => {
